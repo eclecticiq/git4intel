@@ -9,3 +9,8 @@ ToDo
 * Create facility for adding further commits from other direct creation identity objects (commits x)
 * Establish use cases for 'end goal' data 'molecules'
 * Establish methods for moving from one to the other.
+
+General Notes:
+* Never delete or revoke entities unless the original source instructs to do so
+* Need a `x_eiq_head` custom stix field on the 'latest' entities to be correlated to the complete (raw) landscape. This is _not_ the overall summarised threat picture as that differs from query to query
+* When a user queries for intelligence, what they see is a summarised picture based on who they are and what they are querying for - by default run on all entities with `x_eiq_head == true`. Running on `false` would be for historic queries - more complex and requires tree walking to figure out if there are conflicts between maerges...but should be fine since deleting is no longer an issue (though have to decide whether referencing a 'replaced' entity is ok...or how that is represented in the translation layer)
