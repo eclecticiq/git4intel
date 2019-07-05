@@ -14,6 +14,9 @@ sub_properties = [
     'oneOf',
 ]
 
+data_types = {
+    'array'
+}
 
 def find(name, path):
     for root, dirs, files in os.walk(path):
@@ -48,6 +51,7 @@ def property_to_mapping(prop_list):
         for prop in props:
 
             if prop == 'id':
+                mappings.append([prop, 'identifier'])
                 break
 
             try:
@@ -55,9 +59,9 @@ def property_to_mapping(prop_list):
 
                 if prop_type == 'array':
                     try:
-                        out_prop_type = str(prop_type) + \
-                            '|' + str(props[prop]['items']['type'])
-                        mappings.append([prop, out_prop_type])
+                        # This will fail if it is a complex array...
+                        out_prop_type = props[prop]['items']['type']
+                        mappings.append([prop, 'nested'])
                     except KeyError:
                         refs = extract_values(props[prop]['items'], '$ref')
                         for ref in refs:
@@ -90,11 +94,44 @@ def resolve_ref(ref):
     with open(abs_path) as json_data:
         data = json.load(json_data)
         try:
+            if data['type'] == 'object':
+                raise KeyError('Schema needs deep inspection...')
             mappings = [data['title'], data['type']]
         except KeyError:
             properties = extract_values(data, "properties")
             mappings = property_to_mapping(properties)
     return mappings
+
+
+def map_simple_to_elk(simple_mappings):
+    elk_mappings = {}
+    for simple_mapping in simple_mappings:
+        index_name = str(simple_mapping).split('/')[-1].split('.')[0]
+        elk_mappings[index_name] = {
+            "mappings": {
+                "properties": {
+                }
+            }
+        }
+        # Might have to reorder this to get Nested vs Object mappings the right way around
+        for field in simple_mappings[simple_mapping]:
+            if field[0] == 'kill_chain_phases' or field[0] == 'granular_markings':
+                elk_mappings[index_name]['mappings'][field[0]] = {
+                    'properties': {
+                    }
+                }
+                for sub_field in field[1]:
+                    print field
+                    elk_mappings[index_name]['mappings'][field[0]]['properties'][sub_field[0]] = sub_field[1]
+            elif type(field[1]) is list:
+                elk_mappings[index_name]['mappings']['properties'][field[0]] = {
+                    'type': 'nested'
+                }
+            else:
+                elk_mappings[index_name]['mappings']['properties'][field[0]] = {
+                    'type': field[1]
+                }
+    return elk_mappings
 
 
 def main():
@@ -109,8 +146,14 @@ def main():
                 data = json.load(json_data)
                 properties = extract_values(data, "properties")
                 mappings = property_to_mapping(properties)
+                core_refs = resolve_ref("../common/core.json")
+                for core_ref in core_refs:
+                    mappings.append(core_ref)
                 schema_field_list[data['id']] = mappings
-    pprint(schema_field_list)
+    # pprint(schema_field_list)
+
+    elk_mappings = map_simple_to_elk(schema_field_list)
+    pprint(elk_mappings)
 
 
 if __name__ == "__main__":
