@@ -1,0 +1,69 @@
+{
+    "mapping": {
+        "properties": {
+            "description": {
+                "type": "text"
+            }, 
+            "revoked": {
+                "type": "boolean"
+            }, 
+            "created": {
+                "type": "date"
+            }, 
+            "granular_markings": {
+                "type": "nested", 
+                "properties": {
+                    "marking_ref": {
+                        "type": "keyword"
+                    }, 
+                    "selectors": {
+                        "type": "keyword"
+                    }
+                }
+            }, 
+            "labels": {
+                "type": "keyword"
+            }, 
+            "kill_chain_phases": {
+                "type": "nested", 
+                "properties": {
+                    "phase_name": {
+                        "type": "text"
+                    }, 
+                    "kill_chain_name": {
+                        "type": "text"
+                    }
+                }
+            }, 
+            "modified": {
+                "type": "date"
+            }, 
+            "object_marking_refs": {
+                "type": "keyword"
+            }, 
+            "external_references": {
+                "type": "nested", 
+                "properties": {
+                    "external_id": {
+                        "type": "text"
+                    }, 
+                    "source_name": {
+                        "type": "text"
+                    }, 
+                    "description": {
+                        "type": "text"
+                    }
+                }
+            }, 
+            "type": {
+                "type": "keyword"
+            }, 
+            "id": {
+                "type": "keyword"
+            }, 
+            "name": {
+                "type": "text"
+            }
+        }
+    }
+}

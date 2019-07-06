@@ -1,0 +1,64 @@
+{
+    "mapping": {
+        "properties": {
+            "revoked": {
+                "type": "boolean"
+            }, 
+            "description": {
+                "type": "text"
+            }, 
+            "created": {
+                "type": "date"
+            }, 
+            "granular_markings": {
+                "type": "nested", 
+                "properties": {
+                    "marking_ref": {
+                        "type": "keyword"
+                    }, 
+                    "selectors": {
+                        "type": "keyword"
+                    }
+                }
+            }, 
+            "labels": {
+                "type": "keyword"
+            }, 
+            "modified": {
+                "type": "date"
+            }, 
+            "object_refs": {
+                "type": "keyword"
+            }, 
+            "object_marking_refs": {
+                "type": "keyword"
+            }, 
+            "authors": {
+                "type": "text"
+            }, 
+            "summary": {
+                "type": "text"
+            }, 
+            "type": {
+                "type": "keyword"
+            }, 
+            "id": {
+                "type": "keyword"
+            }, 
+            "external_references": {
+                "type": "nested", 
+                "properties": {
+                    "external_id": {
+                        "type": "text"
+                    }, 
+                    "source_name": {
+                        "type": "text"
+                    }, 
+                    "description": {
+                        "type": "text"
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,55 @@
+{
+  "id": "../sdos/observed-data.json",
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "observed-data",
+  "description": "Observed data conveys information that was observed on systems and networks, such as log data or network traffic, using the Cyber Observable specification.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../common/core.json"
+    },
+    {
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The type of this object, which MUST be the literal `observed-data`.",
+          "enum": [
+            "observed-data"
+          ]
+        },
+        "id": {
+          "title": "id",
+          "pattern": "^observed-data--"
+        },
+        "first_observed": {
+          "$ref": "../common/timestamp.json",
+          "description": "The beginning of the time window that the data was observed during."
+        },
+        "last_observed": {
+          "$ref": "../common/timestamp.json",
+          "description": "The end of the time window that the data was observed during."
+        },
+        "number_observed": {
+          "type": "integer",
+          "description": "The number of times the data represented in the objects property was observed. This MUST be an integer between 1 and 999,999,999 inclusive.",
+          "minimum": 1,
+          "maximum": 999999999
+        },
+        "object_refs": {
+          "type": "array",
+          "description": "[MANUALLY ADDED] Specifies the STIX Objects that are referred to by this Observed Data Object.",
+          "items": {
+            "$ref": "../common/identifier.json"
+          },
+          "minItems": 1
+        }
+      }
+    }
+  ],
+  "required": [
+    "first_observed",
+    "last_observed",
+    "number_observed",
+    "objects"
+  ]
+}

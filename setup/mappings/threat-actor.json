@@ -1,0 +1,82 @@
+{
+    "mapping": {
+        "properties": {
+            "secondary_motivations": {
+                "type": "keyword"
+            }, 
+            "labels": {
+                "type": "keyword"
+            }, 
+            "description": {
+                "type": "text"
+            }, 
+            "roles": {
+                "type": "keyword"
+            }, 
+            "created": {
+                "type": "date"
+            }, 
+            "aliases": {
+                "type": "text"
+            }, 
+            "name": {
+                "type": "text"
+            }, 
+            "granular_markings": {
+                "type": "nested", 
+                "properties": {
+                    "marking_ref": {
+                        "type": "keyword"
+                    }, 
+                    "selectors": {
+                        "type": "keyword"
+                    }
+                }
+            }, 
+            "primary_motivation": {
+                "type": "keyword"
+            }, 
+            "resource_level": {
+                "type": "keyword"
+            }, 
+            "sophistication": {
+                "type": "keyword"
+            }, 
+            "object_marking_refs": {
+                "type": "keyword"
+            }, 
+            "goals": {
+                "type": "text"
+            }, 
+            "modified": {
+                "type": "date"
+            }, 
+            "id": {
+                "type": "keyword"
+            }, 
+            "external_references": {
+                "type": "nested", 
+                "properties": {
+                    "external_id": {
+                        "type": "text"
+                    }, 
+                    "source_name": {
+                        "type": "text"
+                    }, 
+                    "description": {
+                        "type": "text"
+                    }
+                }
+            }, 
+            "type": {
+                "type": "keyword"
+            }, 
+            "personal_motivations": {
+                "type": "text"
+            }, 
+            "revoked": {
+                "type": "boolean"
+            }
+        }
+    }
+}
