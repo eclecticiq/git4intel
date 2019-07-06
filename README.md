@@ -4,7 +4,9 @@ Git4Intelligence
 ToDo
 * ~Setup IDE~
 * ~Translate STIX2 json schemas in to a workable model, automated to keep up with schema changes~
-* Use translation to create automated elasticsearch mappings for continuous deployment
+* ~Use translation to create automated elasticsearch mappings for continuous deployment~
+* Setup easy deployment to a local elk stack
+* Build some basic search harnesses to test it works
 * Import common libraries to elastic as stix2 literals (att&ck, galaxies, etc) - treated as a direct creator identity object (commit 1)
 * Ingest sample data feeds as literal stix2 (indcator feed, aptgo, other open source) - treated as an indirect interprative identity object (commit 1)
 * Create interpolation layer to enhance feeds (ie: literal incoming --> data model) through _only adding_ stix entities (ie: no de-dupe, no deletion, no editing unless up-versioning because you can't because you aren't the creator) - treated as a direct creation from new identity object (commit 2)
