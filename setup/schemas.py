@@ -1,7 +1,7 @@
 import os
 import json
 from pprint import pprint
-from elkmapping import ElkMapping, ELKProperties
+from elkmapping import ElkMapping
 
 included_schemas = [
     'sdos',

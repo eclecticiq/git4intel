@@ -1,5 +1,5 @@
 {
-    "mapping": {
+    "mappings": {
         "properties": {
             "secondary_motivations": {
                 "type": "keyword"

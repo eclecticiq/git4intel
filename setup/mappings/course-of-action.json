@@ -1,5 +1,5 @@
 {
-    "mapping": {
+    "mappings": {
         "properties": {
             "description": {
                 "type": "text"
