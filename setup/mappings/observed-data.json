@@ -1,55 +1,67 @@
 {
     "mappings": {
         "properties": {
-            "revoked": {
-                "type": "boolean"
-            }, 
+            "type": {
+                "type": "keyword"
+            },
+            "id": {
+                "type": "keyword"
+            },
+            "created_by_ref": {
+                "type": "keyword"
+            },
             "created": {
                 "type": "date"
-            }, 
-            "granular_markings": {
-                "type": "nested", 
+            },
+            "modified": {
+                "type": "date"
+            },
+            "first_observed": {
+                "type": "date"
+            },
+            "last_observed": {
+                "type": "date"
+            },
+            "number_observed": {
+                "type": "integer"
+            },
+            "revoked": {
+                "type": "boolean"
+            },
+            "labels": {
+                "type": "keyword"
+            },
+            "external_references": {
+                "type": "nested",
                 "properties": {
-                    "marking_ref": {
+                    "source_name": {
+                        "type": "text"
+                    },
+                    "description": {
+                        "type": "text"
+                    },
+                    "url": {
                         "type": "keyword"
-                    }, 
-                    "selectors": {
+                    },
+                    "hashes": {
+                        "type": "keyword"
+                    },
+                    "external_id": {
                         "type": "keyword"
                     }
                 }
-            }, 
-            "labels": {
-                "type": "keyword"
-            }, 
-            "number_observed": {
-                "type": "integer"
-            }, 
-            "object_refs": {
-                "type": "keyword"
-            }, 
+            },
             "object_marking_refs": {
                 "type": "keyword"
-            }, 
-            "modified": {
-                "type": "date"
-            }, 
-            "type": {
-                "type": "keyword"
-            }, 
-            "id": {
-                "type": "keyword"
-            }, 
-            "external_references": {
-                "type": "nested", 
+            },
+            "granular_markings": {
+                "type": "nested",
                 "properties": {
-                    "external_id": {
-                        "type": "text"
-                    }, 
-                    "source_name": {
-                        "type": "text"
-                    }, 
-                    "description": {
-                        "type": "text"
+                    "marking_ref": {
+                        "type": "keyword"
+                    },
+                    "selectors": {
+                        "type": "keyword"
                     }
                 }
             }

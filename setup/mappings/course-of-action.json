@@ -1,57 +1,66 @@
 {
     "mappings": {
         "properties": {
-            "description": {
-                "type": "text"
-            }, 
-            "name": {
-                "type": "text"
-            }, 
+            "type": {
+                "type": "keyword"
+            },
+            "id": {
+                "type": "keyword"
+            },
+            "created_by_ref": {
+                "type": "keyword"
+            },
             "created": {
                 "type": "date"
-            }, 
+            },
+            "modified": {
+                "type": "date"
+            },
+            "name": {
+                "type": "text"
+            },
+            "description": {
+                "type": "text"
+            },
+            "revoked": {
+                "type": "boolean"
+            },
+            "labels": {
+                "type": "keyword"
+            },
+            "external_references": {
+                "type": "nested",
+                "properties": {
+                    "source_name": {
+                        "type": "text"
+                    },
+                    "description": {
+                        "type": "text"
+                    },
+                    "url": {
+                        "type": "keyword"
+                    },
+                    "hashes": {
+                        "type": "keyword"
+                    },
+                    "external_id": {
+                        "type": "keyword"
+                    }
+                }
+            },
+            "object_marking_refs": {
+                "type": "keyword"
+            },
             "granular_markings": {
-                "type": "nested", 
+                "type": "nested",
                 "properties": {
                     "marking_ref": {
                         "type": "keyword"
-                    }, 
+                    },
                     "selectors": {
                         "type": "keyword"
                     }
                 }
-            }, 
-            "labels": {
-                "type": "keyword"
-            }, 
-            "modified": {
-                "type": "date"
-            }, 
-            "object_marking_refs": {
-                "type": "keyword"
-            }, 
-            "external_references": {
-                "type": "nested", 
-                "properties": {
-                    "external_id": {
-                        "type": "text"
-                    }, 
-                    "source_name": {
-                        "type": "text"
-                    }, 
-                    "description": {
-                        "type": "text"
-                    }
-                }
-            }, 
-            "type": {
-                "type": "keyword"
-            }, 
-            "id": {
-                "type": "keyword"
-            }, 
-            "revoked": {
-                "type": "boolean"
             }
         }
     }

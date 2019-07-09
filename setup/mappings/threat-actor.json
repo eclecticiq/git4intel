@@ -1,81 +1,90 @@
 {
     "mappings": {
         "properties": {
-            "secondary_motivations": {
+            "type": {
                 "type": "keyword"
-            }, 
-            "labels": {
+            },
+            "id": {
                 "type": "keyword"
-            }, 
-            "description": {
-                "type": "text"
-            }, 
-            "roles": {
+            },
+            "created_by_ref": {
                 "type": "keyword"
-            }, 
+            },
             "created": {
                 "type": "date"
-            }, 
-            "aliases": {
-                "type": "text"
-            }, 
+            },
+            "modified": {
+                "type": "date"
+            },
             "name": {
                 "type": "text"
-            }, 
+            },
+            "description": {
+                "type": "text"
+            },
+            "aliases": {
+                "type": "keyword"
+            },
+            "roles": {
+                "type": "keyword"
+            },
+            "goals": {
+                "type": "text"
+            },
+            "sophistication": {
+                "type": "keyword"
+            },
+            "resource_level": {
+                "type": "keyword"
+            },
+            "primary_motivation": {
+                "type": "keyword"
+            },
+            "secondary_motivations": {
+                "type": "keyword"
+            },
+            "personal_motivations": {
+                "type": "keyword"
+            },
+            "revoked": {
+                "type": "boolean"
+            },
+            "labels": {
+                "type": "keyword"
+            },
+            "external_references": {
+                "type": "nested",
+                "properties": {
+                    "source_name": {
+                        "type": "text"
+                    },
+                    "description": {
+                        "type": "text"
+                    },
+                    "url": {
+                        "type": "keyword"
+                    },
+                    "hashes": {
+                        "type": "keyword"
+                    },
+                    "external_id": {
+                        "type": "keyword"
+                    }
+                }
+            },
+            "object_marking_refs": {
+                "type": "keyword"
+            },
             "granular_markings": {
-                "type": "nested", 
+                "type": "nested",
                 "properties": {
                     "marking_ref": {
                         "type": "keyword"
-                    }, 
+                    },
                     "selectors": {
                         "type": "keyword"
                     }
                 }
-            }, 
-            "primary_motivation": {
-                "type": "keyword"
-            }, 
-            "resource_level": {
-                "type": "keyword"
-            }, 
-            "sophistication": {
-                "type": "keyword"
-            }, 
-            "object_marking_refs": {
-                "type": "keyword"
-            }, 
-            "goals": {
-                "type": "text"
-            }, 
-            "modified": {
-                "type": "date"
-            }, 
-            "id": {
-                "type": "keyword"
-            }, 
-            "external_references": {
-                "type": "nested", 
-                "properties": {
-                    "external_id": {
-                        "type": "text"
-                    }, 
-                    "source_name": {
-                        "type": "text"
-                    }, 
-                    "description": {
-                        "type": "text"
-                    }
-                }
-            }, 
-            "type": {
-                "type": "keyword"
-            }, 
-            "personal_motivations": {
-                "type": "text"
-            }, 
-            "revoked": {
-                "type": "boolean"
             }
         }
     }

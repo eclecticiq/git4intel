@@ -1,66 +1,75 @@
 {
     "mappings": {
         "properties": {
-            "revoked": {
-                "type": "boolean"
-            }, 
-            "sectors": {
+            "type": {
                 "type": "keyword"
-            }, 
+            },
+            "id": {
+                "type": "keyword"
+            },
+            "created_by_ref": {
+                "type": "keyword"
+            },
             "created": {
                 "type": "date"
-            }, 
+            },
+            "modified": {
+                "type": "date"
+            },
             "name": {
                 "type": "text"
-            }, 
+            },
+            "description": {
+                "type": "text"
+            },
+            "identity_class": {
+                "type": "keyword"
+            },
+            "sectors": {
+                "type": "keyword"
+            },
+            "contact_information": {
+                "type": "text"
+            },
+            "revoked": {
+                "type": "boolean"
+            },
+            "labels": {
+                "type": "keyword"
+            },
+            "external_references": {
+                "type": "nested",
+                "properties": {
+                    "source_name": {
+                        "type": "text"
+                    },
+                    "description": {
+                        "type": "text"
+                    },
+                    "url": {
+                        "type": "keyword"
+                    },
+                    "hashes": {
+                        "type": "keyword"
+                    },
+                    "external_id": {
+                        "type": "keyword"
+                    }
+                }
+            },
+            "object_marking_refs": {
+                "type": "keyword"
+            },
             "granular_markings": {
-                "type": "nested", 
+                "type": "nested",
                 "properties": {
                     "marking_ref": {
                         "type": "keyword"
-                    }, 
+                    },
                     "selectors": {
                         "type": "keyword"
                     }
                 }
-            }, 
-            "labels": {
-                "type": "keyword"
-            }, 
-            "modified": {
-                "type": "date"
-            }, 
-            "id": {
-                "type": "keyword"
-            }, 
-            "contact_information": {
-                "type": "text"
-            }, 
-            "object_marking_refs": {
-                "type": "keyword"
-            }, 
-            "external_references": {
-                "type": "nested", 
-                "properties": {
-                    "external_id": {
-                        "type": "text"
-                    }, 
-                    "source_name": {
-                        "type": "text"
-                    }, 
-                    "description": {
-                        "type": "text"
-                    }
-                }
-            }, 
-            "type": {
-                "type": "keyword"
-            }, 
-            "identity_class": {
-                "type": "text"
-            }, 
-            "description": {
-                "type": "text"
             }
         }
     }

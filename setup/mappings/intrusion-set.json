@@ -1,72 +1,87 @@
 {
     "mappings": {
         "properties": {
-            "secondary_motivations": {
+            "type": {
                 "type": "keyword"
-            }, 
-            "labels": {
+            },
+            "id": {
                 "type": "keyword"
-            }, 
-            "revoked": {
-                "type": "boolean"
-            }, 
-            "name": {
-                "type": "text"
-            }, 
+            },
+            "created_by_ref": {
+                "type": "keyword"
+            },
             "created": {
                 "type": "date"
-            }, 
-            "aliases": {
+            },
+            "modified": {
+                "type": "date"
+            },
+            "name": {
                 "type": "text"
-            }, 
+            },
+            "description": {
+                "type": "text"
+            },
+            "aliases": {
+                "type": "keyword"
+            },
+            "first_seen": {
+                "type": "date"
+            },
+            "last_seen": {
+                "type": "date"
+            },
+            "goals": {
+                "type": "text"
+            },
+            "resource_level": {
+                "type": "keyword"
+            },
+            "primary_motivation": {
+                "type": "keyword"
+            },
+            "secondary_motivations": {
+                "type": "keyword"
+            },
+            "revoked": {
+                "type": "boolean"
+            },
+            "labels": {
+                "type": "keyword"
+            },
+            "external_references": {
+                "type": "nested",
+                "properties": {
+                    "source_name": {
+                        "type": "text"
+                    },
+                    "description": {
+                        "type": "text"
+                    },
+                    "url": {
+                        "type": "keyword"
+                    },
+                    "hashes": {
+                        "type": "keyword"
+                    },
+                    "external_id": {
+                        "type": "keyword"
+                    }
+                }
+            },
+            "object_marking_refs": {
+                "type": "keyword"
+            },
             "granular_markings": {
-                "type": "nested", 
+                "type": "nested",
                 "properties": {
                     "marking_ref": {
                         "type": "keyword"
-                    }, 
+                    },
                     "selectors": {
                         "type": "keyword"
                     }
                 }
-            }, 
-            "primary_motivation": {
-                "type": "keyword"
-            }, 
-            "resource_level": {
-                "type": "keyword"
-            }, 
-            "modified": {
-                "type": "date"
-            }, 
-            "object_marking_refs": {
-                "type": "keyword"
-            }, 
-            "goals": {
-                "type": "text"
-            }, 
-            "external_references": {
-                "type": "nested", 
-                "properties": {
-                    "external_id": {
-                        "type": "text"
-                    }, 
-                    "source_name": {
-                        "type": "text"
-                    }, 
-                    "description": {
-                        "type": "text"
-                    }
-                }
-            }, 
-            "type": {
-                "type": "keyword"
-            }, 
-            "id": {
-                "type": "keyword"
-            }, 
-            "description": {
-                "type": "text"
             }
         }
     }
