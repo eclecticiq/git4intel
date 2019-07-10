@@ -1,0 +1,12 @@
+{
+    "mappings": {
+        "properties": {
+            "contains_refs": {
+                "type": "keyword"
+            },
+            "comment": {
+                "type": "keyword"
+            }
+        }
+    }
+}

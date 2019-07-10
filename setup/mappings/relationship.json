@@ -4,6 +4,9 @@
             "type": {
                 "type": "keyword"
             },
+            "spec_version": {
+                "type": "keyword"
+            },
             "id": {
                 "type": "keyword"
             },
@@ -28,10 +31,22 @@
             "target_ref": {
                 "type": "keyword"
             },
+            "start_time": {
+                "type": "date"
+            },
+            "stop_time": {
+                "type": "date"
+            },
             "revoked": {
                 "type": "boolean"
             },
             "labels": {
+                "type": "keyword"
+            },
+            "confidence": {
+                "type": "integer"
+            },
+            "lang": {
                 "type": "keyword"
             },
             "external_references": {
@@ -60,6 +75,9 @@
             "granular_markings": {
                 "type": "nested",
                 "properties": {
+                    "lang": {
+                        "type": "keyword"
+                    },
                     "marking_ref": {
                         "type": "keyword"
                     },

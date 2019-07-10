@@ -4,6 +4,9 @@
             "type": {
                 "type": "keyword"
             },
+            "spec_version": {
+                "type": "keyword"
+            },
             "id": {
                 "type": "keyword"
             },
@@ -21,6 +24,9 @@
             },
             "description": {
                 "type": "text"
+            },
+            "indicator_types": {
+                "type": "keyword"
             },
             "pattern": {
                 "type": "text"
@@ -46,6 +52,12 @@
                 "type": "boolean"
             },
             "labels": {
+                "type": "keyword"
+            },
+            "confidence": {
+                "type": "integer"
+            },
+            "lang": {
                 "type": "keyword"
             },
             "external_references": {
@@ -74,6 +86,9 @@
             "granular_markings": {
                 "type": "nested",
                 "properties": {
+                    "lang": {
+                        "type": "keyword"
+                    },
                     "marking_ref": {
                         "type": "keyword"
                     },

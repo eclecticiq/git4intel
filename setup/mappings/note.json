@@ -19,28 +19,17 @@
             "modified": {
                 "type": "date"
             },
-            "name": {
-                "type": "text"
-            },
-            "description": {
-                "type": "text"
-            },
-            "tool_types": {
+            "abstract": {
                 "type": "keyword"
             },
-            "kill_chain_phases": {
-                "type": "nested",
-                "properties": {
-                    "kill_chain_name": {
-                        "type": "keyword"
-                    },
-                    "phase_name": {
-                        "type": "keyword"
-                    }
-                }
+            "content": {
+                "type": "keyword"
             },
-            "tool_version": {
-                "type": "text"
+            "authors": {
+                "type": "keyword"
+            },
+            "object_refs": {
+                "type": "keyword"
             },
             "revoked": {
                 "type": "boolean"

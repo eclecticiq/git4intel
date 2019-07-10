@@ -4,6 +4,9 @@
             "type": {
                 "type": "keyword"
             },
+            "spec_version": {
+                "type": "keyword"
+            },
             "id": {
                 "type": "keyword"
             },
@@ -40,6 +43,12 @@
             "labels": {
                 "type": "keyword"
             },
+            "confidence": {
+                "type": "integer"
+            },
+            "lang": {
+                "type": "keyword"
+            },
             "external_references": {
                 "type": "nested",
                 "properties": {
@@ -66,6 +75,9 @@
             "granular_markings": {
                 "type": "nested",
                 "properties": {
+                    "lang": {
+                        "type": "keyword"
+                    },
                     "marking_ref": {
                         "type": "keyword"
                     },

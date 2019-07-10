@@ -22,7 +22,11 @@ schema_map = {
         'objective': 'text',
         'source_name': 'text',
         'statement': 'text',
-        'tool_version': 'text'},
+        'tool_version': 'text',
+        'administrative_area': 'text',
+        'city': 'text',
+        'street_address': 'text',
+        'postal_code': 'text'},
 }
 
 schema_defaults = {
@@ -41,12 +45,16 @@ schema_defaults = {
     'StringProperty': 'keyword',
     'TimestampProperty': 'date',
     'TypeProperty': 'keyword',
+    'BinaryProperty': 'binary',
+    'ExtensionsProperty': 'object',
 }
 
 supported_types = [
     # '_STIXBase',
     'STIXDomainObject',
     'STIXRelationshipObject',
+    '_Observable',
+    '_Extension',
 ]
 
 unsupported_props = [
@@ -95,7 +103,7 @@ def stixprop_to_field(prop_name, prop):
 def stix_to_elk(obj):
     class_name = obj.__name__
     prop_list = getattr(
-        sys.modules[stix2.__name__], class_name)._properties
+        sys.modules[stix2.v21.__name__], class_name)._properties
     mapping = {'mappings': {'properties': {}}}
     for prop in prop_list:
         prop_type = type(prop_list[prop]).__name__
@@ -110,25 +118,34 @@ def stix_to_elk(obj):
 
 
 def main():
-    for name, obj in inspect.getmembers(sys.modules[stix2.__name__]):
+    for name, obj in inspect.getmembers(sys.modules[stix2.v21.__name__]):
         if inspect.isclass(obj):
             class_type = inspect.getmro(obj)[1].__name__
+            print(class_type)
             if class_type in supported_types:
                 index_name = obj._type
+                print(index_name)
                 new_es_mapping = stix_to_elk(obj)
                 # print(index_name)
                 # pprint(new_es_mapping)
                 cached_mapping_file = './mappings/' + str(index_name) + '.json'
 
-                # get cached mapping
-                with open(cached_mapping_file) as json_file:
-                    cached_mapping = json.load(json_file)
+                try:
+                    # get cached mapping
+                    with open(cached_mapping_file) as json_file:
+                        cached_mapping = json.load(json_file)
 
-                # compare and resave cache if needed
-                if ordered(new_es_mapping.items()) == ordered(cached_mapping.items()):
-                    print("No updates in stix2 mapping from cache for " + index_name)
-                else:
-                    print("Update found and refreshed for " + index_name)
+                    # compare and resave cache if needed
+                    if ordered(new_es_mapping.items()) == ordered(cached_mapping.items()):
+                        print("No updates in stix2 mapping from cache for " + index_name)
+                    else:
+                        print("Update found and refreshed for " + index_name)
+                        with open(cached_mapping_file, 'w') as f:
+                            json.dump(new_es_mapping, f,
+                                      ensure_ascii=False, indent=4)
+                except FileNotFoundError:
+                    # first cache of data
+                    print("First print for " + index_name)
                     with open(cached_mapping_file, 'w') as f:
                         json.dump(new_es_mapping, f,
                                   ensure_ascii=False, indent=4)
