@@ -1,15 +1,16 @@
 import stix2
-import subprocess
 import sys
 import os
 import inspect
 import json
 import collections
+import requests
 from pprint import pprint
 
-# stix_ver for dev purposes only. Not for prod!
-# If you're deploying to elastic for real, don't change this!
-stix_ver = '21'
+from elasticsearch import Elasticsearch
+from datetime import datetime
+
+stix_ver = '20'
 
 schema_map = {
     'ListProperty': {
@@ -127,6 +128,24 @@ def stix_to_elk(obj):
     return mapping
 
 
+def update_es_indexmapping(index_alias, new_mapping):
+    now = datetime.now()
+    date_str = now.strftime("%y%m%d")
+    new_index_name = index_alias + '-' + date_str
+
+    es = Elasticsearch()
+    if es.indices.exists(index=[new_index_name]):
+        print('Wait until tomorrow to update...I guess...')
+        return False
+
+    es.indices.create(index=new_index_name, body=new_mapping)
+    if es.indices.exists_alias([index_alias]):
+        es.indices.delete_alias(index=[index_alias], name=[index_alias])
+    es.indices.put_alias(index=[new_index_name], name=index_alias)
+
+    return True
+
+
 def main():
     mapping_cache_dir = './' + stix_ver + 'mappings/'
     master_mapping = {}
@@ -169,6 +188,7 @@ def main():
             json.dump(master_mapping, f,
                       ensure_ascii=False, indent=4)
         print("Refreshed master mapping.")
+        print(update_es_indexmapping('master', master_mapping))
 
 
 if __name__ == "__main__":
