@@ -1,0 +1,62 @@
+{
+    "mappings": {
+        "properties": {},
+        "type": {
+            "type": "keyword"
+        },
+        "start": {
+            "type": "date"
+        },
+        "end": {
+            "type": "date"
+        },
+        "is_active": {
+            "type": "boolean"
+        },
+        "src_ref": {
+            "type": "keyword"
+        },
+        "dst_ref": {
+            "type": "keyword"
+        },
+        "src_port": {
+            "type": "integer"
+        },
+        "dst_port": {
+            "type": "integer"
+        },
+        "protocols": {
+            "type": "keyword"
+        },
+        "src_byte_count": {
+            "type": "integer"
+        },
+        "dst_byte_count": {
+            "type": "integer"
+        },
+        "src_packets": {
+            "type": "integer"
+        },
+        "dst_packets": {
+            "type": "integer"
+        },
+        "ipfix": {
+            "type": "object"
+        },
+        "src_payload_ref": {
+            "type": "keyword"
+        },
+        "dst_payload_ref": {
+            "type": "keyword"
+        },
+        "encapsulates_refs": {
+            "type": "keyword"
+        },
+        "encapsulates_by_ref": {
+            "type": "keyword"
+        },
+        "extensions": {
+            "type": "object"
+        }
+    }
+}

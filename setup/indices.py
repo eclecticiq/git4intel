@@ -1,6 +1,7 @@
 import stix2
 import subprocess
 import sys
+import os
 import inspect
 import json
 import collections
@@ -26,7 +27,9 @@ schema_map = {
         'administrative_area': 'text',
         'city': 'text',
         'street_address': 'text',
-        'postal_code': 'text'},
+        'postal_code': 'text',
+        'abstract': 'text',
+        'authors': 'text'},
 }
 
 schema_defaults = {
@@ -47,6 +50,8 @@ schema_defaults = {
     'TypeProperty': 'keyword',
     'BinaryProperty': 'binary',
     'ExtensionsProperty': 'object',
+    'DictionaryProperty': 'object',
+    'EmbeddedObjectProperty': 'object'
 }
 
 supported_types = [
@@ -54,7 +59,7 @@ supported_types = [
     'STIXDomainObject',
     'STIXRelationshipObject',
     '_Observable',
-    '_Extension',
+    # '_Extension',
 ]
 
 unsupported_props = [
@@ -88,16 +93,14 @@ def stixprop_to_field(prop_name, prop):
     except KeyError:
         es_type = schema_defaults[prop_type]
 
-    if es_type == 'nested' or es_type == 'object':
+    if es_type == 'nested':
         out_dict = {prop_name: {'type': 'nested'}}
         for sub_prop in prop.contained._properties:
             update(out_dict, {prop_name: {'properties': stixprop_to_field(
-                sub_prop, prop.contained._properties[sub_prop])[0]}})
-        if es_type == 'object':
-            is_object = True
-        return out_dict, is_object
+                sub_prop, prop.contained._properties[sub_prop])}})
+        return out_dict
     else:
-        return {prop_name: {'type': es_type}}, is_object
+        return {prop_name: {'type': es_type}}
 
 
 def stix_to_elk(obj):
@@ -108,27 +111,23 @@ def stix_to_elk(obj):
     for prop in prop_list:
         prop_type = type(prop_list[prop]).__name__
         if prop_type not in unsupported_props:
-            es_prop = stixprop_to_field(prop, prop_list[prop])
-            if es_prop[1]:
-                update(mapping['mappings'], es_prop[0])
-            else:
-                update(mapping['mappings']
-                       ['properties'], es_prop[0])
+            update(mapping['mappings'], stixprop_to_field(
+                prop, prop_list[prop]))
     return mapping
 
 
 def main():
+    mapping_cache_dir = './mappings/'
     for name, obj in inspect.getmembers(sys.modules[stix2.v21.__name__]):
         if inspect.isclass(obj):
             class_type = inspect.getmro(obj)[1].__name__
-            print(class_type)
             if class_type in supported_types:
                 index_name = obj._type
-                print(index_name)
                 new_es_mapping = stix_to_elk(obj)
                 # print(index_name)
                 # pprint(new_es_mapping)
-                cached_mapping_file = './mappings/' + str(index_name) + '.json'
+                cached_mapping_file = mapping_cache_dir + \
+                    str(index_name) + '.json'
 
                 try:
                     # get cached mapping
@@ -137,7 +136,8 @@ def main():
 
                     # compare and resave cache if needed
                     if ordered(new_es_mapping.items()) == ordered(cached_mapping.items()):
-                        print("No updates in stix2 mapping from cache for " + index_name)
+                        print(
+                            "No updates in stix2 mapping from cache for " + index_name)
                     else:
                         print("Update found and refreshed for " + index_name)
                         with open(cached_mapping_file, 'w') as f:
@@ -149,6 +149,7 @@ def main():
                     with open(cached_mapping_file, 'w') as f:
                         json.dump(new_es_mapping, f,
                                   ensure_ascii=False, indent=4)
+    print(str(len(os.listdir(mapping_cache_dir))) + ' mappings cached.')
 
 
 if __name__ == "__main__":

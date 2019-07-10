@@ -1,94 +1,93 @@
 {
     "mappings": {
-        "properties": {
-            "type": {
-                "type": "keyword"
-            },
-            "spec_version": {
-                "type": "keyword"
-            },
-            "id": {
-                "type": "keyword"
-            },
-            "created_by_ref": {
-                "type": "keyword"
-            },
-            "created": {
-                "type": "date"
-            },
-            "modified": {
-                "type": "date"
-            },
-            "name": {
-                "type": "text"
-            },
-            "description": {
-                "type": "text"
-            },
-            "tool_types": {
-                "type": "keyword"
-            },
-            "kill_chain_phases": {
-                "type": "nested",
-                "properties": {
-                    "kill_chain_name": {
-                        "type": "keyword"
-                    },
-                    "phase_name": {
-                        "type": "keyword"
-                    }
+        "properties": {},
+        "type": {
+            "type": "keyword"
+        },
+        "spec_version": {
+            "type": "keyword"
+        },
+        "id": {
+            "type": "keyword"
+        },
+        "created_by_ref": {
+            "type": "keyword"
+        },
+        "created": {
+            "type": "date"
+        },
+        "modified": {
+            "type": "date"
+        },
+        "name": {
+            "type": "text"
+        },
+        "description": {
+            "type": "text"
+        },
+        "tool_types": {
+            "type": "keyword"
+        },
+        "kill_chain_phases": {
+            "type": "nested",
+            "properties": {
+                "kill_chain_name": {
+                    "type": "keyword"
+                },
+                "phase_name": {
+                    "type": "keyword"
                 }
-            },
-            "tool_version": {
-                "type": "text"
-            },
-            "revoked": {
-                "type": "boolean"
-            },
-            "labels": {
-                "type": "keyword"
-            },
-            "confidence": {
-                "type": "integer"
-            },
-            "lang": {
-                "type": "keyword"
-            },
-            "external_references": {
-                "type": "nested",
-                "properties": {
-                    "source_name": {
-                        "type": "text"
-                    },
-                    "description": {
-                        "type": "text"
-                    },
-                    "url": {
-                        "type": "keyword"
-                    },
-                    "hashes": {
-                        "type": "keyword"
-                    },
-                    "external_id": {
-                        "type": "keyword"
-                    }
+            }
+        },
+        "tool_version": {
+            "type": "text"
+        },
+        "revoked": {
+            "type": "boolean"
+        },
+        "labels": {
+            "type": "keyword"
+        },
+        "confidence": {
+            "type": "integer"
+        },
+        "lang": {
+            "type": "keyword"
+        },
+        "external_references": {
+            "type": "nested",
+            "properties": {
+                "source_name": {
+                    "type": "text"
+                },
+                "description": {
+                    "type": "text"
+                },
+                "url": {
+                    "type": "keyword"
+                },
+                "hashes": {
+                    "type": "keyword"
+                },
+                "external_id": {
+                    "type": "keyword"
                 }
-            },
-            "object_marking_refs": {
-                "type": "keyword"
-            },
-            "granular_markings": {
-                "type": "nested",
-                "properties": {
-                    "lang": {
-                        "type": "keyword"
-                    },
-                    "marking_ref": {
-                        "type": "keyword"
-                    },
-                    "selectors": {
-                        "type": "keyword"
-                    }
+            }
+        },
+        "object_marking_refs": {
+            "type": "keyword"
+        },
+        "granular_markings": {
+            "type": "nested",
+            "properties": {
+                "lang": {
+                    "type": "keyword"
+                },
+                "marking_ref": {
+                    "type": "keyword"
+                },
+                "selectors": {
+                    "type": "keyword"
                 }
             }
         }

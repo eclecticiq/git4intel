@@ -1,0 +1,14 @@
+{
+    "mappings": {
+        "properties": {},
+        "type": {
+            "type": "keyword"
+        },
+        "name": {
+            "type": "text"
+        },
+        "extensions": {
+            "type": "object"
+        }
+    }
+}

@@ -1,0 +1,17 @@
+{
+    "mappings": {
+        "properties": {},
+        "type": {
+            "type": "keyword"
+        },
+        "value": {
+            "type": "keyword"
+        },
+        "resolves_to_refs": {
+            "type": "keyword"
+        },
+        "extensions": {
+            "type": "object"
+        }
+    }
+}
