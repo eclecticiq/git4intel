@@ -7,6 +7,10 @@ import json
 import collections
 from pprint import pprint
 
+# stix_ver for dev purposes only. Not for prod!
+# If you're deploying to elastic for real, don't change this!
+stix_ver = '21'
+
 schema_map = {
     'ListProperty': {
         'external_references': 'nested',
@@ -67,6 +71,13 @@ unsupported_props = [
 ]
 
 
+def get_stix_ver_name():
+    if stix_ver == '21':
+        return stix2.v21.__name__
+    else:
+        return stix2.v20.__name__
+
+
 def update(d, u):
     for k, v in u.items():
         if isinstance(v, collections.Mapping):
@@ -106,24 +117,27 @@ def stixprop_to_field(prop_name, prop):
 def stix_to_elk(obj):
     class_name = obj.__name__
     prop_list = getattr(
-        sys.modules[stix2.v21.__name__], class_name)._properties
+        sys.modules[get_stix_ver_name()], class_name)._properties
     mapping = {'mappings': {'properties': {}}}
     for prop in prop_list:
         prop_type = type(prop_list[prop]).__name__
         if prop_type not in unsupported_props:
-            update(mapping['mappings'], stixprop_to_field(
+            update(mapping['mappings']['properties'], stixprop_to_field(
                 prop, prop_list[prop]))
     return mapping
 
 
 def main():
-    mapping_cache_dir = './mappings/'
-    for name, obj in inspect.getmembers(sys.modules[stix2.v21.__name__]):
+    mapping_cache_dir = './' + stix_ver + 'mappings/'
+    master_mapping = {}
+    update_detected = False
+    for name, obj in inspect.getmembers(sys.modules[get_stix_ver_name()]):
         if inspect.isclass(obj):
             class_type = inspect.getmro(obj)[1].__name__
             if class_type in supported_types:
                 index_name = obj._type
                 new_es_mapping = stix_to_elk(obj)
+                update(master_mapping, new_es_mapping)
                 # print(index_name)
                 # pprint(new_es_mapping)
                 cached_mapping_file = mapping_cache_dir + \
@@ -134,22 +148,27 @@ def main():
                     with open(cached_mapping_file) as json_file:
                         cached_mapping = json.load(json_file)
 
-                    # compare and resave cache if needed
+                    # compare and resave recache if needed
                     if ordered(new_es_mapping.items()) == ordered(cached_mapping.items()):
                         print(
                             "No updates in stix2 mapping from cache for " + index_name)
                     else:
-                        print("Update found and refreshed for " + index_name)
-                        with open(cached_mapping_file, 'w') as f:
-                            json.dump(new_es_mapping, f,
-                                      ensure_ascii=False, indent=4)
+                        raise FileNotFoundError(
+                            "Update found and refreshed for " + index_name)
                 except FileNotFoundError:
-                    # first cache of data
-                    print("First print for " + index_name)
+                    # cache for first time or recache data
+                    update_detected = True
+                    print("Caching " + index_name)
                     with open(cached_mapping_file, 'w') as f:
                         json.dump(new_es_mapping, f,
                                   ensure_ascii=False, indent=4)
-    print(str(len(os.listdir(mapping_cache_dir))) + ' mappings cached.')
+    print(str(len(os.listdir(mapping_cache_dir))) + ' object mappings cached.')
+    # pprint(master_mapping)
+    if update_detected:
+        with open('./' + stix_ver + 'master_mapping.json', 'w') as f:
+            json.dump(master_mapping, f,
+                      ensure_ascii=False, indent=4)
+        print("Refreshed master mapping.")
 
 
 if __name__ == "__main__":

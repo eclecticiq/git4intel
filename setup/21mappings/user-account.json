@@ -1,0 +1,54 @@
+{
+    "mappings": {
+        "properties": {
+            "type": {
+                "type": "keyword"
+            },
+            "user_id": {
+                "type": "keyword"
+            },
+            "credential": {
+                "type": "keyword"
+            },
+            "account_login": {
+                "type": "keyword"
+            },
+            "account_type": {
+                "type": "keyword"
+            },
+            "display_name": {
+                "type": "keyword"
+            },
+            "is_service_account": {
+                "type": "boolean"
+            },
+            "is_privileged": {
+                "type": "boolean"
+            },
+            "can_escalate_privs": {
+                "type": "boolean"
+            },
+            "is_disabled": {
+                "type": "boolean"
+            },
+            "account_created": {
+                "type": "date"
+            },
+            "account_expires": {
+                "type": "date"
+            },
+            "credential_last_changed": {
+                "type": "date"
+            },
+            "account_first_login": {
+                "type": "date"
+            },
+            "account_last_login": {
+                "type": "date"
+            },
+            "extensions": {
+                "type": "object"
+            }
+        }
+    }
+}

@@ -1,0 +1,30 @@
+{
+    "mappings": {
+        "properties": {
+            "type": {
+                "type": "keyword"
+            },
+            "path": {
+                "type": "keyword"
+            },
+            "path_enc": {
+                "type": "keyword"
+            },
+            "created": {
+                "type": "date"
+            },
+            "modified": {
+                "type": "date"
+            },
+            "accessed": {
+                "type": "date"
+            },
+            "contains_refs": {
+                "type": "keyword"
+            },
+            "extensions": {
+                "type": "object"
+            }
+        }
+    }
+}

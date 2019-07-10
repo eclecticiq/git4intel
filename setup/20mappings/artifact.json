@@ -1,0 +1,24 @@
+{
+    "mappings": {
+        "properties": {
+            "type": {
+                "type": "keyword"
+            },
+            "mime_type": {
+                "type": "keyword"
+            },
+            "payload_bin": {
+                "type": "binary"
+            },
+            "url": {
+                "type": "keyword"
+            },
+            "hashes": {
+                "type": "keyword"
+            },
+            "extensions": {
+                "type": "object"
+            }
+        }
+    }
+}

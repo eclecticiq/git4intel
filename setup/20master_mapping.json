@@ -1,0 +1,456 @@
+{
+    "mappings": {
+        "properties": {
+            "type": {
+                "type": "keyword"
+            },
+            "mime_type": {
+                "type": "keyword"
+            },
+            "payload_bin": {
+                "type": "binary"
+            },
+            "url": {
+                "type": "keyword"
+            },
+            "hashes": {
+                "type": "keyword"
+            },
+            "extensions": {
+                "type": "object"
+            },
+            "id": {
+                "type": "keyword"
+            },
+            "created_by_ref": {
+                "type": "keyword"
+            },
+            "created": {
+                "type": "date"
+            },
+            "modified": {
+                "type": "date"
+            },
+            "name": {
+                "type": "text"
+            },
+            "description": {
+                "type": "text"
+            },
+            "kill_chain_phases": {
+                "type": "nested",
+                "properties": {
+                    "kill_chain_name": {
+                        "type": "keyword"
+                    },
+                    "phase_name": {
+                        "type": "keyword"
+                    }
+                }
+            },
+            "revoked": {
+                "type": "boolean"
+            },
+            "labels": {
+                "type": "keyword"
+            },
+            "external_references": {
+                "type": "nested",
+                "properties": {
+                    "source_name": {
+                        "type": "text"
+                    },
+                    "description": {
+                        "type": "text"
+                    },
+                    "url": {
+                        "type": "keyword"
+                    },
+                    "hashes": {
+                        "type": "keyword"
+                    },
+                    "external_id": {
+                        "type": "keyword"
+                    }
+                }
+            },
+            "object_marking_refs": {
+                "type": "keyword"
+            },
+            "granular_markings": {
+                "type": "nested",
+                "properties": {
+                    "marking_ref": {
+                        "type": "keyword"
+                    },
+                    "selectors": {
+                        "type": "keyword"
+                    }
+                }
+            },
+            "number": {
+                "type": "integer"
+            },
+            "rir": {
+                "type": "keyword"
+            },
+            "aliases": {
+                "type": "keyword"
+            },
+            "first_seen": {
+                "type": "date"
+            },
+            "last_seen": {
+                "type": "date"
+            },
+            "objective": {
+                "type": "text"
+            },
+            "path": {
+                "type": "keyword"
+            },
+            "path_enc": {
+                "type": "keyword"
+            },
+            "accessed": {
+                "type": "date"
+            },
+            "contains_refs": {
+                "type": "keyword"
+            },
+            "value": {
+                "type": "keyword"
+            },
+            "resolves_to_refs": {
+                "type": "keyword"
+            },
+            "display_name": {
+                "type": "keyword"
+            },
+            "belongs_to_ref": {
+                "type": "keyword"
+            },
+            "is_multipart": {
+                "type": "boolean"
+            },
+            "date": {
+                "type": "date"
+            },
+            "content_type": {
+                "type": "keyword"
+            },
+            "from_ref": {
+                "type": "keyword"
+            },
+            "sender_ref": {
+                "type": "keyword"
+            },
+            "to_refs": {
+                "type": "keyword"
+            },
+            "cc_refs": {
+                "type": "keyword"
+            },
+            "bcc_refs": {
+                "type": "keyword"
+            },
+            "subject": {
+                "type": "keyword"
+            },
+            "received_lines": {
+                "type": "keyword"
+            },
+            "additional_header_fields": {
+                "type": "object"
+            },
+            "body": {
+                "type": "text"
+            },
+            "body_multipart": {
+                "type": "keyword"
+            },
+            "raw_email_ref": {
+                "type": "keyword"
+            },
+            "size": {
+                "type": "integer"
+            },
+            "name_enc": {
+                "type": "keyword"
+            },
+            "magic_number_hex": {
+                "type": "keyword"
+            },
+            "parent_directory_ref": {
+                "type": "keyword"
+            },
+            "is_encrypted": {
+                "type": "boolean"
+            },
+            "encryption_algorithm": {
+                "type": "keyword"
+            },
+            "decryption_key": {
+                "type": "keyword"
+            },
+            "content_ref": {
+                "type": "keyword"
+            },
+            "belongs_to_refs": {
+                "type": "keyword"
+            },
+            "identity_class": {
+                "type": "keyword"
+            },
+            "sectors": {
+                "type": "keyword"
+            },
+            "contact_information": {
+                "type": "text"
+            },
+            "pattern": {
+                "type": "text"
+            },
+            "valid_from": {
+                "type": "date"
+            },
+            "valid_until": {
+                "type": "date"
+            },
+            "goals": {
+                "type": "text"
+            },
+            "resource_level": {
+                "type": "keyword"
+            },
+            "primary_motivation": {
+                "type": "keyword"
+            },
+            "secondary_motivations": {
+                "type": "keyword"
+            },
+            "start": {
+                "type": "date"
+            },
+            "end": {
+                "type": "date"
+            },
+            "is_active": {
+                "type": "boolean"
+            },
+            "src_ref": {
+                "type": "keyword"
+            },
+            "dst_ref": {
+                "type": "keyword"
+            },
+            "src_port": {
+                "type": "integer"
+            },
+            "dst_port": {
+                "type": "integer"
+            },
+            "protocols": {
+                "type": "keyword"
+            },
+            "src_byte_count": {
+                "type": "integer"
+            },
+            "dst_byte_count": {
+                "type": "integer"
+            },
+            "src_packets": {
+                "type": "integer"
+            },
+            "dst_packets": {
+                "type": "integer"
+            },
+            "ipfix": {
+                "type": "object"
+            },
+            "src_payload_ref": {
+                "type": "keyword"
+            },
+            "dst_payload_ref": {
+                "type": "keyword"
+            },
+            "encapsulates_refs": {
+                "type": "keyword"
+            },
+            "encapsulates_by_ref": {
+                "type": "keyword"
+            },
+            "first_observed": {
+                "type": "date"
+            },
+            "last_observed": {
+                "type": "date"
+            },
+            "number_observed": {
+                "type": "integer"
+            },
+            "is_hidden": {
+                "type": "boolean"
+            },
+            "pid": {
+                "type": "integer"
+            },
+            "cwd": {
+                "type": "keyword"
+            },
+            "arguments": {
+                "type": "keyword"
+            },
+            "command_line": {
+                "type": "keyword"
+            },
+            "environment_variables": {
+                "type": "object"
+            },
+            "opened_connection_refs": {
+                "type": "keyword"
+            },
+            "creator_user_ref": {
+                "type": "keyword"
+            },
+            "binary_ref": {
+                "type": "keyword"
+            },
+            "parent_ref": {
+                "type": "keyword"
+            },
+            "child_refs": {
+                "type": "keyword"
+            },
+            "relationship_type": {
+                "type": "keyword"
+            },
+            "source_ref": {
+                "type": "keyword"
+            },
+            "target_ref": {
+                "type": "keyword"
+            },
+            "published": {
+                "type": "date"
+            },
+            "object_refs": {
+                "type": "keyword"
+            },
+            "count": {
+                "type": "integer"
+            },
+            "sighting_of_ref": {
+                "type": "keyword"
+            },
+            "observed_data_refs": {
+                "type": "keyword"
+            },
+            "where_sighted_refs": {
+                "type": "keyword"
+            },
+            "summary": {
+                "type": "boolean"
+            },
+            "cpe": {
+                "type": "keyword"
+            },
+            "languages": {
+                "type": "keyword"
+            },
+            "vendor": {
+                "type": "keyword"
+            },
+            "version": {
+                "type": "keyword"
+            },
+            "roles": {
+                "type": "keyword"
+            },
+            "sophistication": {
+                "type": "keyword"
+            },
+            "personal_motivations": {
+                "type": "keyword"
+            },
+            "tool_version": {
+                "type": "text"
+            },
+            "user_id": {
+                "type": "keyword"
+            },
+            "account_login": {
+                "type": "keyword"
+            },
+            "account_type": {
+                "type": "keyword"
+            },
+            "is_service_account": {
+                "type": "boolean"
+            },
+            "is_privileged": {
+                "type": "boolean"
+            },
+            "can_escalate_privs": {
+                "type": "boolean"
+            },
+            "is_disabled": {
+                "type": "boolean"
+            },
+            "account_created": {
+                "type": "date"
+            },
+            "account_expires": {
+                "type": "date"
+            },
+            "password_last_changed": {
+                "type": "date"
+            },
+            "account_first_login": {
+                "type": "date"
+            },
+            "account_last_login": {
+                "type": "date"
+            },
+            "key": {
+                "type": "keyword"
+            },
+            "values": {
+                "type": "keyword"
+            },
+            "number_of_subkeys": {
+                "type": "integer"
+            },
+            "is_self_signed": {
+                "type": "boolean"
+            },
+            "serial_number": {
+                "type": "keyword"
+            },
+            "signature_algorithm": {
+                "type": "keyword"
+            },
+            "issuer": {
+                "type": "keyword"
+            },
+            "validity_not_before": {
+                "type": "date"
+            },
+            "validity_not_after": {
+                "type": "date"
+            },
+            "subject_public_key_algorithm": {
+                "type": "keyword"
+            },
+            "subject_public_key_modulus": {
+                "type": "keyword"
+            },
+            "subject_public_key_exponent": {
+                "type": "integer"
+            },
+            "x509_v3_extensions": {
+                "type": "object"
+            }
+        }
+    }
+}
