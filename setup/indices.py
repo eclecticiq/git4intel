@@ -4,12 +4,13 @@ import os
 import inspect
 import json
 import collections
-import requests
+import re
 from pprint import pprint
 
 from elasticsearch import Elasticsearch
 from datetime import datetime
 
+es = Elasticsearch()
 stix_ver = '20'
 
 schema_map = {
@@ -128,22 +129,52 @@ def stix_to_elk(obj):
     return mapping
 
 
+def todays_index(index_alias):
+    return (index_alias + '-' + datetime.now().strftime("%y%m%d"))
+
+
+def get_index_from_alias(index_alias):
+    aliases = es.cat.aliases(name=[index_alias]).split(' ')
+    for alias in aliases:
+        if re.match(r'.+-[0-9]+', alias):
+            return alias
+    return False
+
+
 def update_es_indexmapping(index_alias, new_mapping):
-    now = datetime.now()
-    date_str = now.strftime("%y%m%d")
-    new_index_name = index_alias + '-' + date_str
+    new_index_name = todays_index(index_alias)
 
-    es = Elasticsearch()
     if es.indices.exists(index=[new_index_name]):
-        print('Wait until tomorrow to update...I guess...')
         return False
+    else:
+        # Strip aliases from old index
+        old_index_name = get_index_from_alias(index_alias)
+        if old_index_name:
+            es.indices.delete_alias(index=[old_index_name], name=[
+                                    index_alias, 'intel'])
 
-    es.indices.create(index=new_index_name, body=new_mapping)
-    if es.indices.exists_alias([index_alias]):
-        es.indices.delete_alias(index=[index_alias], name=[index_alias])
-    es.indices.put_alias(index=[new_index_name], name=index_alias)
+        new_index(index_alias, new_mapping)
 
-    return True
+        # Reindexing requires at least 1 document in the index...
+        if int(str(es.cat.count(index=[new_index_name])).split(' ')[2]) > 0:
+            reindex_body = {
+                "source": {
+                    "index": index_alias
+                },
+                "dest": {
+                    "index": new_index_name
+                }
+            }
+            es.reindex(body=reindex_body)
+
+        return True
+
+
+def new_index(index_alias, mapping):
+    index_name = todays_index(index_alias)
+    es.indices.create(index=index_name, body=mapping)
+    es.indices.put_alias(index=[index_name], name='intel')
+    return es.indices.put_alias(index=[index_name], name=index_alias)
 
 
 def main():
@@ -157,38 +188,29 @@ def main():
                 index_name = obj._type
                 new_es_mapping = stix_to_elk(obj)
                 update(master_mapping, new_es_mapping)
-                # print(index_name)
-                # pprint(new_es_mapping)
-                cached_mapping_file = mapping_cache_dir + \
-                    str(index_name) + '.json'
 
-                try:
-                    # get cached mapping
-                    with open(cached_mapping_file) as json_file:
-                        cached_mapping = json.load(json_file)
+                # index_name = 'intel'
+                # new_es_mapping = master_mapping
+                current_mapping = es.indices.get_mapping(
+                    index=[index_name], ignore_unavailable=True)
 
-                    # compare and resave recache if needed
-                    if ordered(new_es_mapping.items()) == ordered(cached_mapping.items()):
-                        print(
-                            "No updates in stix2 mapping from cache for " + index_name)
+                if current_mapping:
+                    if ordered(new_es_mapping.items()) == ordered(next(iter(current_mapping.values())).items()):
+                        print(index_name + ' mapping is up to date!')
+                        pass
                     else:
-                        raise FileNotFoundError(
-                            "Update found and refreshed for " + index_name)
-                except FileNotFoundError:
-                    # cache for first time or recache data
-                    update_detected = True
-                    print("Caching " + index_name)
-                    with open(cached_mapping_file, 'w') as f:
-                        json.dump(new_es_mapping, f,
-                                  ensure_ascii=False, indent=4)
-    print(str(len(os.listdir(mapping_cache_dir))) + ' object mappings cached.')
-    # pprint(master_mapping)
-    if update_detected:
-        with open('./' + stix_ver + 'master_mapping.json', 'w') as f:
-            json.dump(master_mapping, f,
-                      ensure_ascii=False, indent=4)
-        print("Refreshed master mapping.")
-        print(update_es_indexmapping('master', master_mapping))
+                        if not update_index_mapping(index_name, new_es_mapping):
+                            print(
+                                index_name + ' was already updated today. Try again tomorrow.')
+                        else:
+                            print('Index refreshed for ' + index_name)
+                else:
+                    resp = new_index(index_name, new_es_mapping)
+                    try:
+                        if resp['acknowledged'] == True:
+                            print('Created new index for ' + index_name)
+                    except KeyError:
+                        print('Failed to create new index for ' + index_name)
 
 
 if __name__ == "__main__":
