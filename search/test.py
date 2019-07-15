@@ -78,7 +78,7 @@ def main():
   }
 
   test_results = {}
-  test_runs = 1000
+  test_runs = 10
   sum_times = 0.0
   for i in range(test_runs):
     ids = []
