@@ -205,11 +205,9 @@ def get_atp_rels(attack_id):
     return res
 
 
-def get_immediates(atpid):
+def get_neighbours(atpid):
     res = get_atp_rels(atpid)
-    pprint(res)
-    sys.exit(0)
-    count = 0
+    neighbours = []
     for hit in res['hits']['hits']:
         if hit['_source']['source_ref'] == atpid:
             related_id = hit['_source']['target_ref']
@@ -219,14 +217,18 @@ def get_immediates(atpid):
         related_doctype = id_parts[0]
         related_docid = id_parts[1]
         res = es.get(index=related_doctype, id=related_docid)
-        count += 1
+        neighbours.append(res['_source']['id'])
 
-        pprint(res)
-        print(count)
+    return neighbours
 
 
-def get_keyword_matches(keyword_list):
+def get_keyword_matches(keyword_list, neighbourhood=None):
     match_phrases = []
+    match_neighbours = []
+    if neighbourhood:
+        for neighbour in neighbourhood:
+            match_neighbours.append({"term": {"id": neighbour}})
+        print('Neighbour count: ' + str(len(match_neighbours)))
     for keyword in keyword_list:
         match_phrases.append({
             "multi_match": {
@@ -235,20 +237,40 @@ def get_keyword_matches(keyword_list):
                 "fields": keyword_query_fields
             }
         })
+    # match_all = match_phrases + match_neighbours
     q = {
         "query": {
             "bool": {
-                "should": match_phrases
+                "should": [{
+                    "bool": {
+                        "should": match_phrases,
+                    },
+                }],
+                "filter": {
+                    "bool": {
+                        "should": match_neighbours
+                    }
+                }
+
             }
         }
     }
     res = es.search(index='intel', body=q, size=10000)
-    pprint(res)
+    return res
+
+
+def ea_query(attack_pattern_id, keyword_list):
+    return get_keyword_matches(keyword_list, get_neighbours(attack_pattern_id))
 
 
 def main():
-    # get_immediates('attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add')
-    get_keyword_matches(["Democratic National Committee", "XTunnel"])
+    results = ea_query('attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add',
+                       ["Democratic National Committee", "XTunnel"])
+
+    pprint(results)
+
+    for hit in results['hits']['hits']:
+        print(hit['_source']['id'], hit['_score'])
 
 
 if __name__ == "__main__":
