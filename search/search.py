@@ -224,11 +224,11 @@ def get_neighbours(atpid):
 
 def get_keyword_matches(keyword_list, neighbourhood=None):
     match_phrases = []
-    match_neighbours = []
-    if neighbourhood:
-        for neighbour in neighbourhood:
-            match_neighbours.append({"term": {"id": neighbour}})
-        print('Neighbour count: ' + str(len(match_neighbours)))
+    # match_neighbours = []
+    # if neighbourhood:
+    #     for neighbour in neighbourhood:
+    #         match_neighbours.append({"term": {"id": neighbour}})
+    #     # print('Neighbour count: ' + str(len(match_neighbours)))
     for keyword in keyword_list:
         match_phrases.append({
             "multi_match": {
@@ -238,39 +238,71 @@ def get_keyword_matches(keyword_list, neighbourhood=None):
             }
         })
     # match_all = match_phrases + match_neighbours
-    q = {
-        "query": {
-            "bool": {
-                "should": [{
-                    "bool": {
-                        "should": match_phrases,
-                    },
-                }],
-                "filter": {
-                    "bool": {
-                        "should": match_neighbours
-                    }
-                }
+    # q = {
+    #     "query": {
+    #         "bool": {
+    #             "should": [{
+    #                 "bool": {
+    #                     "should": match_phrases,
+    #                 },
+    #             }],
+    #             "filter": {
+    #                 "bool": {
+    #                     "should": match_neighbours
+    #                 }
+    #             }
+    #         }
+    #     }
+    # }
 
+        q = {
+            "query": {
+                "bool": {
+                    "should": [{
+                        "bool": {
+                            "should": match_phrases,
+                        },
+                    }],
+                    # "must": {
+                    #     "bool": {
+                    #         "should": match_neighbours
+                    #     }
+                    # }
+
+                }
             }
         }
-    }
-    res = es.search(index='intel', body=q, size=10000)
+
+    res = es.search(index='sdo', body=q, size=10000)
     return res
 
 
 def ea_query(attack_pattern_id, keyword_list):
-    return get_keyword_matches(keyword_list, get_neighbours(attack_pattern_id))
+    results = get_keyword_matches(keyword_list)
+    results['neighbours'] = get_neighbours(attack_pattern_id)
+    return results
 
 
 def main():
-    results = ea_query('attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add',
-                       ["Democratic National Committee", "XTunnel"])
+    test_results = {}
+    test_runs = 100
+    sum_times = 0.0
+    for i in range(test_runs):
+        start = time.time()
+        results = ea_query('attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add',
+                           ["Sednit", "XTunnel"])
+        end = time.time()
+        time_taken = end - start
+        test_results[i] = time_taken
+        sum_times += time_taken
 
-    pprint(results)
+        # pprint(results)
 
-    for hit in results['hits']['hits']:
-        print(hit['_source']['id'], hit['_score'])
+        # for hit in results['hits']['hits']:
+        #     print(hit['_source']['id'], hit['_score'])
+
+    pprint(test_results)
+    print('Average time taken: ' + str(sum_times / test_runs))
 
 
 if __name__ == "__main__":

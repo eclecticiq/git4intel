@@ -13,6 +13,21 @@ from datetime import datetime
 es = Elasticsearch()
 stix_ver = '20'
 
+sdo_indices = [
+    'attack-pattern',
+    'campaign',
+    'course-of-action',
+    'identity',
+    'indicator',
+    'intrusion-set',
+    'malware',
+    'observed-data',
+    'report',
+    'threat-actor',
+    'tool',
+    'vulnerability',
+]
+
 schema_map = {
     'ListProperty': {
         'external_references': 'nested',
@@ -152,6 +167,8 @@ def update_es_indexmapping(index_alias, new_mapping):
         if old_index_name:
             es.indices.delete_alias(index=[old_index_name], name=[
                                     index_alias, 'intel'])
+        if index_alias in sdo_indices:
+            es.indices.delete_alias(index=[old_index_name], name=['sdo'])
 
         new_index(index_alias, new_mapping)
 
@@ -174,6 +191,8 @@ def new_index(index_alias, mapping):
     index_name = todays_index(index_alias)
     es.indices.create(index=index_name, body=mapping)
     es.indices.put_alias(index=[index_name], name='intel')
+    if index_alias in sdo_indices:
+        es.indices.put_alias(index=[index_name], name='sdo')
     return es.indices.put_alias(index=[index_name], name=index_alias)
 
 
