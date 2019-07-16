@@ -8,9 +8,8 @@ from pprint import pprint
 with open('../config.json') as config_file:
     config = json.load(config_file)
 
-
-def get_config(param):
-    return config[param]
+with open('molecules.json') as molecule_file:
+    molecules = json.load(molecule_file)
 
 
 es = Elasticsearch(config['es_host'])
@@ -34,88 +33,7 @@ keyword_query_fields = [
 ]
 
 
-def attack_all():
-
-    s = Search(using=es, index="intel") \
-        .query("match_all")
-
-    response = s.execute()
-
-    # print(response)
-
-    # count = 0
-    objects = []
-    for hit in s.scan():
-        #     count += 1
-        if hit.type != 'identity':
-            objects.append(next(iter(hit.__dict__.values())))
-        else:
-            print('Got the id out!')
-    # print(dir(hit))
-
-    bundle = {
-        "type": "bundle",
-        "id": "bundle--b041e2e4-3648-4f8f-8975-b29386a489a8",
-        "spec_version": "2.0",
-        "objects": objects
-    }
-    # print(bundle)
-    with open('data.json', 'w') as f:
-        json.dump(bundle, f)
-
-    # print(count)
-
-
-def get_killchain_phase():
-    s = Search(using=es, index="intel") \
-        .query('match', phase_name='defense-evasion')
-
-    response = s.execute()
-
-    print(response)
-
-    # count = 0
-    # objects = []
-    # for hit in s.scan():
-    #     #     count += 1
-    #     if hit.type != 'identity':
-    #         objects.append(next(iter(hit.__dict__.values())))
-    #     else:
-    #         print('Got the id out!')
-    # # print(dir(hit))
-
-    # bundle = {
-    #     "type": "bundle",
-    #     "id": "bundle--b041e2e4-3648-4f8f-8975-b29386a489a8",
-    #     "spec_version": "2.0",
-    #     "objects": objects
-    # }
-    # # print(bundle)
-    # with open('data.json', 'w') as f:
-    #     json.dump(bundle, f)
-
-    # print(count)
-
-
 def run_time_test():
-    failed_query = {
-        "query": {
-            "nested": {
-                "path": "kill_chain_phases",
-                "query": {
-                    "bool": {
-                        "must": [
-                            {"match": {"kill_chain_phases.phase_name": "defense-evasion"}},
-                            {"match": {
-                                "kill_chain_phases.kill_chain_name":  "lockheed-martin"}}
-                        ]
-                    }
-                }
-            }
-        }
-    }
-
-    # print(es.search(index="intel", body=failed_query))
 
     successful_query = {
         "query": {
@@ -213,19 +131,29 @@ def get_atp_rels(attack_id):
     return res
 
 
-def get_neighbours(atpid):
-    res = get_atp_rels(atpid)
-    neighbours = []
+def get_neighbours(stixid):
+    res = get_atp_rels(stixid)
+    orig_type = stixid.split('--')[0]
+    neighbours = {
+        'molecule_relevant': [],
+        'suggestions': []
+    }
     for hit in res['hits']['hits']:
-        if hit['_source']['source_ref'] == atpid:
+        if hit['_source']['source_ref'] == stixid:
             related_id = hit['_source']['target_ref']
         else:
             related_id = hit['_source']['source_ref']
         id_parts = related_id.split('--')
         related_doctype = id_parts[0]
         related_docid = id_parts[1]
-        res = es.get(index=related_doctype, id=related_docid)
-        neighbours.append(res['_source']['id'])
+
+        # NOTE: Currently hard-coding for specific molecule config pattern. Need to figure out how to pass
+        # specific molecule pattern to use OR whether we should just cycle them all...?
+        if related_doctype in molecules['molecule_1'][orig_type]:
+            res = es.get(index=related_doctype, id=related_docid)
+            neighbours['molecule_relevant'].append(res['_source'])
+        else:
+            neighbours['suggestions'].append(related_id)
 
     return neighbours
 
@@ -245,23 +173,6 @@ def get_keyword_matches(keyword_list, neighbourhood=None):
                 "fields": keyword_query_fields
             }
         })
-    # match_all = match_phrases + match_neighbours
-    # q = {
-    #     "query": {
-    #         "bool": {
-    #             "should": [{
-    #                 "bool": {
-    #                     "should": match_phrases,
-    #                 },
-    #             }],
-    #             "filter": {
-    #                 "bool": {
-    #                     "should": match_neighbours
-    #                 }
-    #             }
-    #         }
-    #     }
-    # }
 
         q = {
             "query": {
@@ -292,8 +203,11 @@ def ea_query(attack_pattern_id, keyword_list):
 
 
 def main():
+    # res = get_neighbours(
+    #     'attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add')
+    # pprint(res)
     test_results = {}
-    test_runs = 100
+    test_runs = 10
     sum_times = 0.0
     for i in range(test_runs):
         start = time.time()

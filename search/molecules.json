@@ -1,0 +1,10 @@
+{
+    "molecule_1": {
+        "attack-pattern": [
+            "indicator",
+            "course-of-action",
+            "incident",
+            "attack-pattern"
+        ]
+    }
+}
