@@ -1,5 +1,24 @@
-# inc-mission-control-git4intel
-Git4Intelligence
+# Git4Intelligence
+
+Open standards on threat intelligence and knowledge management implemented in a best-of-breed way to enable deep provenance management and version control. Assertions tracked as object cluster/groupings in a way that provides real time access to relevant data to support actionable intelligence.
+
+## Installation
+
+Current build is designed to run off local setup of the code but should be able to handle remote elasticsearch host too.
+
+* Copy/fetch repo to local
+* Make sure the environment that you are using to run python has [cti-python-stix2](https://github.com/oasis-open/cti-python-stix2) installed
+* Download and install [elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/install-elasticsearch.html) (and maybe kibana to track stuff), OR, if you already have an elasticsearch stack you want to use...
+* Adjust settings in config.json to taste (including hostname for your elasticsearch if not on localhost)
+* Run `setup.py` which will:
+  * run `indices.py` to setup elasticsearch with mappings based off the stix2
+  * run `attack.py` to prime the indices with [Mitre Att&ck](https://attack.mitre.org/) data
+
+## Usage
+
+Currently supporting simple scored searching results based on pivoting with a Mitre Att&ck id. Use `ea_query()` in `search.py`.
+Will extend functionality in due course...
+
 
 ToDo
 * ~Setup IDE~
@@ -18,5 +37,3 @@ General Notes:
 * Never delete or revoke entities unless the original source instructs to do so
 * Need a `x_eiq_head` custom stix field on the 'latest' entities to be correlated to the complete (raw) landscape. This is _not_ the overall summarised threat picture as that differs from query to query
 * When a user queries for intelligence, what they see is a summarised picture based on who they are and what they are querying for - by default run on all entities with `x_eiq_head == true`. Running on `false` would be for historic queries - more complex and requires tree walking to figure out if there are conflicts between maerges...but should be fine since deleting is no longer an issue (though have to decide whether referencing a 'replaced' entity is ok...or how that is represented in the translation layer).
-
-Testing some stuff...

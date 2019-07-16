@@ -7,7 +7,15 @@ import json
 import sys
 from elasticsearch import Elasticsearch
 
-es = Elasticsearch()
+with open('../config.json') as config_file:
+    config = json.load(config_file)
+
+
+def get_config(param):
+    return config[param]
+
+
+es = Elasticsearch(config['es_host'])
 
 
 def main():
@@ -26,7 +34,7 @@ def main():
                 index=obj['type'], id=obj['id'].split('--')[1], body=obj.serialize())
             print(res['result'])
         except AttributeError:
-            print('---> NOT pushed: ' + obj['id'])
+            print('---> NOT pushed (serialization issues): ' + obj['id'])
 
 
 if __name__ == "__main__":

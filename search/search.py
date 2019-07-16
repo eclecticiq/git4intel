@@ -5,7 +5,15 @@ import json
 import time
 from pprint import pprint
 
-es = Elasticsearch()
+with open('../config.json') as config_file:
+    config = json.load(config_file)
+
+
+def get_config(param):
+    return config[param]
+
+
+es = Elasticsearch(config['es_host'])
 
 # Accept calls for Mitre Attack pattern id and keyword list
 # Search on all entities known to relate to that id

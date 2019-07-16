@@ -10,8 +10,16 @@ from pprint import pprint
 from elasticsearch import Elasticsearch
 from datetime import datetime
 
-es = Elasticsearch()
-stix_ver = '20'
+with open('../config.json') as config_file:
+    config = json.load(config_file)
+
+
+def get_config(param):
+    return config[param]
+
+
+es = Elasticsearch(config['es_host'])
+stix_ver = config['stix_ver']
 
 sdo_indices = [
     'attack-pattern',
@@ -196,6 +204,23 @@ def new_index(index_alias, mapping):
     return es.indices.put_alias(index=[index_name], name=index_alias)
 
 
+def compare_mappings(current_mapping, new_mapping):
+    # Return True if there are differences
+    # pprint(current_mapping)
+    # pprint(new_mapping)
+    for field in new_mapping['mappings']['properties']:
+        try:
+            if current_mapping['mappings']['properties'][field] != new_mapping['mappings']['properties'][field]:
+                pprint(current_mapping['mappings']['properties'][field])
+                pprint(new_mapping['mappings']['properties'][field])
+                return True
+        except KeyError:
+            pprint(current_mapping['mappings']['properties'][field])
+            pprint(new_mapping['mappings']['properties'][field])
+            return True
+    return False
+
+
 def main():
     mapping_cache_dir = './' + stix_ver + 'mappings/'
     master_mapping = {}
@@ -210,11 +235,13 @@ def main():
 
                 # index_name = 'intel'
                 # new_es_mapping = master_mapping
-                current_mapping = es.indices.get_mapping(
+                tmp_mapping = es.indices.get_mapping(
                     index=[index_name], ignore_unavailable=True)
 
+                current_mapping = next(iter(tmp_mapping.values()))
+
                 if current_mapping:
-                    if ordered(new_es_mapping.items()) == ordered(next(iter(current_mapping.values())).items()):
+                    if not compare_mappings(current_mapping, new_es_mapping):
                         print(index_name + ' mapping is up to date!')
                         pass
                     else:
