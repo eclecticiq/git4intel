@@ -37,3 +37,9 @@ General Notes:
 * Never delete or revoke entities unless the original source instructs to do so
 * Need a `x_eiq_head` custom stix field on the 'latest' entities to be correlated to the complete (raw) landscape. This is _not_ the overall summarised threat picture as that differs from query to query
 * When a user queries for intelligence, what they see is a summarised picture based on who they are and what they are querying for - by default run on all entities with `x_eiq_head == true`. Running on `false` would be for historic queries - more complex and requires tree walking to figure out if there are conflicts between maerges...but should be fine since deleting is no longer an issue (though have to decide whether referencing a 'replaced' entity is ok...or how that is represented in the translation layer).
+
+Workflow:
+* Hunter has done all of their stuff...ending in identifying a Mitre Att&ck attack-pattern as being relevant to their ongoing case/investigation/work
+* Hunting platform creates a sighting entity and pushes that towards the ea_query api
+* ea_query pushes the sighting in to the database
+* ea_query searches on the id of the attack-pattern from the sighting object to return (all filtered by what the end user is allowed to see - otherwise ids only):  related entities (`molecule_relevant` all objects which fit the molecule pattern(s) (WHICH PATTERNS?!?), `suggestions` for all other related entities which the Hunter can verify with additional actions if applicable - TBC)
