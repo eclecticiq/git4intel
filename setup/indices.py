@@ -223,16 +223,14 @@ def compare_mappings(current_mapping, new_mapping):
 
 
 def main():
-    mapping_cache_dir = './' + stix_ver + 'mappings/'
-    master_mapping = {}
-    update_detected = False
+    # master_mapping = {}
     for name, obj in inspect.getmembers(sys.modules[get_stix_ver_name()]):
         if inspect.isclass(obj):
             class_type = inspect.getmro(obj)[1].__name__
             if class_type in supported_types:
                 index_name = obj._type
                 new_es_mapping = stix_to_elk(obj)
-                update(master_mapping, new_es_mapping)
+                # update(master_mapping, new_es_mapping)
 
                 # index_name = 'intel'
                 # new_es_mapping = master_mapping

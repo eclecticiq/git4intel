@@ -9,11 +9,5 @@ attack = loader.load_module('attack')
 from indices import *
 from attack import *
 
-
-def main():
-    indices.main()
-    attack.main()
-
-
-if __name__ == "__main__":
-    main()
+indices.main()
+attack.main()

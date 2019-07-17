@@ -34,7 +34,7 @@ def main():
         try:
             res = es.index(
                 index=obj['type'], id=obj['id'].split('--')[1], body=obj.serialize())
-            print(res['result'])
+            print(str(res['result']) + ' ' + obj['id'])
         except AttributeError:
             print('---> NOT pushed (serialization issues): ' + obj['id'])
 
