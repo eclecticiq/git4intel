@@ -1,0 +1,4 @@
+{
+    "es_host": "localhost:9200",
+    "stix_ver": "20"
+}
