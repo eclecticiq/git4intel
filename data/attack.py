@@ -1,5 +1,3 @@
-
-
 from stix2 import TAXIICollectionSource, Filter
 from taxii2client import Collection
 from pprint import pprint
