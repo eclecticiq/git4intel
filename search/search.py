@@ -4,11 +4,13 @@ import stix2
 import json
 import time
 from pprint import pprint
+import os
 
-with open('../config.json') as config_file:
+dir_path = os.path.dirname(os.path.realpath(__file__))
+with open(dir_path + '/../config.json') as config_file:
     config = json.load(config_file)
 
-with open('molecules.json') as molecule_file:
+with open(dir_path + 'molecules.json') as molecule_file:
     molecules = json.load(molecule_file)
 
 

@@ -6,8 +6,10 @@ from pprint import pprint
 import json
 import sys
 from elasticsearch import Elasticsearch
+import os
 
-with open('../config.json') as config_file:
+dir_path = os.path.dirname(os.path.realpath(__file__))
+with open(dir_path + '/../config.json') as config_file:
     config = json.load(config_file)
 
 

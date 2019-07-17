@@ -10,7 +10,8 @@ from pprint import pprint
 from elasticsearch import Elasticsearch
 from datetime import datetime
 
-with open('../config.json') as config_file:
+dir_path = os.path.dirname(os.path.realpath(__file__))
+with open(dir_path + '/../config.json') as config_file:
     config = json.load(config_file)
 
 
@@ -238,9 +239,8 @@ def main():
                 tmp_mapping = es.indices.get_mapping(
                     index=[index_name], ignore_unavailable=True)
 
-                current_mapping = next(iter(tmp_mapping.values()))
-
-                if current_mapping:
+                try:
+                    current_mapping = next(iter(tmp_mapping.values()))
                     if not compare_mappings(current_mapping, new_es_mapping):
                         print(index_name + ' mapping is up to date!')
                         pass
@@ -250,7 +250,7 @@ def main():
                                 index_name + ' was already updated today. Try again tomorrow.')
                         else:
                             print('Index refreshed for ' + index_name)
-                else:
+                except StopIteration:
                     resp = new_index(index_name, new_es_mapping)
                     try:
                         if resp['acknowledged'] == True:
