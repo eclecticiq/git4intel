@@ -4,6 +4,7 @@ import stix2
 import json
 
 
+# Just playing around with some stuff. Doesn't really work in this context.
 def main():
     url = 'https://www.theregister.co.uk/security/headlines.atom'
 
