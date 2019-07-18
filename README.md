@@ -8,7 +8,7 @@ Current build is designed to run off local setup of the code but should be able 
 
 * Copy/fetch this repo to local
 * `python3 -m pip install ./dist/git4intel-0.0.1.tar.gz` to install
-* Copy/fetch the patched version of cti-python-stix2 from [this branch](https://github.com/cobsec/cti-python-stix2)
+* Copy/fetch the patched version of cti-python-stix2 from [this branch](https://github.com/eclecticiq/cti-python-stix2)
 * `python3 -m pip install ./dist/stix2eiq-0.0.1.tar.gz` to install the patched stix2 library which will behanve the same as stix2 (so `import stix2` and use as normal)
 * Download and install [elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/install-elasticsearch.html) (and maybe kibana to track stuff), OR, if you already have an elasticsearch stack you want to use...
 
