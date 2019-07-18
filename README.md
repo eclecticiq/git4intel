@@ -6,18 +6,19 @@ Open standards on threat intelligence and knowledge management implemented in a 
 
 Current build is designed to run off local setup of the code but should be able to handle remote elasticsearch host too.
 
-* Copy/fetch repo to local
-* Make sure the environment that you are using to run python has [cti-python-stix2](https://github.com/oasis-open/cti-python-stix2) installed
+* Copy/fetch this repo to local
+* `python3 -m pip install ./dist/git4intel-0.0.1.tar.gz` to install
+* Copy/fetch the patched version of cti-python-stix2 from [this branch](https://github.com/cobsec/cti-python-stix2)
+* `python3 -m pip install ./dist/stix2eiq-0.0.1.tar.gz` to install the patched stix2 library which will behanve the same as stix2 (so `import stix2` and use as normal)
 * Download and install [elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/install-elasticsearch.html) (and maybe kibana to track stuff), OR, if you already have an elasticsearch stack you want to use...
-* Adjust settings in config.json to taste (including hostname for your elasticsearch if not on localhost)
-* Run `setup.py` which will:
-  * run `indices.py` to setup elasticsearch with mappings based off the stix2
-  * run `attack.py` to prime the indices with [Mitre Att&ck](https://attack.mitre.org/) data
 
 ## Usage
 
-Currently supporting simple scored searching results based on pivoting with a Mitre Att&ck id. Use `ea_query()` in `search.py`.
-Will extend functionality in due course...
+* Make sure elasticsearch is running
+* git4intel acts as a wrapper around the elasticsearch python client with specific function calls that ensure that searches are optimised and filters are applied appropriately (ie: ensuring the latest intel 'commits' are used, molecule pattern searching is optimised and client identities are used to filter what you are allowed to see...that last part isn't locked down just yet and will be handled later, this is just a PoC)
+
+Functions include:
+* `store()` which takes a stix2 bundle and uses elasticsearch `index()` to push documents in to elasticsearch, applying necessary git4intel fields and 
 
 
 ToDo

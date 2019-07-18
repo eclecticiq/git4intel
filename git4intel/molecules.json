@@ -1,5 +1,5 @@
 {
-    "molecule_1": {
+    "m_hunt": {
         "attack-pattern": [
             "indicator",
             "course-of-action",

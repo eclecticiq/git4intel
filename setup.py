@@ -1,10 +1,28 @@
-import importlib.machinery
+import os
+from setuptools import setup, find_packages
 
-loader = importlib.machinery.SourceFileLoader('indices', './setup/indices.py')
-indices = loader.load_module('indices')
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
-loader = importlib.machinery.SourceFileLoader('attack', './data/attack.py')
-attack = loader.load_module('attack')
-
-indices.main()
-attack.main()
+setup(
+    name="git4intel",
+    description="elasticsearch threat intel client library",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="https://github.com/eclecticiq/inc-mission-control-git4intel/",
+    author="EclecticIQ",
+    author_email="chris@eclecticiq.com",
+    version='0.0.1',
+    license="GNU General Public License v3.0",
+    packages=find_packages(),
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Information Technology",
+        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+        "Programming Language :: Python :: 3",
+        "Topic :: Internet",
+        "Topic :: Security",
+        "Topic :: Software Development :: Libraries :: Python Modules"
+    ]
+)
