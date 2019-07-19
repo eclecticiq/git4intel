@@ -1,48 +1,35 @@
 import json
 
 
-def check_bundle_for_type(bundle, _type):
-    for stix_object in bundle.objects:
-        if stix_object.type == _type:
-            return stix_object.id
-    return False
-
-
-def check_equal(lst):
-    return not lst or lst.count(lst[0]) == len(lst)
-
-
 def check_commit(bundle):
-    sdos = [
-        'attack-pattern',
-        'campaign',
-        'course-of-action',
-        'indicator',
-        'intrusion-set',
-        'malware',
-        'observed-data',
-        'report',
-        'threat-actor',
-        'tool',
-        'vulnerability',
-    ]
-    # Intel Commit Feature 1: identity object is present and applied as created_by_ref
-    identity_id = check_bundle_for_type(bundle, 'identity')
-    mod_ts = []
-    if identity_id:
-        for stix_object in bundle.objects:
-            # mod_ts.append(stix_object.modified)
-            if stix_object.type in sdos and stix_object.created_by_ref != identity_id:
-                return False
-    else:
-        return False
+    grouping_count = 0
+    identity_count = 0
+    ids = []
+    ident_ids = []
+    group_obj_lst = []
 
-    # Intel Commit Feature 2: modified timestamp must be the same for all objects§
-    # if check_equal(mod_ts):
-    #     return True
-    # else:
-    #     return False
-    return True
+    for obj in bundle.objects:
+        if obj.type == 'grouping':
+            grouping_count += 1
+            group_author = obj.created_by_ref
+            group_obj_lst = obj.object_refs
+        elif obj.type == 'identity':
+            identity_count += 1
+            ident_ids.append(obj.id)
+            ids.append(obj.id)
+        else:
+            try:
+                ids.append(obj.id)
+            except AttributeError:
+                pass
+
+    if grouping_count != 1 or identity_count < 1:
+        return False
+    else:
+        if ids.sort() == group_obj_lst.sort():
+            return True
+        else:
+            return False
 
 
 def load_molecules(path):

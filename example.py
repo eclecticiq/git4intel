@@ -24,8 +24,14 @@ def make_some_stix():
     rel_ind_obsdata = stix2.v21.Relationship(
         source_ref=ind_event.id, target_ref=obs_data.id, relationship_type='based_on', created_by_ref=ident.id)
 
-    bundle = stix2.v21.Bundle(
-        [obs_data, domain_name, ipv4, atp_hunter, ind_event, rel_atp_mitre, rel_obsdata_ind, rel_ind_obsdata, ident])
+    objs = [obs_data, domain_name, ipv4, atp_hunter, ind_event,
+            rel_atp_mitre, rel_obsdata_ind, rel_ind_obsdata, ident]
+    grouping = stix2.v21.Grouping(
+        context='g4i commit', object_refs=objs, created_by_ref=ident.id)
+
+    objs.append(grouping)
+
+    bundle = stix2.v21.Bundle(objs)
     return bundle
 
 

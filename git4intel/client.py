@@ -17,13 +17,12 @@ class Client(Elasticsearch):
                 index_name = stix_object.type
                 obj_id = str(stix_object.id).split('--')[1]
                 tmp_obj = stix_object._inner
-                # tmp_obj['HEAD'] = True
                 response = super(Client, self).index(index=index_name, body=tmp_obj,
                                                      doc_type="_doc", id=obj_id)
                 responses.append(response)
         else:
             raise ValueError(
-                'Bundle commit must have an identity object with the id as created_by_ref for all other objects.')
+                'Bundle commit must have only 1 grouping object (where grouping.object_refs refers to every object other than grouping in the bundle) and at least 1 identity object with `identity.id == grouping.created_by_ref`.')
         return responses
 
     # Accept calls for Mitre Attack pattern id and keyword list
