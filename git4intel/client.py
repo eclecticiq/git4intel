@@ -10,7 +10,40 @@ class Client(Elasticsearch):
         self.molecules = load_molecules(molecule_data_path)
         Elasticsearch.__init__(self, uri)
 
+    def check_commit(self, bundle):
+        grouping_count = 0
+        ids = []
+        ident_ids = []
+        group_obj_lst = []
+
+        for obj in bundle.objects:
+            if obj.type == 'grouping':
+                grouping_count += 1
+                group_author = obj.created_by_ref
+                group_obj_lst = obj.object_refs
+            elif obj.type == 'identity':
+                ident_ids.append(obj.id)
+                ids.append(obj.id)
+            else:
+                try:
+                    ids.append(obj.id)
+                except AttributeError:
+                    pass
+
+        if grouping_count == 1 and ids.sort() == group_obj_lst.sort():
+            # Only 1 grouping and it refers to all objects in the commit - good
+            if self.exists(index='intel', id=group_author, _source=False, ignore=[400, 404]):
+                # Regardless of supplied identities, id of group author exists in kb - good
+                return True
+            elif group_author in ident_ids:
+                # Explicit inclusion of id entity in commit - good
+                return True
+        # Otherwise, not enough info for commit - bad
+
+        return False
+
     def store(self, bundle):
+
         if check_commit(bundle):
             responses = []
             for stix_object in bundle.objects:
@@ -122,3 +155,9 @@ class Client(Elasticsearch):
         results['neighbours'] = self.get_neighbours(
             attack_pattern_id, molecule)
         return results
+
+    def register_identity(self, ):
+        # Regiter an end user identity who is submitting data (either person or system) - stix ident obj
+        # Build sub-org and org in hierarchy for the end user - also ident objs
+        #
+        pass
