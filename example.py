@@ -2,11 +2,33 @@ import git4intel
 import stix2
 from datetime import datetime
 
-# Initialise as per es but including the molecule json file for structured intel definition (house rules)
-git4intel = git4intel.Client('localhost:9200', './git4intel/molecules.json')
+
+def marking_definitions():
+    # Install basis marking definitions:
+    # - TLP from stix API (except AMBER and RED which need to be extended for named recipient identity ids)
+    # - PII for all idents and their relationships (including to locations) - required for user creation
+    # - Default open source licence for any TLP WHITE/GREEN data
+
+    tlp_white_dm = stix2.v21.common.TLP_WHITE
+    tlp_green_dm = stix2.v21.common.TLP_GREEN
+    os_licence = stix2.v21.common.OS_LICENSE
+    pii_dm = stix2.v21.common.PII_DM
+
+    objs = [tlp_green_dm, tlp_white_dm, pii_dm, os_licence]
+    bundle = stix2.v21.Bundle(objs)
+    return bundle
 
 
-def make_some_stix():
+def countries():
+    # Store static library on country-based location objects
+    pass
+
+
+def mitre_attack():
+
+    # Don't forget to update_user() for Mitre Corporation on ingest!!!
+    # Also, figure out how to submit appropriate groupings and use store_intel() api!!
+
     ident = stix2.v21.Identity(identity_class='individual', name='cobsec')
     ipv4 = stix2.v21.IPv4Address(value='8.8.8.8')
     domain_name = stix2.v21.DomainName(
@@ -37,16 +59,52 @@ def make_some_stix():
 
 def main():
 
-    bundle = make_some_stix()
+    # Setup the indices...
+    # g4i.setup_es('21')
 
-    # Push a bundle in to git4intel - returns a list of responses, 1 for each object
-    res = git4intel.store(bundle)
-    print(res)
+    # Prime the database with data...
+    datamarking_bundle = marking_definitions()
 
-    # Provide a stix id and a list of keywords - returns a scored list of related objects (es), a list of related entities
-    res = git4intel.query_exposure('attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add',
-                                   ["Sednit", "XTunnel"], 'm_hunt')
-    print(res)
+    # keyword_query_fields = [
+    #     "source_ref",
+    #     "target_ref",
+    # ]
+    # match_phrases = [{
+    #     "multi_match": {
+    #         "query": '.*attack-pattern--.*',
+    #         "type": "phrase",
+    #         "fields": keyword_query_fields
+    #     }
+    # }]
+
+    # q = {
+    #     "query": {
+    #         "bool": {
+    #             "should": [{
+    #                 "match": {
+    #                     "source_ref.text": 'attack-pattern--',
+    #                 },
+    #                 "match": {
+    #                     "target_ref.text": 'attack-pattern--',
+    #                 },
+    #             }],
+    #         }
+    #     }
+    # }
+
+    # res = git4intel.search(index='relationship', body=q, size=10000)
+    # pprint(res)
+
+    # bundle = make_some_stix()
+
+    # # Push a bundle in to git4intel - returns a list of responses, 1 for each object
+    # res = git4intel.store_intel(bundle)
+    # print(res)
+
+    # # Provide a stix id and a list of keywords - returns a scored list of related objects (es), a list of related entities
+    # res = git4intel.query_exposure('attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add',
+    #                                ["Sednit", "XTunnel"], 'm_hunt')
+    # print(res)
 
 
 if __name__ == "__main__":

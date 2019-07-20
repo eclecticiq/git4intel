@@ -6,5 +6,15 @@
             "incident",
             "attack-pattern"
         ]
+    },
+    "m_user": {
+        "identity": [
+            "identity",
+            "location"
+        ],
+        "location": [
+            "identity",
+            "location"
+        ]
     }
 }

@@ -1,7 +1,27 @@
 from elasticsearch import Elasticsearch
 import stix2
+import os
+import inspect
+import json
+import re
+from pprint import pprint
 
 from .utils import *
+
+sdo_indices = [
+    'attack-pattern',
+    'campaign',
+    'course-of-action',
+    'identity',
+    'indicator',
+    'intrusion-set',
+    'malware',
+    'observed-data',
+    'report',
+    'threat-actor',
+    'tool',
+    'vulnerability',
+]
 
 
 class Client(Elasticsearch):
@@ -9,6 +29,96 @@ class Client(Elasticsearch):
     def __init__(self, uri, molecule_data_path):
         self.molecules = load_molecules(molecule_data_path)
         Elasticsearch.__init__(self, uri)
+
+    def get_index_from_alias(self, index_alias):
+        aliases = self.cat.aliases(name=[index_alias]).split(' ')
+        for alias in aliases:
+            if re.match(r'.+-[0-9]+', alias):
+                return alias
+        return False
+
+    def update_es_indexmapping(self, index_alias, new_mapping):
+        new_index_name = todays_index(index_alias)
+
+        if self.indices.exists(index=[new_index_name]):
+            return False
+        else:
+            # Strip aliases from old index
+            old_index_name = get_index_from_alias(index_alias)
+            if old_index_name:
+                self.indices.delete_alias(index=[old_index_name], name=[
+                    index_alias, 'intel'])
+            if index_alias in sdo_indices:
+                self.indices.delete_alias(index=[old_index_name], name=['sdo'])
+
+            new_index(index_alias, new_mapping)
+
+            # Reindexing requires at least 1 document in the index...
+            if int(str(self.cat.count(index=[new_index_name])).split(' ')[2]) > 0:
+                reindex_body = {
+                    "source": {
+                        "index": index_alias
+                    },
+                    "dest": {
+                        "index": new_index_name
+                    }
+                }
+                self.reindex(body=reindex_body)
+
+            return True
+
+    def new_index(self, index_alias, mapping):
+        index_name = todays_index(index_alias)
+        self.indices.create(index=index_name, body=mapping)
+        # NOTE: support for tokenization not complete here, should be built in future, especially for relationship souce_ref and target_ref to support graph-like querying
+        # tokenizer = get_tokenizer(index_name)
+        # if tokenizer:
+        #     self.indices.analyze(index=index_name, body=tokenizer['setup'])
+        self.indices.put_alias(index=[index_name], name='intel')
+        if index_alias in sdo_indices:
+            self.indices.put_alias(index=[index_name], name='sdo')
+        return self.indices.put_alias(index=[index_name], name=index_alias)
+
+    def setup_es(self, stix_ver):
+        supported_types = [
+            # '_STIXBase',
+            'STIXDomainObject',
+            'STIXRelationshipObject',
+            '_Observable',
+            # '_Extension',
+        ]
+        # master_mapping = {}
+        for name, obj in inspect.getmembers(sys.modules[get_stix_ver_name(stix_ver)]):
+            if inspect.isclass(obj):
+                class_type = inspect.getmro(obj)[1].__name__
+                if class_type in supported_types:
+                    index_name = obj._type
+                    new_es_mapping = stix_to_elk(obj, stix_ver)
+                    # update(master_mapping, new_es_mapping)
+
+                    # index_name = 'intel'
+                    # new_es_mapping = master_mapping
+                    tmp_mapping = self.indices.get_mapping(
+                        index=[index_name], ignore_unavailable=True)
+
+                    try:
+                        current_mapping = next(iter(tmp_mapping.values()))
+                        if not compare_mappings(current_mapping, new_es_mapping):
+                            print(index_name + ' mapping is up to date!')
+                            pass
+                        else:
+                            if not update_index_mapping(index_name, new_es_mapping):
+                                print(
+                                    index_name + ' was already updated today. Try again tomorrow.')
+                            else:
+                                print('Index refreshed for ' + index_name)
+                    except StopIteration:
+                        resp = self.new_index(index_name, new_es_mapping)
+                        try:
+                            if resp['acknowledged'] == True:
+                                print('Created new index for ' + index_name)
+                        except KeyError:
+                            print('Failed to create new index for ' + index_name)
 
     def check_commit(self, bundle):
         grouping_count = 0
@@ -42,7 +152,7 @@ class Client(Elasticsearch):
 
         return False
 
-    def store(self, bundle):
+    def store_intel(self, bundle):
 
         if check_commit(bundle):
             responses = []
@@ -55,22 +165,10 @@ class Client(Elasticsearch):
                 responses.append(response)
         else:
             raise ValueError(
-                'Bundle commit must have only 1 grouping object (where grouping.object_refs refers to every object other than grouping in the bundle) and at least 1 identity object with `identity.id == grouping.created_by_ref`.')
+                'Bundle commit must have only 1 grouping object (where grouping.object_refs refers to every object other than grouping in the bundle) and where the grouping.created_by_ref refers to an ident already stored or in this commit.')
         return responses
 
-    # Accept calls for Mitre Attack pattern id and keyword list
-    # Search on all entities known to relate to that id
-    # Search on all entities that contain those keywords (as phrases)
-    # Filter on marking definition as to what the user can see
-    # Post-filter to summarise results that they can't see
-
-    # Big improvement required here!!!
-    # Keyword searching currently just multi_matches against these fields
-    # Need to write a query creator that specifies fields depending on the type of keyword
-    # eg: if an ASN is sumnitted, split to RIR and number to query the autonomous-system index
-    # With the below current setting it should at least hit on IPs and Domains (using `value`)
-
-    def get_atp_rels(self, attack_id):
+    def get_rels(self, stixid):
         q = {
             "_source": [
                 "source_ref", "target_ref"
@@ -79,10 +177,10 @@ class Client(Elasticsearch):
                 "bool": {
                     "should": [
                         {
-                            "term": {"source_ref": attack_id}
+                            "term": {"source_ref": stixid}
                         },
                         {
-                            "term": {"target_ref": attack_id}
+                            "term": {"target_ref": stixid}
                         }
                     ]
                 }
@@ -92,8 +190,8 @@ class Client(Elasticsearch):
         res = self.search(index='relationship', body=q, size=10000)
         return res
 
-    def get_neighbours(self, stixid, molecule):
-        res = self.get_atp_rels(stixid)
+    def get_molecule_rels(self, stixid, molecule):
+        res = self.get_rels(stixid)
         orig_type = stixid.split('--')[0]
         neighbours = {
             'molecule_relevant': [],
@@ -108,8 +206,6 @@ class Client(Elasticsearch):
             related_doctype = id_parts[0]
             related_docid = id_parts[1]
 
-            # NOTE: Currently hard-coding for specific molecule config pattern. Need to figure out how to pass
-            # specific molecule pattern to use OR whether we should just cycle them all...?
             if related_doctype in self.molecules[molecule][orig_type]:
                 res = self.get(index=related_doctype, id=related_docid)
                 neighbours['molecule_relevant'].append(res['_source'])
@@ -152,12 +248,24 @@ class Client(Elasticsearch):
 
     def query_exposure(self, attack_pattern_id, keyword_list, molecule=None):
         results = self.query_related_phrases(keyword_list)
-        results['neighbours'] = self.get_neighbours(
+        results['neighbours'] = self.get_molecule_rels(
             attack_pattern_id, molecule)
         return results
 
-    def register_identity(self, ):
-        # Regiter an end user identity who is submitting data (either person or system) - stix ident obj
-        # Build sub-org and org in hierarchy for the end user - also ident objs
-        #
-        pass
+    # def update_user(self, bundle):
+    #     # Assume correct org-suborg-individual and tooling structure is used to register a user
+    #     # An end user can also be an automated system
+    #     # Expect at least 1 related location to declare geographic interest
+    #     # This function can be used to store a new user or update an existing one...maybe I should clean up old relationships too?
+    #     # System should automatically data mark these entities as PII and otherwise there should be no marking references
+    #     for obj in bundle.objects:
+    #         if obj.type == 'relationship':
+    #             source_type = obj.source_ref.split('--')[0]
+    #             target_type = obj.target_ref.split('--')[0]
+    #             if source_type != 'location' and source_type != 'identity':
+    #                 return False
+    #         elif obj.type == 'identity':
+    #         elif obj.type == 'location':
+    #         else:
+    #             return False
+    #     pass
