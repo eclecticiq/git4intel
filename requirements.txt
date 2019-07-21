@@ -1,1 +1,3 @@
 elasticsearch
+slugify
+stix2
