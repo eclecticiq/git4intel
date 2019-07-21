@@ -4,9 +4,6 @@ from setuptools import setup, find_packages
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-with open('requirements.txt') as f:
-    requirements = f.read().splitlines()
-
 setup(
     name="git4intel",
     description="elasticsearch threat intel client library",
@@ -18,7 +15,10 @@ setup(
     version='0.0.1',
     license="GNU General Public License v3.0",
     packages=find_packages(),
-    install_requires=requirements,
+    install_requires=[
+        'elasticsearch',
+        'stix2',
+    ],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
