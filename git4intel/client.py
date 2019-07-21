@@ -1,12 +1,21 @@
 from elasticsearch import Elasticsearch
 import stix2
 import os
+import sys
 import inspect
 import json
 import re
 from pprint import pprint
 
-from .utils import *
+from .utils import (
+    get_system_id,
+    get_molecules,
+    refresh_static_data,
+    todays_index,
+    compare_mappings,
+    get_stix_ver_name,
+    stix_to_elk
+    )
 
 sdo_indices = [
     'attack-pattern',
@@ -26,9 +35,9 @@ sdo_indices = [
 
 class Client(Elasticsearch):
 
-    def __init__(self, uri):
+    def __init__(self, uri, molecule_file=None):
         self.identity = get_system_id()
-        self.molecules = get_molecules()
+        self.molecules = get_molecules(molecule_file)
         Elasticsearch.__init__(self, uri)
 
     def store_obj(self, obj):
@@ -61,7 +70,7 @@ class Client(Elasticsearch):
             return False
         else:
             # Strip aliases from old index
-            old_index_name = get_index_from_alias(index_alias)
+            old_index_name = self.get_index_from_alias(index_alias)
             if old_index_name:
                 self.indices.delete_alias(index=[old_index_name], name=[
                     index_alias, 'intel'])
@@ -124,7 +133,7 @@ class Client(Elasticsearch):
                             print(index_name + ' mapping is up to date!')
                             pass
                         else:
-                            if not update_index_mapping(index_name, new_es_mapping):
+                            if not self.update_es_indexmapping(index_name, new_es_mapping):
                                 print(
                                     index_name + ' was already updated today. Try again tomorrow.')
                             else:

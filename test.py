@@ -5,7 +5,7 @@ from datetime import datetime
 import unittest
 
 client = Client('localhost:9200', './git4intel/molecules.json')
-
+client.setup_es("21")
 
 def make_valid_commit():
     ident = stix2.v21.Identity(identity_class='individual', name='cobsec')

@@ -30,8 +30,14 @@ def get_deterministic_uuid(prefix=None, seed=None):
 
     return "{}{}".format(prefix, stix_id)
 
-def get_molecules():
-    molecules = {
+def get_molecules(config_file=None):
+    # If user supplied config file
+    if config_file:
+        with open(config_file, "r") as f:
+            return json.loads(f.read())
+
+    # Else return boilerplate
+    return {
         "m_hunt": {
             "attack-pattern": [
                 "indicator",
@@ -51,7 +57,6 @@ def get_molecules():
             ]
         }
     }
-    return molecules
 
 
 def get_marking_definitions(created_by_ref):
