@@ -3,6 +3,9 @@ import stix2
 import sys
 import collections
 from datetime import datetime
+import random
+import uuid
+from slugify import slugify
 
 
 def load_data(path):
@@ -28,26 +31,26 @@ def get_deterministic_uuid(prefix=None, seed=None):
     return "{}{}".format(prefix, stix_id)
 
 def get_molecules():
-    molecules = "molecules": {
-                    "m_hunt": {
-                        "attack-pattern": [
-                            "indicator",
-                            "course-of-action",
-                            "incident",
-                            "attack-pattern"
-                        ]
-                    },
-                    "m_user": {
-                        "identity": [
-                            "identity",
-                            "location"
-                        ],
-                        "location": [
-                            "identity",
-                            "location"
-                        ]
-                    }
-                }
+    molecules = {
+        "m_hunt": {
+            "attack-pattern": [
+                "indicator",
+                "course-of-action",
+                "incident",
+                "attack-pattern"
+            ]
+        },
+        "m_user": {
+            "identity": [
+                "identity",
+                "location"
+            ],
+            "location": [
+                "identity",
+                "location"
+            ]
+        }
+    }
     return molecules
 
 
@@ -57,6 +60,7 @@ def get_marking_definitions(created_by_ref):
     # - PII for all idents and their relationships (including to locations) - required for user creation
     # - Default open source licence for any TLP WHITE/GREEN data
 
+    # Markings with nested objects don't serialise very well...need to fix this!
     tlp_white_dm = stix2.v21.common.TLP_WHITE
     tlp_green_dm = stix2.v21.common.TLP_GREEN
 
@@ -99,7 +103,7 @@ def get_marking_definitions(created_by_ref):
     os_licence = OS_LICENSE
     pii_dm = PII_DM
 
-    objs = [tlp_green_dm, tlp_white_dm, pii_dm, os_licence]
+    objs = [pii_dm, os_licence]
     bundle = stix2.v21.Bundle(objs)
     return bundle
 

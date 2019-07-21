@@ -31,19 +31,19 @@ class Client(Elasticsearch):
         self.molecules = get_molecules()
         Elasticsearch.__init__(self, uri)
 
-    def store_obj(obj):
+    def store_obj(self, obj):
         id_parts = str(obj.id).split('--')
         index_name = id_parts[0]
         doc_id = id_parts[1]
-        doc = obj._inner
+        doc = obj.serialize()
         return super(Client, self).index(index=index_name, body=doc,
                                          doc_type="_doc", id=doc_id)
 
     def store_core_data(self):
         static_data = refresh_static_data(self.identity)
         responses = []
-        for obj in static_data
-            res = store_obj(obj)
+        for obj in static_data:
+            res = self.store_obj(obj)
             responses.append(res)
         return responses
 
