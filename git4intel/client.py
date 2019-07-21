@@ -180,7 +180,7 @@ class Client(Elasticsearch):
 
     def store_intel(self, bundle):
 
-        if check_commit(bundle):
+        if self.check_commit(bundle):
             responses = []
             for stix_object in bundle.objects:
                 response = store_obj(stix_object)
