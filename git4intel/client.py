@@ -15,7 +15,7 @@ from .utils import (
     compare_mappings,
     get_stix_ver_name,
     stix_to_elk
-    )
+)
 
 sdo_indices = [
     'attack-pattern',
