@@ -1,22 +1,13 @@
-import json
+import git4intel
 import stix2
-import sys
-import collections
 from datetime import datetime
+import random
+import uuid
+from slugify import slugify
+from pprint import pprint
 
 
-def load_data(path):
-    with open(path) as f:
-        data = json.load(f)
-    return data
-
-
-def get_system_id():
-    return stix2.v21.Identity(
-        id="identity--831fead5-1cb6-490c-aafd-fc4702c085c6", identity_class='system', name='git4intel Setup')
-
-
-def get_deterministic_uuid(prefix=None, seed=None):
+def get_uuid(prefix=None, seed=None):
     if seed is None:
         stix_id = uuid.uuid4()
     else:
@@ -129,7 +120,7 @@ def get_locations(created_by_ref):
                     # Make Country and relationship to region above
                     country_code = get_2from3(row[-1:][0])
                     country_name = row[-2:-1][0]
-                    country_id = get_deterministic_uuid(
+                    country_id = get_uuid(
                         prefix="location--", seed=country_name)
                     country_loc = stix2.v21.Location(created_by_ref=created_by_ref,
                         id=country_id, name=country_name, country=country_code.lower())
@@ -140,9 +131,9 @@ def get_locations(created_by_ref):
                     new_child = True
                     while len(row[upper:lower]) > 0:
                         located_at = row[upper:lower][0]  # Try making this
-                        located_at_id = get_deterministic_uuid("location--", located_at)
+                        located_at_id = get_uuid("location--", located_at)
                         if new_child:
-                            rel1 = stix2.v21.Relationship(created_by_ref=created_by_ref, id=get_deterministic_uuid(prefix="relationship--", seed=str(located_at_id + down_loc_id + 'located_at')),
+                            rel1 = stix2.v21.Relationship(created_by_ref=created_by_ref, id=get_uuid(prefix="relationship--", seed=str(located_at_id + down_loc_id + 'located_at')),
                                                           source_ref=down_loc_id, target_ref=located_at_id, relationship_type='located_at')
                             all_objs.append(rel1)
                         if located_at_id not in region_ids:
@@ -162,159 +153,92 @@ def get_locations(created_by_ref):
     bundle = stix2.v21.Bundle(all_objs)
     return bundle
 
-def refresh_static_data(created_by_ref):
-    location_bundle = get_locations(created_by_ref)
-    marking_bundle = get_marking_definitions(created_by_ref)
-    return location_bundle.objects + marking_bundle.objects
+
+def mitre_attack():
+
+    # Don't forget to update_user() for Mitre Corporation on ingest!!!
+    # Also, figure out how to submit appropriate groupings and use store_intel() api!!
+
+    ident = stix2.v21.Identity(identity_class='individual', name='cobsec')
+    ipv4 = stix2.v21.IPv4Address(value='8.8.8.8')
+    domain_name = stix2.v21.DomainName(
+        value='google.com')
+    obs_data = stix2.v21.ObservedData(first_observed=datetime.now(
+    ), last_observed=datetime.now(), number_observed=1, object_refs=[ipv4.id, domain_name.id], created_by_ref=ident.id)
+    atp_hunter = stix2.v21.AttackPattern(
+        name="ATP Phase Definition from Hunter", created_by_ref=ident.id)
+    ind_event = stix2.v21.Indicator(name="Collection of Observed Data signifying Event", labels=[
+                                    'malicious-activity'], pattern="[file:hashes.'SHA-256' = 'aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019e']", pattern_type='stix', indicator_types=['malicious-activity'], created_by_ref=ident.id)
+    rel_obsdata_ind = stix2.v21.Relationship(
+        source_ref=ind_event.id, target_ref=atp_hunter.id, relationship_type='indicates', created_by_ref=ident.id)
+    rel_atp_mitre = stix2.v21.Relationship(
+        source_ref=atp_hunter.id, target_ref='attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add', relationship_type='relates_to', created_by_ref=ident.id)
+    rel_ind_obsdata = stix2.v21.Relationship(
+        source_ref=ind_event.id, target_ref=obs_data.id, relationship_type='based_on', created_by_ref=ident.id)
+
+    objs = [obs_data, domain_name, ipv4, atp_hunter, ind_event,
+            rel_atp_mitre, rel_obsdata_ind, rel_ind_obsdata, ident]
+    grouping = stix2.v21.Grouping(
+        context='g4i commit', object_refs=objs, created_by_ref=ident.id)
+
+    objs.append(grouping)
+
+    bundle = stix2.v21.Bundle(objs)
+    return bundle
 
 
-def update(d, u):
-    for k, v in u.items():
-        if isinstance(v, collections.Mapping):
-            d[k] = update(d.get(k, {}), v)
-        else:
-            d[k] = v
-    return d
+def main():
+
+    # Setup the indices...
+    # g4i.setup_es('21')
+
+    # Prime the database with data...
+    g4i = git4intel.Client('localhost:9200')
+    # print(g4i.identity.id)
+    # markings = marking_definitions(g4i.identity.id)
+    # print(markings)
+
+    # keyword_query_fields = [
+    #     "source_ref",
+    #     "target_ref",
+    # ]
+    # match_phrases = [{
+    #     "multi_match": {
+    #         "query": '.*attack-pattern--.*',
+    #         "type": "phrase",
+    #         "fields": keyword_query_fields
+    #     }
+    # }]
+
+    # q = {
+    #     "query": {
+    #         "bool": {
+    #             "should": [{
+    #                 "match": {
+    #                     "source_ref.text": 'attack-pattern--',
+    #                 },
+    #                 "match": {
+    #                     "target_ref.text": 'attack-pattern--',
+    #                 },
+    #             }],
+    #         }
+    #     }
+    # }
+
+    # res = git4intel.search(index='relationship', body=q, size=10000)
+    # pprint(res)
+
+    # bundle = make_some_stix()
+
+    # # Push a bundle in to git4intel - returns a list of responses, 1 for each object
+    # res = git4intel.store_intel(bundle)
+    # print(res)
+
+    # # Provide a stix id and a list of keywords - returns a scored list of related objects (es), a list of related entities
+    # res = git4intel.query_exposure('attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add',
+    #                                ["Sednit", "XTunnel"], 'm_hunt')
+    # print(res)
 
 
-def ordered(obj):
-    if isinstance(obj, dict):
-        return sorted((k, ordered(v)) for k, v in obj.items())
-    if isinstance(obj, list):
-        return sorted(ordered(x) for x in obj)
-    else:
-        return obj
-
-
-def stixprop_to_field(prop_name, prop):
-    schema_map = {
-        'ListProperty': {
-            'external_references': 'nested',
-            'goals': 'text',
-            'granular_markings': 'nested',
-            'kill_chain_phases': 'nested',
-        },
-        'StringProperty': {
-            'body': 'text',
-            'contact_information': 'text',
-            'data': 'text',
-            'description': 'text',
-            'name': 'text',
-            'objective': 'text',
-            'source_name': 'text',
-            'statement': 'text',
-            'tool_version': 'text',
-            'administrative_area': 'text',
-            'city': 'text',
-            'street_address': 'text',
-            'postal_code': 'text',
-            'abstract': 'text',
-            'authors': 'text'},
-    }
-
-    schema_defaults = {
-        'BooleanProperty': 'boolean',
-        'EnumProperty': 'keyword',
-        'FloatProperty': 'float',
-        'HashesProperty': 'keyword',
-        'HexProperty': 'keyword',
-        'IDProperty': 'tokenized',
-        'IntegerProperty': 'integer',
-        'ListProperty': 'keyword',
-        'MarkingProperty': 'object',
-        'ObjectReferenceProperty': 'tokenized',
-        'PatternProperty': 'text',
-        'ReferenceProperty': 'tokenized',
-        'StringProperty': 'keyword',
-        'TimestampProperty': 'date',
-        'TypeProperty': 'keyword',
-        'BinaryProperty': 'binary',
-        'ExtensionsProperty': 'object',
-        'DictionaryProperty': 'object',
-        'EmbeddedObjectProperty': 'object'
-    }
-
-    prop_type = type(prop).__name__
-
-    try:
-        es_type = schema_map[prop_type][prop_name]
-    except KeyError:
-        es_type = schema_defaults[prop_type]
-
-    # Override anything ending in _ref or _refs with tokenized
-    if prop_name[-5:] == '_refs' or prop_name[-4:] == '_ref':
-        es_type = 'tokenized'
-
-    if es_type == 'tokenized':
-        return {prop_name: {'type': 'text', "analyzer": "stixid_analyzer"}}
-    elif es_type == 'nested':
-        out_dict = {prop_name: {'type': 'nested'}}
-        for sub_prop in prop.contained._properties:
-            update(out_dict, {prop_name: {'properties': stixprop_to_field(
-                sub_prop, prop.contained._properties[sub_prop])}})
-        return out_dict
-    else:
-        return {prop_name: {'type': es_type}}
-
-
-def get_stix_ver_name(stix_ver):
-    if stix_ver == '21':
-        return stix2.v21.__name__
-    else:
-        return stix2.v20.__name__
-
-
-def compare_mappings(current_mapping, new_mapping):
-    # Return True if there are differences
-    # pprint(current_mapping)
-    # pprint(new_mapping)
-    for field in new_mapping['mappings']['properties']:
-        try:
-            if current_mapping['mappings']['properties'][field] != new_mapping['mappings']['properties'][field]:
-                pprint(current_mapping['mappings']['properties'][field])
-                pprint(new_mapping['mappings']['properties'][field])
-                return True
-        except KeyError:
-            pprint(current_mapping['mappings']['properties'][field])
-            pprint(new_mapping['mappings']['properties'][field])
-            return True
-    return False
-
-
-def stix_to_elk(obj, stix_ver):
-    unsupported_props = [
-        'ObservableProperty',
-    ]
-    index_boilerplate = {
-        "settings": {
-            "analysis": {
-                "analyzer": {
-                    "stixid_analyzer": {
-                        "tokenizer": "id_split"
-                    }
-                },
-                "tokenizer": {
-                    "id_split": {
-                        "type": "pattern",
-                        "pattern": "--"
-                    }
-                }
-            }
-
-        },
-        'mappings': {'properties': {}}
-    }
-    class_name = obj.__name__
-    prop_list = getattr(
-        sys.modules[get_stix_ver_name(stix_ver)], class_name)._properties
-    mapping = index_boilerplate
-    for prop in prop_list:
-        prop_type = type(prop_list[prop]).__name__
-        if prop_type not in unsupported_props:
-            update(mapping['mappings']['properties'], stixprop_to_field(
-                prop, prop_list[prop]))
-    return mapping
-
-
-def todays_index(index_alias):
-    return (index_alias + '-' + datetime.now().strftime("%y%m%d"))
+if __name__ == "__main__":
+    main()

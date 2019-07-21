@@ -26,9 +26,26 @@ sdo_indices = [
 
 class Client(Elasticsearch):
 
-    def __init__(self, uri, molecule_data_path):
-        self.molecules = load_molecules(molecule_data_path)
+    def __init__(self, uri):
+        self.identity = get_system_id()
+        self.molecules = get_molecules()
         Elasticsearch.__init__(self, uri)
+
+    def store_obj(obj):
+        id_parts = str(obj.id).split('--')
+        index_name = id_parts[0]
+        doc_id = id_parts[1]
+        doc = obj._inner
+        return super(Client, self).index(index=index_name, body=doc,
+                                         doc_type="_doc", id=doc_id)
+
+    def store_core_data(self):
+        static_data = refresh_static_data(self.identity)
+        responses = []
+        for obj in static_data
+            res = store_obj(obj)
+            responses.append(res)
+        return responses
 
     def get_index_from_alias(self, index_alias):
         aliases = self.cat.aliases(name=[index_alias]).split(' ')
@@ -157,11 +174,7 @@ class Client(Elasticsearch):
         if check_commit(bundle):
             responses = []
             for stix_object in bundle.objects:
-                index_name = stix_object.type
-                obj_id = str(stix_object.id).split('--')[1]
-                tmp_obj = stix_object._inner
-                response = super(Client, self).index(index=index_name, body=tmp_obj,
-                                                     doc_type="_doc", id=obj_id)
+                response = store_obj(stix_object)
                 responses.append(response)
         else:
             raise ValueError(
