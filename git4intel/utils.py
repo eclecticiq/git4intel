@@ -14,11 +14,6 @@ def load_data(path):
     return data
 
 
-def get_system_id():
-    return stix2.v21.Identity(
-        id="identity--831fead5-1cb6-490c-aafd-fc4702c085c6", identity_class='system', name='git4intel Setup')
-
-
 def get_deterministic_uuid(prefix=None, seed=None):
     if seed is None:
         stix_id = uuid.uuid4()
@@ -30,6 +25,16 @@ def get_deterministic_uuid(prefix=None, seed=None):
 
     return "{}{}".format(prefix, stix_id)
 
+def get_system_id(full_org=None):
+    system_id = stix2.v21.Identity(id=get_deterministic_uuid(prefix="identity--", seed='git4intel Setup'), identity_class='system', name='git4intel Setup', sectors=[slugify("IT Consulting & Other Services")])
+    if full_org:
+        org_id = stix2.v21.Identity(id=get_deterministic_uuid(prefix="identity--", seed='EclecticIQ'), identity_class='organization', name='EclecticIQ', sectors=[slugify("IT Consulting & Other Services")])
+        org_rel = stix2.v21.Relationship(id=get_deterministic_uuid(prefix="relationship--", seed=(str(system_id.id) + str(org_id.id) + 'relates_to')), source_ref=system_id.id, target_ref=org_id.id, relationship_type='relates_to')
+        loc_rel = stix2.v21.Relationship(id=get_deterministic_uuid(prefix="relationship--", seed=(str(org_id.id) + "location--3fc1c688-c7e9-4609-ac72-01ac8b4afbc1" + 'located_at')), source_ref=org_id.id, target_ref="location--3fc1c688-c7e9-4609-ac72-01ac8b4afbc1", relationship_type='located_at')
+        bundle = stix2.v21.Bundle([system_id, org_id, org_rel, loc_rel])
+        return bundle
+    return system_id
+
 def get_molecules(config_file=None):
     # If user supplied config file
     if config_file:
@@ -39,22 +44,23 @@ def get_molecules(config_file=None):
     # Else return boilerplate
     return {
         "m_hunt": {
-            "attack-pattern": [
-                "indicator",
-                "course-of-action",
-                "incident",
-                "attack-pattern"
-            ]
+            "attack-pattern": {},
+            "indicator": {
+                "indicates": ["attack-pattern"]
+            },
+            "course-of-action": {
+                "mitigates": ["attack-pattern"]
+            },
+            # "incident": {
+
+            # }
         },
         "m_user": {
-            "identity": [
-                "identity",
-                "location"
-            ],
-            "location": [
-                "identity",
-                "location"
-            ]
+            "identity": {
+                "relates_to": ["identity"],
+                "located_at": ["location"]
+            },
+            "location": {}
         }
     }
 
@@ -176,7 +182,8 @@ def get_locations(created_by_ref):
 def refresh_static_data(created_by_ref):
     location_bundle = get_locations(created_by_ref)
     marking_bundle = get_marking_definitions(created_by_ref)
-    return location_bundle.objects + marking_bundle.objects
+    bundle = stix2.v21.Bundle(location_bundle.objects + marking_bundle.objects)
+    return bundle
 
 
 def update(d, u):
@@ -282,12 +289,8 @@ def compare_mappings(current_mapping, new_mapping):
     for field in new_mapping['mappings']['properties']:
         try:
             if current_mapping['mappings']['properties'][field] != new_mapping['mappings']['properties'][field]:
-                pprint(current_mapping['mappings']['properties'][field])
-                pprint(new_mapping['mappings']['properties'][field])
                 return True
         except KeyError:
-            pprint(current_mapping['mappings']['properties'][field])
-            pprint(new_mapping['mappings']['properties'][field])
             return True
     return False
 
@@ -329,3 +332,27 @@ def stix_to_elk(obj, stix_ver):
 
 def todays_index(index_alias):
     return (index_alias + '-' + datetime.now().strftime("%y%m%d"))
+
+def get_external_refs(bundle):
+    # Returns True if bundle has external refs that are resolvable in g4i backend
+    # Returns False if bundle contains extrefs that are unresolvable
+    # Returns None if no extrefs
+    rel_lst = []
+    id_lst = []
+    for obj in bundle.objects:
+        for field in obj:
+            if field[-4:] == '_ref':
+                rel_lst.append(obj[field])
+            elif field[-5:] == '_refs':
+                for rel in obj[field]:
+                    rel_lst.append(rel)
+        if obj.type == 'relationship':
+            if obj.source_ref not in rel_lst:
+                rel_lst.append(obj.source_ref)
+            if obj.target_ref not in rel_lst:
+                rel_lst.append(obj.target_ref)
+        else:
+            if obj.id not in id_lst:
+                id_lst.append(obj.id)
+    diff = list(set(rel_lst) - set(id_lst))
+    return diff

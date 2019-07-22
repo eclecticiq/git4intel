@@ -1,5 +1,6 @@
 from elasticsearch import Elasticsearch
 import stix2
+from taxii2client import Collection
 import os
 import sys
 import inspect
@@ -14,7 +15,8 @@ from .utils import (
     todays_index,
     compare_mappings,
     get_stix_ver_name,
-    stix_to_elk
+    stix_to_elk,
+    get_external_refs,
 )
 
 sdo_indices = [
@@ -41,21 +43,83 @@ class Client(Elasticsearch):
         Elasticsearch.__init__(self, uri)
 
     def store_obj(self, obj):
-        id_parts = str(obj.id).split('--')
+        id_parts = str(obj['id']).split('--')
         index_name = id_parts[0]
         doc_id = id_parts[1]
-        doc = obj.serialize()
+        try:
+            doc = obj.serialize()
+        except AttributeError:
+            doc = obj
         return super(Client, self).index(index=index_name, body=doc,
                                          doc_type="_doc", id=doc_id)
 
-    def store_core_data(self):
-        self.store_obj(self.identity)
-        static_data = refresh_static_data(self.identity.id)
+    def store_intel(self, bundle, is_commit=None):
+        if is_commit:
+            if not self.check_commit(bundle):
+                raise ValueError(
+                    'Bundle commit must have only 1 grouping object (where grouping.object_refs refers to every object other than grouping in the bundle) and where the grouping.created_by_ref refers to an ident already stored or in this commit.')
         responses = []
-        for obj in static_data:
-            res = self.store_obj(obj)
-            responses.append(res)
+        for stix_object in bundle.objects:
+            response = self.store_obj(stix_object)
+            responses.append(response)
         return responses
+
+    def store_core_data(self):
+        full_ids = get_system_id(full_org=True)
+        id_resp = regiser_user(full_ids)
+        if id_resp:
+            static_data = refresh_static_data(self.identity.id)
+            data_resp = self.store_intel(static_data)
+            responses = id_resp + data_resp
+            return responses
+        else:
+            raise ValueError(
+                'Could not create system IDs. Check utils settings comply with check_user() conditions.')
+
+    def data_primer(self):
+        # Get Mitre Att&ck as a basis
+        # Note: We don't apply commit control on ingest - it runs in the background so as not to slow down ingestion
+        # If it's stix2.x - let it in.
+        attack = {}
+        collection = Collection(
+            "https://cti-taxii.mitre.org/stix/collections/95ecc380-afe9-11e4-9b6c-751b66dd541e")
+        tc_source = stix2.TAXIICollectionSource(collection)
+        attack = tc_source.query()
+
+        for obj in attack:
+            res = self.store_obj(obj)
+            print(str(res['result']) + ' ' + obj['id'])
+
+    def regiser_user(self, id_bundle):
+        # Specific implementation that checks the id, then stores if pass (different from just store_intel)
+        if self.check_user(id_bundle):
+            return self.store_intel(id_bundle)
+        else:
+            return False
+
+    def get_countries(self):
+
+        q = {
+            "query": {
+                "bool": {
+                    "must": [{
+                        "match": {
+                            "created_by_ref": self.identity.id
+                        },
+                    }],
+                    "filter": [{
+                        "exists": {
+                            "field": "country"
+                        },
+                    }]
+                }
+            }
+        }
+        res = self.search(index='location', body=q, _source=['name', 'id'], size=10000)
+        countries = {}
+        for hit in res['hits']['hits']:
+            countries[hit['_source']['id']] = hit['_source']['name']
+        return countries
 
     def get_index_from_alias(self, index_alias):
         aliases = self.cat.aliases(name=[index_alias]).split(' ')
@@ -94,13 +158,9 @@ class Client(Elasticsearch):
 
             return True
 
-    def new_index(self, index_alias, mapping):
+    def new_index(self, index_alias, mapping=None):
         index_name = todays_index(index_alias)
         self.indices.create(index=index_name, body=mapping)
-        # NOTE: support for tokenization not complete here, should be built in future, especially for relationship souce_ref and target_ref to support graph-like querying
-        # tokenizer = get_tokenizer(index_name)
-        # if tokenizer:
-        #     self.indices.analyze(index=index_name, body=tokenizer['setup'])
         self.indices.put_alias(index=[index_name], name='intel')
         if index_alias in sdo_indices:
             self.indices.put_alias(index=[index_name], name='sdo')
@@ -169,27 +229,15 @@ class Client(Elasticsearch):
 
         if grouping_count == 1 and ids.sort() == group_obj_lst.sort():
             # Only 1 grouping and it refers to all objects in the commit - good
-            if self.exists(index='intel', id=group_author, _source=False, ignore=[400, 404]):
+            if group_author in ident_ids:
                 # Regardless of supplied identities, id of group author exists in kb - good
                 return True
-            elif group_author in ident_ids:
+            elif self.exists(index='identity', id=group_author.split('--')[1], _source=False, ignore=[400, 404]):
                 # Explicit inclusion of id entity in commit - good
                 return True
         # Otherwise, not enough info for commit - bad
 
         return False
-
-    def store_intel(self, bundle):
-
-        if self.check_commit(bundle):
-            responses = []
-            for stix_object in bundle.objects:
-                response = store_obj(stix_object)
-                responses.append(response)
-        else:
-            raise ValueError(
-                'Bundle commit must have only 1 grouping object (where grouping.object_refs refers to every object other than grouping in the bundle) and where the grouping.created_by_ref refers to an ident already stored or in this commit.')
-        return responses
 
     def get_rels(self, stixid):
         q = {
@@ -275,24 +323,55 @@ class Client(Elasticsearch):
             attack_pattern_id, molecule)
         return results
 
-    # def update_user(self, bundle):
-    #     # Assume correct org-suborg-individual and tooling structure is used to register a user
-    #     # An end user can also be an automated system
-    #     # Expect at least 1 related location to declare geographic interest
-    #     # This function can be used to store a new user or update an existing one...maybe I should clean up old relationships too?
-    #     # System should automatically data mark these entities as PII and otherwise there should be no marking references
-    #     for obj in bundle.objects:
-    #         if obj.type == 'relationship':
-    #             source_type = obj.source_ref.split('--')[0]
-    #             target_type = obj.target_ref.split('--')[0]
-    #             if source_type != 'location' and source_type != 'identity':
-    #                 return False
-    #         elif obj.type == 'identity':
-    #         elif obj.type == 'location':
-    #         else:
-    #             return False
-    #     pass
+    def compare_bundle_to_molecule(self, bundle, molecule=None):
+        # If a specific molecule is proided, just compate that one, else use specific
+        if molecule:
+            molecules = {molecule: self.molecules[molecule]}
+        else:
+            molecules = self.molecules
 
+        overall_score = {}
+        for molecule in molecules:
+            target_score = 0
+            overall_score[molecule] = [0]
+            for source in molecules[molecule]:
+                for rel in molecules[molecule][source]:
+                    target_score += len(
+                        molecules[molecule][source][rel])
+            overall_score[molecule].append(target_score)
+
+        for obj in bundle.objects:
+            if obj.type == 'relationship':
+                source_type = obj.source_ref.split('--')[0]
+                target_type = obj.target_ref.split('--')[0]
+                rel_type = obj.relationship_type
+                for molecule in molecules:
+                    try:
+                        if target_type in molecules[molecule][source_type][rel_type]:
+                            overall_score[molecule][0] += 1
+                    except KeyError:
+                        pass
+
+        return overall_score
+
+    def check_user(self, bundle):
+        # Assume correct org-suborg-individual and tooling structure is used to register a user
+        # An end user can also be an automated system
+        # Expect at least 1 related location to declare geographic interest
+        # This function can be used to store a new user or update an existing one...maybe I should clean up old relationships too?
+        # System should automatically data mark these entities as PII and otherwise there should be no marking references
+        scores = self.compare_bundle_to_molecule(bundle, molecule='m_user')
+
+        if scores['m_user'][1] > scores['m_user'][0]:
+            return False
+
+        extrefs = get_external_refs(bundle)
+        for extref in extrefs:
+            res = self.exists(index=extref.split('--')[0],
+                              id=str(extref.split('--')[1]), _source=False)
+            if not res:
+                return False
+        return True
 
 
 # Custom STIX Objects

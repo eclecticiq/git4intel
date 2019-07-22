@@ -18,6 +18,7 @@ setup(
     install_requires=[
         'elasticsearch',
         'stix2',
+        'taxii2client',
     ],
     classifiers=[
         "Development Status :: 4 - Beta",
