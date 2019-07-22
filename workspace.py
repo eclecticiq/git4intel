@@ -1,4 +1,5 @@
 import git4intel
+from git4intel import TLPPlusMarking
 import stix2
 from datetime import datetime
 import random
@@ -28,14 +29,9 @@ def main():
     # Client automatically applies git4intel requirements on ingest (commit-style + default location/markings)
     # Should also trigger background analytic to identify molecules and create grouping objects for them - also for identities...just all of them...
 
-
     # Setup new hunting tool user identities/locations - maybe return similar ones based on identity molecules? generic get_molecule_rels function call
 
-
     # Basic get_molecule_rels call for an attack-pattern with no submitted data
-
-
-
 
     # print(g4i.identity.id)
     # markings = marking_definitions(g4i.identity.id)

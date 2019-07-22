@@ -68,6 +68,8 @@ def get_marking_definitions(created_by_ref):
     # Markings with nested objects don't serialise very well...need to fix this!
     tlp_white_dm = stix2.v21.common.TLP_WHITE
     tlp_green_dm = stix2.v21.common.TLP_GREEN
+    tlp_amber_dm = stix2.v21.common.TLP_AMBER
+    tlp_red_dm = stix2.v21.common.TLP_RED
 
     PII_NIST_EXTREF = stix2.v21.ExternalReference(
         source_name="nist",
@@ -108,7 +110,7 @@ def get_marking_definitions(created_by_ref):
     os_licence = OS_LICENSE
     pii_dm = PII_DM
 
-    objs = [pii_dm, os_licence]
+    objs = [tlp_red_dm, tlp_amber_dm, tlp_green_dm, tlp_white_dm, pii_dm, os_licence]
     bundle = stix2.v21.Bundle(objs)
     return bundle
 

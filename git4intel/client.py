@@ -49,7 +49,8 @@ class Client(Elasticsearch):
                                          doc_type="_doc", id=doc_id)
 
     def store_core_data(self):
-        static_data = refresh_static_data(self.identity)
+        self.store_obj(self.identity)
+        static_data = refresh_static_data(self.identity.id)
         responses = []
         for obj in static_data:
             res = self.store_obj(obj)
@@ -291,3 +292,19 @@ class Client(Elasticsearch):
     #         else:
     #             return False
     #     pass
+
+
+
+# Custom STIX Objects
+from stix2.v21 import CustomMarking
+from stix2.properties import ListProperty, ReferenceProperty
+
+
+@CustomMarking('x-tlpplus-marking', [
+    ('tlp_marking_def_ref', ReferenceProperty(
+        type='marking-definition', required=True)),
+    ('distribution_refs', ListProperty(
+        ReferenceProperty(type='identity'), required=True)),
+])
+class TLPPlusMarking(object):
+    pass
