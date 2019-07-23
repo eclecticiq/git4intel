@@ -65,33 +65,25 @@ class Client(Elasticsearch):
                                          doc_type="_doc", id=doc_id)
 
     def store_intel(self, bundle, is_commit=None):
-        if is_commit:
-            if not self.check_commit(bundle):
-                raise ValueError(
-                    'Bundle commit must have only 1 grouping object (where '
-                    'grouping.object_refs refers to every object other than '
-                    'grouping in the bundle) and where the '
-                    'grouping.created_by_ref refers to an ident already stored'
-                    ' or in this commit.')
-        responses = []
+        if is_commit and not self.check_commit(bundle):
+            return False
         for stix_object in bundle.objects:
-            response = self.store_obj(stix_object)
-            responses.append(response)
-        return responses
+            res = self.store_obj(stix_object)
+            if res['result'] != 'created' or res['result'] != 'updated':
+                print(res)
+                return False
+        return True
 
     def store_core_data(self):
-        full_ids = get_system_id(full_org=True)
+        system_bundle, org_bundle = get_system_id(full_org=True)
         static_data = refresh_static_data(self.identity.id)
-        print(static_data)
-        data_resp = self.store_intel(static_data)
-        id_resp = self.register_user(full_ids)
-        if id_resp:
-            responses = id_resp + data_resp
-            return responses
-        else:
-            raise ValueError(
-                'Could not create system IDs. Check utils settings '
-                'comply with check_user() conditions.')
+        if not self.register_ident(system_bundle, 'system'):
+            return False
+        if not self.register_ident(system_bundle, 'organization'):
+            return False
+        if not self.store_intel(static_data):
+            return False
+        return True
 
     def data_primer(self):
         # Get Mitre Att&ck as a basis
@@ -106,8 +98,7 @@ class Client(Elasticsearch):
         attack = tc_source.query()
 
         for obj in attack:
-            res = self.store_obj(obj)
-            print(str(res['result']) + ' ' + obj['id'])
+            self.store_obj(obj)
 
     def register_ident(self, id_bundle, _type):
         # Must only contain a id obj and a location ref
