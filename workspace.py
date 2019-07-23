@@ -6,6 +6,7 @@ import random
 import uuid
 from slugify import slugify
 from pprint import pprint
+import time
 
 
 def get_deterministic_uuid(prefix=None, seed=None):
@@ -96,7 +97,7 @@ def main():
     # Use the stix2 version number specified - calls the current installed
     #   stix2 from running environment
     print('Setting up indices...')
-    print(g4i.setup_es('21'))
+    g4i.setup_es('21')
 
     # Setup the core data (system idents, locations and default data markings)
     # - hard coded config
@@ -126,63 +127,15 @@ def main():
                                      relationship_type='relates_to')
     print(g4i.add_user_to_org(org_rel))
 
-
-    # # Have a function at _your_ end that can generate a valid commit.
-    #   The below referenced `make_valid_commit()` is just an example
-    # hunt_bundle = make_valid_commit(user_id)
-    # # Then store it in g4i. This one _is_ a commit so needs to have
-    #   `is_commit` set to True for validation checks
-    # store_intel_responses = g4i.store_intel(bundle=hunt_bundle,
-    #   is_commit=True)
-    # print(store_intel_responses)
-
-    # # Get object by id - includes user_id (and checks thtat it is one)
-    #   but currently not filtering
-    # res = g4i.get_object(obj_id='attack-pattern--23faa7d9-a62c-48b2-b6e0-34ac2cd6166e',
-    #                      user_id='identity--74a3bb67-431a-4005-a867-e1c3fb81f1f2')
-    # print(res)
-
-    # All good up to here!!!
-
-    # g4i.get_molecule_rels(
-    #     stixid="attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add", molecule=g4i.molecules['m_hunt'])
-
-    # Basic get_molecule_rels call for an attack-pattern with no submitted data
-
-    # keyword_query_fields = [
-    #     "source_ref",
-    #     "target_ref",
-    # ]
-    # match_phrases = [{
-    #     "multi_match": {
-    #         "query": '.*attack-pattern--.*',
-    #         "type": "phrase",
-    #         "fields": keyword_query_fields
-    #     }
-    # }]
-
-    # q = {
-    #     "query": {
-    #         "bool": {
-    #             "should": [{
-    #                 "match": {
-    #                     "source_ref": 'identity',
-    #                 },
-    #                 "match": {
-    #                     "target_ref": 'identity',
-    #                 },
-    #             }],
-    #         }
-    #     }
-    # }
-
-    # res = g4i.search(index='relationship', body=q, size=10000)
-    # pprint(res)
-
-    # # Provide a stix id and a list of keywords - returns a scored list of related objects (es), a list of related entities
-    # res = git4intel.query_exposure('attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add',
-    #                                ["Sednit", "XTunnel"], 'm_hunt')
-    # print(res)
+    # First step in exposure query below. Probably won't expose directly...
+    print('Show objects related to a stixid that also match a molecule...')
+    start = time.time()
+    res = g4i.get_molecule_rels(
+                stixid='attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add',
+                molecule=g4i.molecules['m_hunt'])
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
 
 if __name__ == "__main__":
