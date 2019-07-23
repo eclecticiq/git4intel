@@ -122,6 +122,19 @@ class Client(Elasticsearch):
             countries[hit['_source']['id']] = hit['_source']['name']
         return countries
 
+    def get_object(self, obj_id, user_id):
+        # Get an object by stix_id ref (of the object) and filtered by what I can see based on my user_id (id of individual identity object)
+        # Currently does not apply filtering...
+        if user_id.split('--')[0] != 'identity':
+            return False
+
+        res = self.get(index=obj_id.split(
+            '--')[0], id=obj_id.split('--')[1], ignore=[400, 404])
+        if res['found']:
+            return res['_source']
+
+        return False
+
     def get_index_from_alias(self, index_alias):
         aliases = self.cat.aliases(name=[index_alias]).split(' ')
         for alias in aliases:

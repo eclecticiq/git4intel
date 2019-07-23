@@ -102,6 +102,11 @@ def main():
     store_intel_responses = g4i.store_intel(bundle=hunt_bundle, is_commit=True)
     print(store_intel_responses)
 
+    # Get object by id - includes user_id (and checks thtat it is one) but currently not filtering
+    res = g4i.get_object(obj_id='attack-pattern--23faa7d9-a62c-48b2-b6e0-34ac2cd6166e',
+                         user_id='identity--74a3bb67-431a-4005-a867-e1c3fb81f1f2')
+    print(res)
+
     # All good up to here!!!
 
     # g4i.get_molecule_rels(
