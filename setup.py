@@ -19,6 +19,7 @@ setup(
         'elasticsearch',
         'stix2',
         'taxii2-client',
+        'python-slugify',
     ],
     classifiers=[
         "Development Status :: 4 - Beta",
