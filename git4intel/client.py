@@ -10,6 +10,8 @@ from stix2.properties import ListProperty, ReferenceProperty
 
 from .utils import (
     get_system_id,
+    get_system_org,
+    get_system_to_org,
     get_molecules,
     refresh_static_data,
     todays_index,
@@ -49,7 +51,6 @@ class TLPPlusMarking(object):
 class Client(Elasticsearch):
 
     def __init__(self, uri, molecule_file=None):
-        self.identity = get_system_id()
         self.molecules = get_molecules(molecule_file)
         Elasticsearch.__init__(self, uri)
 
@@ -65,24 +66,38 @@ class Client(Elasticsearch):
                                          doc_type="_doc", id=doc_id)
 
     def store_intel(self, bundle, is_commit=None):
-        if is_commit and not self.check_commit(bundle):
-            return False
+        if is_commit:
+            if not self.check_commit(bundle):
+                return False
         for stix_object in bundle.objects:
             res = self.store_obj(stix_object)
-            if res['result'] != 'created' or res['result'] != 'updated':
-                print(res)
+            if res['result'] != 'created' and res['result'] != 'updated':
                 return False
         return True
 
     def store_core_data(self):
-        system_bundle, org_bundle = get_system_id(full_org=True)
+        system_id_bundle = get_system_id()
+        for obj in system_id_bundle.objects:
+            if obj.type == 'identity':
+                self.identity = obj
+        if not self.register_ident(system_id_bundle, 'system'):
+            return False
+
+        org_id_bundle = get_system_org(self.identity.id)
+        for obj in org_id_bundle.objects:
+            if obj.type == 'identity':
+                self.org = obj
+        if not self.register_ident(org_id_bundle, 'organization'):
+            return False
+
+        org_rel = get_system_to_org(self.identity.id, self.org.id)
+        self.store_obj(org_rel)
+
         static_data = refresh_static_data(self.identity.id)
-        if not self.register_ident(system_bundle, 'system'):
-            return False
-        if not self.register_ident(system_bundle, 'organization'):
-            return False
         if not self.store_intel(static_data):
+            print('here')
             return False
+
         return True
 
     def data_primer(self):
@@ -98,7 +113,10 @@ class Client(Elasticsearch):
         attack = tc_source.query()
 
         for obj in attack:
-            self.store_obj(obj)
+            res = self.store_obj(obj)
+            if res['result'] != 'created' and res['result'] != 'updated':
+                return False
+        return True
 
     def register_ident(self, id_bundle, _type):
         # Must only contain a id obj and a location ref
@@ -112,7 +130,7 @@ class Client(Elasticsearch):
                 return False
             if obj_type == 'identity' or obj_type == 'relationship':
                 res = self.store_obj(obj)
-                if res['result'] != 'created':
+                if res['result'] != 'created' and res['result'] != 'updated':
                     return False
         return True
 

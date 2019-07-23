@@ -7,6 +7,8 @@ import random
 import uuid
 from slugify import slugify
 
+hard_loc = "location--3fc1c688-c7e9-4609-ac72-01ac8b4afbc1"
+
 
 def load_data(path):
     with open(path) as f:
@@ -26,7 +28,7 @@ def get_deterministic_uuid(prefix=None, seed=None):
     return "{}{}".format(prefix, stix_id)
 
 
-def get_system_id(full_org=None):
+def get_system_id():
     system_id = stix2.v21.Identity(
                 id=get_deterministic_uuid(
                     prefix="identity--",
@@ -34,35 +36,53 @@ def get_system_id(full_org=None):
                 identity_class='system',
                 name='git4intel Setup',
                 sectors=[slugify("IT Consulting & Other Services")])
-    if full_org:
-        org_id = stix2.v21.Identity(
-                id=get_deterministic_uuid(
-                    prefix="identity--",
-                    seed='EclecticIQ'),
-                identity_class='organization',
-                name='EclecticIQ',
-                sectors=[slugify("IT Consulting & Other Services")])
-        org_rel = stix2.v21.Relationship(
+    loc_rel = stix2.v21.Relationship(
+                created_by_ref=system_id.id,
                 id=get_deterministic_uuid(
                     prefix="relationship--",
-                    seed=(str(system_id.id) + str(org_id.id) + 'relates_to')),
-                source_ref=system_id.id,
-                target_ref=org_id.id,
-                relationship_type='relates_to'
-        )
-        loc_rel = stix2.v21.Relationship(
-                id=get_deterministic_uuid(
-                    prefix="relationship--",
-                    seed=(str(org_id.id) +
-                          "location--3fc1c688-c7e9-4609-ac72-01ac8b4afbc1" +
+                    seed=(str(system_id.id) +
+                          hard_loc +
                           'located_at')),
-                source_ref=org_id.id,
-                target_ref="location--3fc1c688-c7e9-4609-ac72-01ac8b4afbc1",
+                source_ref=system_id.id,
+                target_ref=hard_loc,
                 relationship_type='located_at')
-        system_bundle = stix2.v21.Bundle([system_id, loc_rel])
-        org_bundle = stix2.v21.Bundle([org_id, org_rel])
-        return system_bundle, org_bundle
-    return system_id
+    return stix2.v21.Bundle([system_id, loc_rel])
+
+
+def get_system_org(system_id):
+    org_id = stix2.v21.Identity(
+            created_by_ref=system_id,
+            id=get_deterministic_uuid(
+                prefix="identity--",
+                seed='EclecticIQ'),
+            identity_class='organization',
+            name='EclecticIQ',
+            sectors=[slugify("IT Consulting & Other Services")])
+
+    loc_rel = stix2.v21.Relationship(
+            created_by_ref=system_id,
+            id=get_deterministic_uuid(
+                prefix="relationship--",
+                seed=(str(org_id.id) +
+                      hard_loc +
+                      'located_at')),
+            source_ref=org_id.id,
+            target_ref=hard_loc,
+            relationship_type='located_at')
+    return stix2.v21.Bundle([org_id, loc_rel])
+
+
+def get_system_to_org(system_id, org_id):
+    org_rel = stix2.v21.Relationship(
+            created_by_ref=system_id,
+            id=get_deterministic_uuid(
+                prefix="relationship--",
+                seed=(str(system_id) + str(org_id) + 'relates_to')),
+            source_ref=system_id,
+            target_ref=org_id,
+            relationship_type='relates_to'
+    )
+    return org_rel
 
 
 def get_molecules(config_file=None):

@@ -91,43 +91,40 @@ def main():
 
     # Initialise client
     g4i = git4intel.Client('localhost:9200')
-    # Show that there is a default identity for the core data set
-    print('system-id: ' + g4i.identity.id)
 
     # Setup the indices...
     # Use the stix2 version number specified - calls the current installed
     #   stix2 from running environment
-    g4i.setup_es('21')
+    print('Setting up indices...')
+    print(g4i.setup_es('21'))
 
-    # Setup the core data (locations and default data markings)
+    # Setup the core data (system idents, locations and default data markings)
     # - hard coded config
-    core_responses = g4i.store_core_data()
-    print(core_responses)
+    print('Loading core data sets...')
+    print(g4i.store_core_data())
 
     # Download latest Mitre Att&ck data from their taxii server as default
     #   data set
     # Ingest is a 'just get' policy for stix2, commit and molecule management
     #    happen with background analytics to avoid ingestion slowness
-    g4i.data_primer()
+    print('Loading data primer (Mitre Att&ck)...')
+    print(g4i.data_primer())
 
-    # Setup new hunting tool user identities/locations...
-    # User will need to specify a country so we can relate to it with an idref
-    # - so use this function to get a list from the backend...
-    countries = g4i.get_countries()
-
+    # Setup client user information - using the included dummy data for testing
+    print('Creating dummy user account...')
     user_id, user_bundle = new_user()
-    res = g4i.register_ident(user_bundle, 'individual')
-    print(res)
+    print(g4i.register_ident(user_bundle, 'individual'))
 
+    print('Creating dummy organisation account...')
     org_id, org_bundle = new_org(user_id.id)
-    res = g4i.register_ident(org_bundle, 'organization')
-    print(res)
+    print(g4i.register_ident(org_bundle, 'organization'))
 
-    org_rel = stix2.v21.Relationship(source_ref=user_id,
+    print('Assigning created user to the created organisation...')
+    org_rel = stix2.v21.Relationship(created_by_ref=user_id.id,
+                                     source_ref=user_id,
                                      target_ref=org_id,
                                      relationship_type='relates_to')
-    res = g4i.add_user_to_org(org_rel)
-    print(res)
+    print(g4i.add_user_to_org(org_rel))
 
 
     # # Have a function at _your_ end that can generate a valid commit.
