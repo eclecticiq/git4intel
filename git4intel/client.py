@@ -1,12 +1,12 @@
 from elasticsearch import Elasticsearch
 import stix2
 from taxii2client import Collection
-import os
 import sys
 import inspect
-import json
 import re
 from pprint import pprint
+from stix2.v21 import CustomMarking
+from stix2.properties import ListProperty, ReferenceProperty
 
 from .utils import (
     get_system_id,
@@ -18,6 +18,7 @@ from .utils import (
     stix_to_elk,
     get_external_refs,
 )
+
 
 sdo_indices = [
     'attack-pattern',
@@ -33,6 +34,16 @@ sdo_indices = [
     'tool',
     'vulnerability',
 ]
+
+
+@CustomMarking('x-tlpplus-marking', [
+    ('tlp_marking_def_ref', ReferenceProperty(
+        type='marking-definition', required=True)),
+    ('distribution_refs', ListProperty(
+        ReferenceProperty(type='identity'), required=True)),
+])
+class TLPPlusMarking(object):
+    pass
 
 
 class Client(Elasticsearch):
@@ -57,7 +68,11 @@ class Client(Elasticsearch):
         if is_commit:
             if not self.check_commit(bundle):
                 raise ValueError(
-                    'Bundle commit must have only 1 grouping object (where grouping.object_refs refers to every object other than grouping in the bundle) and where the grouping.created_by_ref refers to an ident already stored or in this commit.')
+                    'Bundle commit must have only 1 grouping object (where '
+                    'grouping.object_refs refers to every object other than '
+                    'grouping in the bundle) and where the '
+                    'grouping.created_by_ref refers to an ident already stored'
+                    ' or in this commit.')
         responses = []
         for stix_object in bundle.objects:
             response = self.store_obj(stix_object)
@@ -67,6 +82,7 @@ class Client(Elasticsearch):
     def store_core_data(self):
         full_ids = get_system_id(full_org=True)
         static_data = refresh_static_data(self.identity.id)
+        print(static_data)
         data_resp = self.store_intel(static_data)
         id_resp = self.register_user(full_ids)
         if id_resp:
@@ -74,15 +90,18 @@ class Client(Elasticsearch):
             return responses
         else:
             raise ValueError(
-                'Could not create system IDs. Check utils settings comply with check_user() conditions.')
+                'Could not create system IDs. Check utils settings '
+                'comply with check_user() conditions.')
 
     def data_primer(self):
         # Get Mitre Att&ck as a basis
-        # Note: We don't apply commit control on ingest - it runs in the background so as not to slow down ingestion
+        # Note: We don't apply commit control on ingest - it runs in the
+        #   background so as not to slow down ingestion
         # If it's stix2.x - let it in.
         attack = {}
         collection = Collection(
-            "https://cti-taxii.mitre.org/stix/collections/95ecc380-afe9-11e4-9b6c-751b66dd541e")
+            "https://cti-taxii.mitre.org/stix/collections/"
+            "95ecc380-afe9-11e4-9b6c-751b66dd541e")
         tc_source = stix2.TAXIICollectionSource(collection)
         attack = tc_source.query()
 
@@ -90,12 +109,37 @@ class Client(Elasticsearch):
             res = self.store_obj(obj)
             print(str(res['result']) + ' ' + obj['id'])
 
-    def register_user(self, id_bundle):
-        # Specific implementation that checks the id, then stores if pass (different from just store_intel)
-        if self.check_user(id_bundle):
-            return self.store_intel(id_bundle)
-        else:
+    def register_ident(self, id_bundle, _type):
+        # Must only contain a id obj and a location ref
+        # _type must be the relevant class (org or individual)
+        if len(id_bundle.objects) != 2:
             return False
+
+        for obj in id_bundle.objects:
+            obj_type = str(obj.id).split('--')[0]
+            if obj_type == 'identity' and obj.identity_class != _type:
+                return False
+            if obj_type == 'identity' or obj_type == 'relationship':
+                res = self.store_obj(obj)
+                if res['result'] != 'created':
+                    return False
+        return True
+
+    def add_user_to_org(self, org_rel):
+        # Must only contain rel object for user_id to org_id
+        org_id = org_rel.target_ref.split('--')[1]
+        ind_id = org_rel.source_ref.split('--')[1]
+        org_obj = self.get(index='identity',
+                           id=org_id,
+                           _source_includes='identity_class')
+        if org_obj['_source']['identity_class'] != 'organization':
+            return False
+        ind_obj = self.get(index='identity',
+                           id=ind_id,
+                           _source_includes='identity_class')
+        if ind_obj['_source']['identity_class'] != 'individual':
+            return False
+        return True
 
     def get_countries(self):
 
@@ -123,7 +167,8 @@ class Client(Elasticsearch):
         return countries
 
     def get_object(self, obj_id, user_id):
-        # Get an object by stix_id ref (of the object) and filtered by what I can see based on my user_id (id of individual identity object)
+        # Get an object by stix_id ref (of the object) and filtered by what I 
+        #   can see based on my user_id (id of individual identity object)
         # Currently does not apply filtering...
         if user_id.split('--')[0] != 'identity':
             return False
@@ -159,7 +204,8 @@ class Client(Elasticsearch):
             self.new_index(index_alias, new_mapping)
 
             # Reindexing requires at least 1 document in the index...
-            if int(str(self.cat.count(index=[new_index_name])).split(' ')[2]) > 0:
+            num_indices = self.cat.count(index=[new_index_name])
+            if int(str(num_indices).split(' ')[2]) > 0:
                 reindex_body = {
                     "source": {
                         "index": index_alias
@@ -189,7 +235,8 @@ class Client(Elasticsearch):
             # '_Extension',
         ]
         # master_mapping = {}
-        for name, obj in inspect.getmembers(sys.modules[get_stix_ver_name(stix_ver)]):
+        for name, obj in inspect.getmembers(sys.modules[
+                                            get_stix_ver_name(stix_ver)]):
             if inspect.isclass(obj):
                 class_type = inspect.getmro(obj)[1].__name__
                 if class_type in supported_types:
@@ -204,22 +251,26 @@ class Client(Elasticsearch):
 
                     try:
                         current_mapping = next(iter(tmp_mapping.values()))
-                        if not compare_mappings(current_mapping, new_es_mapping):
+                        if not compare_mappings(current_mapping,
+                                                new_es_mapping):
                             print(index_name + ' mapping is up to date!')
                             pass
                         else:
-                            if not self.update_es_indexmapping(index_name, new_es_mapping):
+                            if not self.update_es_indexmapping(index_name,
+                                                               new_es_mapping):
                                 print(
-                                    index_name + ' was already updated today. Try again tomorrow.')
+                                    index_name + ' was already updated today. '
+                                    'Try again tomorrow.')
                             else:
                                 print('Index refreshed for ' + index_name)
                     except StopIteration:
                         resp = self.new_index(index_name, new_es_mapping)
                         try:
-                            if resp['acknowledged'] == True:
+                            if resp['acknowledged']:
                                 print('Created new index for ' + index_name)
                         except KeyError:
-                            print('Failed to create new index for ' + index_name)
+                            print('Failed to create new index for '
+                                  + index_name)
 
     def check_commit(self, bundle):
         grouping_count = 0
@@ -244,9 +295,14 @@ class Client(Elasticsearch):
         if grouping_count == 1 and ids.sort() == group_obj_lst.sort():
             # Only 1 grouping and it refers to all objects in the commit - good
             if group_author in ident_ids:
-                # Regardless of supplied identities, id of group author exists in kb - good
+                # Regardless of supplied identities, id of group author exists
+                #   in kb - good
                 return True
-            elif self.exists(index='identity', id=group_author.split('--')[1], _source=False, ignore=[400, 404]):
+            elif self.exists(
+                             index='identity',
+                             id=group_author.split('--')[1],
+                             _source=False,
+                             ignore=[400, 404]):
                 # Explicit inclusion of id entity in commit - good
                 return True
         # Otherwise, not enough info for commit - bad
@@ -460,7 +516,8 @@ class Client(Elasticsearch):
                 rel_type = obj.relationship_type
                 for molecule in molecules:
                     try:
-                        if target_type in molecules[molecule][source_type][rel_type]:
+                        if (target_type in
+                                molecules[molecule][source_type][rel_type]):
                             overall_score[molecule][0] += 1
                     except KeyError:
                         pass
@@ -468,11 +525,14 @@ class Client(Elasticsearch):
         return overall_score
 
     def check_user(self, bundle):
-        # Assume correct org-suborg-individual and tooling structure is used to register a user
+        # Assume correct org-suborg-individual and tooling structure is used to
+        #   register a user
         # An end user can also be an automated system
         # Expect at least 1 related location to declare geographic interest
-        # This function can be used to store a new user or update an existing one...maybe I should clean up old relationships too?
-        # System should automatically data mark these entities as PII and otherwise there should be no marking references
+        # This function can be used to store a new user or update an existing
+        #   one...maybe I should clean up old relationships too?
+        # System should automatically data mark these entities as PII and
+        #   otherwise there should be no marking references
         scores = self.compare_bundle_to_molecule(bundle)
 
         if scores['m_user'][1] > scores['m_user'][0]:
@@ -481,20 +541,6 @@ class Client(Elasticsearch):
         extrefs = get_external_refs(bundle)
         for extref in extrefs:
             res = self.exists(index=extref.split('--')[0],
-                              id=str(extref.split('--')[1]), _source=False)
+                              id=str(extref.split('--')[1]),
+                              _source=False)
             return res
-
-
-# Custom STIX Objects
-from stix2.v21 import CustomMarking
-from stix2.properties import ListProperty, ReferenceProperty
-
-
-@CustomMarking('x-tlpplus-marking', [
-    ('tlp_marking_def_ref', ReferenceProperty(
-        type='marking-definition', required=True)),
-    ('distribution_refs', ListProperty(
-        ReferenceProperty(type='identity'), required=True)),
-])
-class TLPPlusMarking(object):
-    pass
