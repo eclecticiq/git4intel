@@ -44,16 +44,16 @@ def get_molecules(config_file=None):
     # Else return boilerplate
     return {
         "m_hunt": {
-            "attack-pattern": {},
+            "attack-pattern": {
+                "relates_to": ["attack-pattern"]
+            },
             "indicator": {
-                "indicates": ["attack-pattern"]
+                "indicates": ["attack-pattern"],
+                "based_on": ["observed-data"]
             },
             "course-of-action": {
                 "mitigates": ["attack-pattern"]
             },
-            # "incident": {
-
-            # }
         },
         "m_user": {
             "identity": {

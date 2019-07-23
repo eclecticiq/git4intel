@@ -66,10 +66,10 @@ class Client(Elasticsearch):
 
     def store_core_data(self):
         full_ids = get_system_id(full_org=True)
-        id_resp = regiser_user(full_ids)
+        static_data = refresh_static_data(self.identity.id)
+        data_resp = self.store_intel(static_data)
+        id_resp = self.register_user(full_ids)
         if id_resp:
-            static_data = refresh_static_data(self.identity.id)
-            data_resp = self.store_intel(static_data)
             responses = id_resp + data_resp
             return responses
         else:
@@ -90,7 +90,7 @@ class Client(Elasticsearch):
             res = self.store_obj(obj)
             print(str(res['result']) + ' ' + obj['id'])
 
-    def regiser_user(self, id_bundle):
+    def register_user(self, id_bundle):
         # Specific implementation that checks the id, then stores if pass (different from just store_intel)
         if self.check_user(id_bundle):
             return self.store_intel(id_bundle)
@@ -115,7 +115,8 @@ class Client(Elasticsearch):
                 }
             }
         }
-        res = self.search(index='location', body=q, _source=['name', 'id'], size=10000)
+        res = self.search(index='location', body=q, _source=[
+                          'name', 'id'], size=10000)
         countries = {}
         for hit in res['hits']['hits']:
             countries[hit['_source']['id']] = hit['_source']['name']
@@ -142,7 +143,7 @@ class Client(Elasticsearch):
             if index_alias in sdo_indices:
                 self.indices.delete_alias(index=[old_index_name], name=['sdo'])
 
-            new_index(index_alias, new_mapping)
+            self.new_index(index_alias, new_mapping)
 
             # Reindexing requires at least 1 document in the index...
             if int(str(self.cat.count(index=[new_index_name])).split(' ')[2]) > 0:
@@ -261,29 +262,45 @@ class Client(Elasticsearch):
         res = self.search(index='relationship', body=q, size=10000)
         return res
 
-    def get_molecule_rels(self, stixid, molecule):
-        res = self.get_rels(stixid)
-        orig_type = stixid.split('--')[0]
-        neighbours = {
-            'molecule_relevant': [],
-            'suggestions': []
-        }
-        for hit in res['hits']['hits']:
-            if hit['_source']['source_ref'] == stixid:
-                related_id = hit['_source']['target_ref']
-            else:
-                related_id = hit['_source']['source_ref']
-            id_parts = related_id.split('--')
-            related_doctype = id_parts[0]
-            related_docid = id_parts[1]
+    # def get_molecule_rels(self, stixid, molecule):
 
-            if related_doctype in self.molecules[molecule][orig_type]:
-                res = self.get(index=related_doctype, id=related_docid)
-                neighbours['molecule_relevant'].append(res['_source'])
-            else:
-                neighbours['suggestions'].append(related_id)
+    #     q = {
+    #         "query": {
+    #             "bool": {
+    #                 "must": [{
+    #                     "match": {
+    #                         "source_ref": 'identity',
+    #                     },
+    #                     "match": {
+    #                         "target_ref": 'identity',
+    #                     },
+    #                 }],
+    #             }
+    #         }
+    #     }
 
-        return neighbours
+    #     res = self.get_rels(stixid)
+    #     orig_type = stixid.split('--')[0]
+    #     neighbours = {
+    #         'molecule_relevant': [],
+    #         'suggestions': []
+    #     }
+    #     for hit in res['hits']['hits']:
+    #         if hit['_source']['source_ref'] == stixid:
+    #             related_id = hit['_source']['target_ref']
+    #         else:
+    #             related_id = hit['_source']['source_ref']
+    #         id_parts = related_id.split('--')
+    #         related_doctype = id_parts[0]
+    #         related_docid = id_parts[1]
+
+    #         if related_doctype in self.molecules[molecule][orig_type]:
+    #             res = self.get(index=related_doctype, id=related_docid)
+    #             neighbours['molecule_relevant'].append(res['_source'])
+    #         else:
+    #             neighbours['suggestions'].append(related_id)
+
+    #     return neighbours
 
     def query_related_phrases(self, keyword_list):
         keyword_query_fields = [
@@ -323,12 +340,95 @@ class Client(Elasticsearch):
             attack_pattern_id, molecule)
         return results
 
-    def compare_bundle_to_molecule(self, bundle, molecule=None):
-        # If a specific molecule is proided, just compate that one, else use specific
-        if molecule:
-            molecules = {molecule: self.molecules[molecule]}
-        else:
-            molecules = self.molecules
+    def get_molecule_rels(self, stixid, molecule):
+        rel_types = {}
+        # obj_id = stixid.split('--')[1]
+        obj_type = stixid.split('--')[0]
+        for from_type in molecule:
+            print(from_type)
+            if from_type == obj_type:
+                get_all = True
+            else:
+                get_all = False
+            for rel_type in molecule[from_type]:
+                print(rel_type)
+                for to_type in molecule[from_type][rel_type]:
+                    print(obj_type, from_type, to_type, get_all)
+
+                    if get_all:
+                        print('here')
+                        _match = {"source_ref": stixid}
+                        _filter = {"target_ref": to_type}
+                        q = {
+                            "query": {
+                                "bool": {
+                                    "must": [{
+                                        "match": _match,
+                                    }],
+                                    # "filter": [{
+                                    #     "match": _filter,
+                                    # }]
+                                }
+                            }
+                        }
+                        pprint(q)
+                        res = self.search(
+                            index='relationship', body=q, size=10000)
+                        for hit in res['hits']['hits']:
+                            print(hit['_source']['source_ref'],
+                                  hit['_source']['target_ref'])
+                        pprint(res)
+                    elif to_type == obj_type:
+                        _match = {"target_ref": stixid}
+                        _filter = {"source_ref": from_type}
+                        q = {
+                            "query": {
+                                "bool": {
+                                    "must": [{
+                                        "match": _match,
+                                    }],
+                                    # "filter": [{
+                                    #     "match": _filter,
+                                    # }]
+                                }
+                            }
+                        }
+                        pprint(q)
+                        res = self.search(
+                            index='relationship', body=q, size=10000)
+                        for hit in res['hits']['hits']:
+                            print(hit['_source']['source_ref'],
+                                  hit['_source']['target_ref'])
+                        pprint(res)
+
+        return
+
+    # def query_exposure(self, stixid, keyword_list, molecules=None):
+    #     if not molecules:
+    #         molecules = self.molecules
+
+    #     for molecule in molecules:
+    #         for obj_type in molecule:
+    #             if stixid.split('--').[0] == obj_type:
+    #                 rel_query = {"match": {"source_ref": stixid}
+    #                 q = {
+    #                     "query": {
+    #                         "bool": {
+    #                             "must": [{
+    #                                 "match": {
+    #                                     "source_ref": 'identity',
+    #                                 },
+    #                                 "match": {
+    #                                     "target_ref": 'identity',
+    #                                 },
+    #                             }],
+    #                         }
+    #                     }
+    #                 }
+    #     pass
+
+    def compare_bundle_to_molecule(self, bundle):
+        molecules = self.molecules
 
         overall_score = {}
         for molecule in molecules:
@@ -360,7 +460,7 @@ class Client(Elasticsearch):
         # Expect at least 1 related location to declare geographic interest
         # This function can be used to store a new user or update an existing one...maybe I should clean up old relationships too?
         # System should automatically data mark these entities as PII and otherwise there should be no marking references
-        scores = self.compare_bundle_to_molecule(bundle, molecule='m_user')
+        scores = self.compare_bundle_to_molecule(bundle)
 
         if scores['m_user'][1] > scores['m_user'][0]:
             return False
@@ -369,9 +469,7 @@ class Client(Elasticsearch):
         for extref in extrefs:
             res = self.exists(index=extref.split('--')[0],
                               id=str(extref.split('--')[1]), _source=False)
-            if not res:
-                return False
-        return True
+            return res
 
 
 # Custom STIX Objects
