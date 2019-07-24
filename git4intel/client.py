@@ -200,7 +200,9 @@ class Client(Elasticsearch):
         res = self.mget(body=g)
         return res['docs']
 
-    def get_myorgs_content(self, user_id):
+    def get_myorgs_content(self, user_id, types=None):
+        if not isinstance(types, list):
+            return False
         valid_authors = [user_id]
         user_info = self.get_molecule_rels(stixid=user_id,
                                            molecule=self.molecules['m_org'])
@@ -223,10 +225,17 @@ class Client(Elasticsearch):
                     continue
                 valid_authors.append(res[0]['_source']['id'])
 
-        q = {"query": {"bool": {"should": []}}}
+        q = {"query": {"bool": {"must": []}}}
+        auth_q = {"bool": {"should": []}}
+        type_q = {"bool": {"should": []}}
         for author in valid_authors:
-            q["query"]["bool"]["should"].append({"match":
-                                                {"created_by_ref": author.split('--')[1]}})
+            auth_q["bool"]["should"].append(
+                                {"match":
+                                    {"created_by_ref": author.split('--')[1]}})
+        for _type in types:
+            type_q["bool"]["should"].append({"match": {"type": _type}})
+        q["query"]["bool"]["must"].append(auth_q)
+        q["query"]["bool"]["must"].append(type_q)
         res = self.search(index='intel',
                           body=q,
                           size=10000)
