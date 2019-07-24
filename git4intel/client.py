@@ -6,6 +6,7 @@ import inspect
 import re
 from stix2.v21 import CustomMarking
 from stix2.properties import ListProperty, ReferenceProperty
+from pprint import pprint
 
 from .utils import (
     get_system_id,
@@ -198,6 +199,38 @@ class Client(Elasticsearch):
 
         res = self.mget(body=g)
         return res['docs']
+
+    def get_myorgs_content(self, user_id):
+        valid_authors = [user_id]
+        user_info = self.get_molecule_rels(stixid=user_id,
+                                           molecule=self.molecules['m_org'])
+        for _id in user_info:
+            obj_type = _id.split('--')[0]
+            if obj_type != 'identity':
+                continue
+            res = self.get_objects([_id], user_id)
+            if res[0]['_source']['identity_class'] != 'organization':
+                continue
+            valid_authors.append(res[0]['_source']['id'])
+            org_info = self.get_molecule_rels(stixid=res[0]['_source']['id'],
+                                              molecule=self.molecules['m_org'])
+            for other_user in org_info:
+                user_type = other_user.split('--')[0]
+                if user_type != 'identity':
+                    continue
+                res = self.get_objects([other_user], user_id)
+                if res[0]['_source']['identity_class'] != 'individual':
+                    continue
+                valid_authors.append(res[0]['_source']['id'])
+
+        q = {"query": {"bool": {"should": []}}}
+        for author in valid_authors:
+            q["query"]["bool"]["should"].append({"match":
+                                                {"created_by_ref": author.split('--')[1]}})
+        res = self.search(index='intel',
+                          body=q,
+                          size=10000)
+        return res['hits']['hits']
 
     def find_value_in_grouping(self, group_id, values, user_id):
         res = self.get_objects([group_id], user_id)
