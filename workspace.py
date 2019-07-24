@@ -1,5 +1,4 @@
 import git4intel
-from git4intel import TLPPlusMarking
 import stix2
 from datetime import datetime
 import random
@@ -21,32 +20,22 @@ def get_deterministic_uuid(prefix=None, seed=None):
     return "{}{}".format(prefix, stix_id)
 
 
-# def make_valid_commit(user_id):
-#     ipv4 = stix2.v21.IPv4Address(value='8.8.8.8')
-#     domain_name = stix2.v21.DomainName(
-#         value='google.com')
-#     obs_data = stix2.v21.ObservedData(first_observed=datetime.now(
-#     ), last_observed=datetime.now(), number_observed=1, object_refs=[ipv4.id, domain_name.id], created_by_ref=user_id)
-#     atp_hunter = stix2.v21.AttackPattern(
-#         name="ATP Phase Definition from Hunter", created_by_ref=user_id)
-#     ind_event = stix2.v21.Indicator(name="Collection of Observed Data signifying Event", labels=[
-#                                     'malicious-activity'], pattern="[file:hashes.'SHA-256' = 'aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019e']", pattern_type='stix', indicator_types=['malicious-activity'], created_by_ref=user_id)
-#     rel_obsdata_ind = stix2.v21.Relationship(
-#         source_ref=ind_event.id, target_ref=atp_hunter.id, relationship_type='indicates', created_by_ref=user_id)
-#     rel_atp_mitre = stix2.v21.Relationship(
-#         source_ref=atp_hunter.id, target_ref='attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add', relationship_type='relates_to', created_by_ref=user_id)
-#     rel_ind_obsdata = stix2.v21.Relationship(
-#         source_ref=ind_event.id, target_ref=obs_data.id, relationship_type='based_on', created_by_ref=user_id)
+def make_valid_commit(user_id):
+    ipv4 = stix2.v21.IPv4Address(value='62.171.220.83')
+    domain_name = stix2.v21.DomainName(value='www.altavista.com')
+    obs_data = stix2.v21.ObservedData(first_observed=datetime.now(),
+                                      last_observed=datetime.now(),
+                                      number_observed=1,
+                                      object_refs=[ipv4.id, domain_name.id],
+                                      created_by_ref=user_id)
 
-#     objs = [obs_data, domain_name, ipv4, atp_hunter, ind_event,
-#             rel_atp_mitre, rel_obsdata_ind, rel_ind_obsdata]
-#     grouping = stix2.v21.Grouping(
-#         context='g4i commit', object_refs=objs, created_by_ref=user_id)
-
-#     objs.append(grouping)
-
-#     bundle = stix2.v21.Bundle(objs)
-#     return bundle
+    objs = [obs_data, domain_name, ipv4]
+    grouping = stix2.v21.Grouping(context='m_event',
+                                  object_refs=objs,
+                                  created_by_ref=user_id)
+    objs.append(grouping)
+    bundle = stix2.v21.Bundle(objs)
+    return bundle
 
 
 def new_user(username):
@@ -96,23 +85,23 @@ def main():
     # Setup the indices...
     # Use the stix2 version number specified - calls the current installed
     #   stix2 from running environment
-    # print('Setting up indices...')
-    # g4i.setup_es('21')
+    print('Setting up indices...')
+    g4i.setup_es('21')
 
-    # # Setup the core data (system idents, locations and default data markings)
-    # # - hard coded config
-    # print('Loading core data sets...')
-    # print(g4i.store_core_data())
+    # Setup the core data (system idents, locations and default data markings)
+    # - hard coded config
+    print('Loading core data sets...')
+    print(g4i.store_core_data())
 
-    # # Download latest Mitre Att&ck data from their taxii server as default
-    # #   data set
-    # # Ingest is a 'just get' policy for stix2, commit and molecule management
-    # #    happen with background analytics to avoid ingestion slowness
-    # print('Loading data primer (Mitre Att&ck)...')
-    # print(g4i.data_primer())
+    # Download latest Mitre Att&ck data from their taxii server as default
+    #   data set
+    # Ingest is a 'just get' policy for stix2, commit and molecule management
+    #    happen with background analytics to avoid ingestion slowness
+    print('Loading data primer (Mitre Att&ck)...')
+    print(g4i.data_primer())
 
     # Setup client user information - using the included dummy data for testing
-    # print('Creating dummy user account...')
+    print('Creating dummy user account...')
     user_id1, user_bundle1 = new_user('NEW UZ3R')
     print(g4i.register_ident(user_bundle1, 'individual'))
 
@@ -131,7 +120,6 @@ def main():
     user_id2, user_bundle2 = new_user('Another NEW UZ3R')
     print(g4i.register_ident(user_bundle2, 'individual'))
 
-    start = time.time()
     print('Invite second user to same organisation...')
     org_rel2 = stix2.v21.Relationship(created_by_ref=user_id2.id,
                                       source_ref=user_id2,
@@ -142,36 +130,49 @@ def main():
     # Indexing is much slower than search, so wait 1 second to catch up
     time.sleep(1)
 
+    # Registered org and user data can be retrieved as objects...
     print('Check that the org information contains the new users...')
     print(user_id1.id, user_id2.id)
     pprint(g4i.get_org_info(org_id.id, user_id1.id))
+
+    # Make a valid commit from Adam's suggested 'event' data as a grouping
+    bundle = make_valid_commit(user_id2.id)
+    print(g4i.store_intel(bundle=bundle, is_commit=True))
+
+    # Try finding a term that we know is in there...
+    #   the user has the grouping id already and provides the userid for
+    #   future filtering
+    for obj in bundle.objects:
+        if obj.type == 'grouping':
+            group_id = obj.id
+            author = obj.created_by_ref
+
+    # Indexing is much slower than search, so wait 1 second to catch up
+    time.sleep(1)
+
+    start = time.time()
+    pprint(g4i.find_value_in_grouping(group_id, ['62.171.220.83'], author))
     end = time.time()
     print(end - start)
 
-    # # First step in exposure query below. Probably won't expose directly...
-    # print('Show objects related to a stixid that also match a molecule...')
-    # start = time.time()
-    # res = g4i.get_molecule_rels(
-    #             stixid='attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add',
-    #             molecule=g4i.molecules['m_org'])
-    # end = time.time()
-    # pprint(res)
-    # print(end-start)
+    # Try searching for something that isn't there _as well_...
+    start = time.time()
+    pprint(g4i.find_value_in_grouping(
+                           group_id,
+                           ['www.altavista.com', 'st-stephens.staffs.sch.uk'],
+                           author))
+    end = time.time()
+    print(end - start)
 
-    # q = {'query': {'bool': {'should': [{'bool': {'must': [{'match': {'target_ref': '6c018e7a-df51-40e8-9456-4531a423c5e7'}},
-    #                                               {'match': {'relationship_type': 'relates_to'}},
-    #                                               {'match': {'source_ref': 'identity'}}]}},
-    #                            {'bool': {'must': [{'match': {'target_ref': 'identity'}},
-    #                                               {'match': {'relationship_type': 'relates_to'}},
-    #                                               {'match': {'source_ref': '6c018e7a-df51-40e8-9456-4531a423c5e7'}}]}},
-    #                            {'bool': {'must': [{'match': {'target_ref': 'location'}},
-    #                                               {'match': {'relationship_type': 'located_at'}},
-    #                                               {'match': {'source_ref': '6c018e7a-df51-40e8-9456-4531a423c5e7'}}]}}]}}}
-    # res = g4i.search(index='relationship',
-    #                       body=q,
-    #                       _source_includes=["source_ref", "target_ref"],
-    #                       size=10000)
-    # pprint(res)
+    # Try searching for something that just isn't there_...
+    start = time.time()
+    pprint(g4i.find_value_in_grouping(group_id,
+                                      ['st-stephens.staffs.sch.uk'],
+                                      author))
+
+    end = time.time()
+    print(end - start)
+
 
 if __name__ == "__main__":
     main()

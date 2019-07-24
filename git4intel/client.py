@@ -4,7 +4,6 @@ from taxii2client import Collection
 import sys
 import inspect
 import re
-from pprint import pprint
 from stix2.v21 import CustomMarking
 from stix2.properties import ListProperty, ReferenceProperty
 
@@ -62,8 +61,10 @@ class Client(Elasticsearch):
             doc = obj.serialize()
         except AttributeError:
             doc = obj
-        return super(Client, self).index(index=index_name, body=doc,
-                                         doc_type="_doc", id=doc_id)
+        return self.index(index=index_name,
+                          body=doc,
+                          doc_type="_doc",
+                          id=doc_id)
 
     def store_intel(self, bundle, is_commit=None):
         if is_commit:
@@ -95,7 +96,6 @@ class Client(Elasticsearch):
 
         static_data = refresh_static_data(self.identity.id)
         if not self.store_intel(static_data):
-            print('here')
             return False
 
         return True
@@ -184,20 +184,36 @@ class Client(Elasticsearch):
         return countries
 
     def get_objects(self, obj_ids, user_id):
-        # Get an object by stix_id ref (of the object) and filtered by what I 
+        # Get an object by stix_id ref (of the object) and filtered by what I
         #   can see based on my user_id (id of individual identity object)
         # Currently does not apply filtering...
         if not obj_ids:
             return False
         if user_id.split('--')[0] != 'identity':
             return False
-        q = {"docs": []}
+        g = {"docs": []}
         for obj_id in obj_ids:
-            q['docs'].append({"_index": obj_id.split('--')[0],
+            g['docs'].append({"_index": obj_id.split('--')[0],
                               "_id": obj_id.split('--')[1]})
 
-        res = self.mget(body=q)
+        res = self.mget(body=g)
         return res['docs']
+
+    def find_value_in_grouping(self, group_id, values, user_id):
+        res = self.get_objects([group_id], user_id)
+        q = {"query": {"bool": {"must": []}}}
+        id_q = {"bool": {"should": []}}
+        value_q = {"bool": {"should": []}}
+        for obj_id in res[0]['_source']['object_refs']:
+            id_q["bool"]["should"].append({"match": {"id": obj_id}})
+        for value in values:
+            value_q["bool"]["should"].append({"multi_match": {"query": value}})
+        q["query"]["bool"]["must"].append(id_q)
+        q["query"]["bool"]["must"].append(value_q)
+        res = self.search(index='intel',
+                          body=q,
+                          size=10000)
+        return res['hits']
 
     def get_index_from_alias(self, index_alias):
         aliases = self.cat.aliases(name=[index_alias]).split(' ')
@@ -328,28 +344,6 @@ class Client(Elasticsearch):
 
         return False
 
-    def get_rels(self, stixid):
-        q = {
-            "_source": [
-                "source_ref", "target_ref"
-            ],
-            "query": {
-                "bool": {
-                    "should": [
-                        {
-                            "term": {"source_ref": stixid}
-                        },
-                        {
-                            "term": {"target_ref": stixid}
-                        }
-                    ]
-                }
-            }
-        }
-
-        res = self.search(index='relationship', body=q, size=10000)
-        return res
-
     def query_related_phrases(self, keyword_list):
         keyword_query_fields = [
             "description",
@@ -417,7 +411,6 @@ class Client(Elasticsearch):
                         q['query']['bool']['should'].append(field_q)
                         # Swap fields in case second iteration (reverse rel)
                         target_field, source_field = source_field, target_field
-        pprint(q)
         ids = []
         res = self.search(index='relationship',
                           body=q,
