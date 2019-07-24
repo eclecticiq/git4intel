@@ -49,10 +49,10 @@ def get_deterministic_uuid(prefix=None, seed=None):
 #     return bundle
 
 
-def new_user():
+def new_user(username):
     # Feel free to add any details you like to the user/org,
     #   these are just the basics...
-    new_username = 'NEW UZ3R'
+    new_username = username
     user_loc_id = "location--53c87d5c-a55c-4f4c-a98e-e216e91ef895"
     user_id = stix2.v21.Identity(
                          identity_class='individual',
@@ -96,47 +96,82 @@ def main():
     # Setup the indices...
     # Use the stix2 version number specified - calls the current installed
     #   stix2 from running environment
-    print('Setting up indices...')
-    g4i.setup_es('21')
+    # print('Setting up indices...')
+    # g4i.setup_es('21')
 
-    # Setup the core data (system idents, locations and default data markings)
-    # - hard coded config
-    print('Loading core data sets...')
-    print(g4i.store_core_data())
+    # # Setup the core data (system idents, locations and default data markings)
+    # # - hard coded config
+    # print('Loading core data sets...')
+    # print(g4i.store_core_data())
 
-    # Download latest Mitre Att&ck data from their taxii server as default
-    #   data set
-    # Ingest is a 'just get' policy for stix2, commit and molecule management
-    #    happen with background analytics to avoid ingestion slowness
-    print('Loading data primer (Mitre Att&ck)...')
-    print(g4i.data_primer())
+    # # Download latest Mitre Att&ck data from their taxii server as default
+    # #   data set
+    # # Ingest is a 'just get' policy for stix2, commit and molecule management
+    # #    happen with background analytics to avoid ingestion slowness
+    # print('Loading data primer (Mitre Att&ck)...')
+    # print(g4i.data_primer())
 
     # Setup client user information - using the included dummy data for testing
-    print('Creating dummy user account...')
-    user_id, user_bundle = new_user()
-    print(g4i.register_ident(user_bundle, 'individual'))
+    # print('Creating dummy user account...')
+    user_id1, user_bundle1 = new_user('NEW UZ3R')
+    print(g4i.register_ident(user_bundle1, 'individual'))
 
     print('Creating dummy organisation account...')
-    org_id, org_bundle = new_org(user_id.id)
+    org_id, org_bundle = new_org(user_id1.id)
     print(g4i.register_ident(org_bundle, 'organization'))
 
     print('Assigning created user to the created organisation...')
-    org_rel = stix2.v21.Relationship(created_by_ref=user_id.id,
-                                     source_ref=user_id,
-                                     target_ref=org_id,
-                                     relationship_type='relates_to')
-    print(g4i.add_user_to_org(org_rel))
+    org_rel1 = stix2.v21.Relationship(created_by_ref=user_id1.id,
+                                      source_ref=user_id1,
+                                      target_ref=org_id,
+                                      relationship_type='relates_to')
+    print(g4i.add_user_to_org(org_rel1))
 
-    # First step in exposure query below. Probably won't expose directly...
-    print('Show objects related to a stixid that also match a molecule...')
+    print('Create a second user account...')
+    user_id2, user_bundle2 = new_user('Another NEW UZ3R')
+    print(g4i.register_ident(user_bundle2, 'individual'))
+
     start = time.time()
-    res = g4i.get_molecule_rels(
-                stixid='attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add',
-                molecule=g4i.molecules['m_hunt'])
-    end = time.time()
-    pprint(res)
-    print(end-start)
+    print('Invite second user to same organisation...')
+    org_rel2 = stix2.v21.Relationship(created_by_ref=user_id2.id,
+                                      source_ref=user_id2,
+                                      target_ref=org_id,
+                                      relationship_type='relates_to')
+    print(g4i.add_user_to_org(org_rel2))
 
+    # Indexing is much slower than search, so wait 1 second to catch up
+    time.sleep(1)
+
+    print('Check that the org information contains the new users...')
+    print(user_id1.id, user_id2.id)
+    pprint(g4i.get_org_info(org_id.id, user_id1.id))
+    end = time.time()
+    print(end - start)
+
+    # # First step in exposure query below. Probably won't expose directly...
+    # print('Show objects related to a stixid that also match a molecule...')
+    # start = time.time()
+    # res = g4i.get_molecule_rels(
+    #             stixid='attack-pattern--e6919abc-99f9-4c6c-95a5-14761e7b2add',
+    #             molecule=g4i.molecules['m_org'])
+    # end = time.time()
+    # pprint(res)
+    # print(end-start)
+
+    # q = {'query': {'bool': {'should': [{'bool': {'must': [{'match': {'target_ref': '6c018e7a-df51-40e8-9456-4531a423c5e7'}},
+    #                                               {'match': {'relationship_type': 'relates_to'}},
+    #                                               {'match': {'source_ref': 'identity'}}]}},
+    #                            {'bool': {'must': [{'match': {'target_ref': 'identity'}},
+    #                                               {'match': {'relationship_type': 'relates_to'}},
+    #                                               {'match': {'source_ref': '6c018e7a-df51-40e8-9456-4531a423c5e7'}}]}},
+    #                            {'bool': {'must': [{'match': {'target_ref': 'location'}},
+    #                                               {'match': {'relationship_type': 'located_at'}},
+    #                                               {'match': {'source_ref': '6c018e7a-df51-40e8-9456-4531a423c5e7'}}]}}]}}}
+    # res = g4i.search(index='relationship',
+    #                       body=q,
+    #                       _source_includes=["source_ref", "target_ref"],
+    #                       size=10000)
+    # pprint(res)
 
 if __name__ == "__main__":
     main()

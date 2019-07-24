@@ -108,7 +108,7 @@ def get_molecules(config_file=None):
                 "uses": ["attack-pattern"]
             }
         },
-        "m_user": {
+        "m_org": {
             "identity": {
                 "relates_to": ["identity"],
                 "located_at": ["location"]
@@ -275,13 +275,6 @@ def stix_to_elk(obj, stix_ver):
 
 def todays_index(index_alias):
     return (index_alias + '-' + datetime.now().strftime("%y%m%d"))
-
-
-def typelst_to_querylst(type_lst, field_name):
-    query_lst = []
-    for _type in type_lst:
-        query_lst.append({"match": {field_name: _type}})
-    return query_lst
 
 
 def get_external_refs(bundle):

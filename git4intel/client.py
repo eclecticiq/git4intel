@@ -19,7 +19,6 @@ from .utils import (
     get_stix_ver_name,
     stix_to_elk,
     get_external_refs,
-    typelst_to_querylst,
 )
 
 
@@ -149,7 +148,15 @@ class Client(Elasticsearch):
                            _source_includes='identity_class')
         if ind_obj['_source']['identity_class'] != 'individual':
             return False
+        res = self.store_obj(org_rel)
+        if res['result'] != 'created' and res['result'] != 'updated':
+            return False
         return True
+
+    def get_org_info(self, org_id, user_id):
+        org_info = self.get_molecule_rels(stixid=org_id,
+                                          molecule=self.molecules['m_org'])
+        return self.get_objects(org_info, user_id)
 
     def get_countries(self):
 
@@ -176,19 +183,21 @@ class Client(Elasticsearch):
             countries[hit['_source']['id']] = hit['_source']['name']
         return countries
 
-    def get_object(self, obj_id, user_id):
+    def get_objects(self, obj_ids, user_id):
         # Get an object by stix_id ref (of the object) and filtered by what I 
         #   can see based on my user_id (id of individual identity object)
         # Currently does not apply filtering...
+        if not obj_ids:
+            return False
         if user_id.split('--')[0] != 'identity':
             return False
+        q = {"docs": []}
+        for obj_id in obj_ids:
+            q['docs'].append({"_index": obj_id.split('--')[0],
+                              "_id": obj_id.split('--')[1]})
 
-        res = self.get(index=obj_id.split(
-            '--')[0], id=obj_id.split('--')[1], ignore=[400, 404])
-        if res['found']:
-            return res['_source']
-
-        return False
+        res = self.mget(body=q)
+        return res['docs']
 
     def get_index_from_alias(self, index_alias):
         aliases = self.cat.aliases(name=[index_alias]).split(' ')
@@ -341,46 +350,6 @@ class Client(Elasticsearch):
         res = self.search(index='relationship', body=q, size=10000)
         return res
 
-    # def get_molecule_rels(self, stixid, molecule):
-
-    #     q = {
-    #         "query": {
-    #             "bool": {
-    #                 "must": [{
-    #                     "match": {
-    #                         "source_ref": 'identity',
-    #                     },
-    #                     "match": {
-    #                         "target_ref": 'identity',
-    #                     },
-    #                 }],
-    #             }
-    #         }
-    #     }
-
-    #     res = self.get_rels(stixid)
-    #     orig_type = stixid.split('--')[0]
-    #     neighbours = {
-    #         'molecule_relevant': [],
-    #         'suggestions': []
-    #     }
-    #     for hit in res['hits']['hits']:
-    #         if hit['_source']['source_ref'] == stixid:
-    #             related_id = hit['_source']['target_ref']
-    #         else:
-    #             related_id = hit['_source']['source_ref']
-    #         id_parts = related_id.split('--')
-    #         related_doctype = id_parts[0]
-    #         related_docid = id_parts[1]
-
-    #         if related_doctype in self.molecules[molecule][orig_type]:
-    #             res = self.get(index=related_doctype, id=related_docid)
-    #             neighbours['molecule_relevant'].append(res['_source'])
-    #         else:
-    #             neighbours['suggestions'].append(related_id)
-
-    #     return neighbours
-
     def query_related_phrases(self, keyword_list):
         keyword_query_fields = [
             "description",
@@ -427,23 +396,28 @@ class Client(Elasticsearch):
         for from_type in molecule:
             for rel_type in molecule[from_type]:
                 for to_type in molecule[from_type][rel_type]:
-                    hit = True
+                    hits = 0
                     if from_type == obj_type:
                         source_field = obj_id
                         target_field = to_type
-                    elif to_type == obj_type:
+                        hits = 1
+                    if to_type == obj_type:
                         source_field = from_type
                         target_field = obj_id
-                    else:
-                        hit = False
+                        hits = 1
+                    if to_type == from_type and to_type == obj_type:
+                        hits = 2
 
-                    if hit:
+                    for i in range(hits):
                         field_q = {"bool": {"must": [
                                     {"match": {"target_ref": target_field}},
                                     {"match": {"relationship_type": rel_type}},
                                     {"match": {"source_ref": source_field}}
                                 ]}}
                         q['query']['bool']['should'].append(field_q)
+                        # Swap fields in case second iteration (reverse rel)
+                        target_field, source_field = source_field, target_field
+        pprint(q)
         ids = []
         res = self.search(index='relationship',
                           body=q,
