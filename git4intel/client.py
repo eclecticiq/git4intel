@@ -209,7 +209,8 @@ class Client(Elasticsearch):
                                         {"id": obj_id.split('--')[1]}})
             value_q = {"bool": {"should": []}}
             for value in values:
-                value_q["bool"]["should"].append({"multi_match": {"query": value}})
+                value_q["bool"]["should"].append({"multi_match": {
+                                                 "query": value}})
 
             q["query"]["bool"]["must"].append(value_q)
             q["query"]["bool"]["must"].append(id_q)
@@ -264,6 +265,8 @@ class Client(Elasticsearch):
             # Future: same walk but get marking definitions as filter rather
             #   than created_by_ref, so 'everything I can see' rather than
             #   just what me/my org/other members created (but includes that)
+            # That will probably be just the same search with author removed
+            #   and rely on the future overloaded search function to filter
             pass
 
         q = {"query": {"bool": {"must": []}}}
@@ -271,8 +274,8 @@ class Client(Elasticsearch):
             auth_q = {"bool": {"should": []}}
             for author in valid_authors:
                 auth_q["bool"]["should"].append(
-                                    {"match":
-                                        {"created_by_ref": author.split('--')[1]}})
+                                {"match":
+                                    {"created_by_ref": author.split('--')[1]}})
             q["query"]["bool"]["must"].append(auth_q)
         if types:
             type_q = {"bool": {"should": []}}
@@ -307,7 +310,9 @@ class Client(Elasticsearch):
                     continue
                 parent_ids.append(hit['_source']['id'])
 
-                child_objs = self.get_objects(obj_ids=child_ids, user_id=user_id, values=values)
+                child_objs = self.get_objects(obj_ids=child_ids,
+                                              user_id=user_id,
+                                              values=values)
                 tmp_obj[new_field] = []
                 for obj in child_objs:
                     tmp_obj[new_field].append(obj)
@@ -327,22 +332,6 @@ class Client(Elasticsearch):
                     results.append(hit)
 
         return results
-
-    def find_value_in_grouping(self, group_id, values, user_id):
-        res = self.get_objects([group_id], user_id)
-        q = {"query": {"bool": {"must": []}}}
-        id_q = {"bool": {"should": []}}
-        value_q = {"bool": {"should": []}}
-        for obj_id in res[0]['_source']['object_refs']:
-            id_q["bool"]["should"].append({"match": {"id": obj_id}})
-        for value in values:
-            value_q["bool"]["should"].append({"multi_match": {"query": value}})
-        q["query"]["bool"]["must"].append(id_q)
-        q["query"]["bool"]["must"].append(value_q)
-        res = self.search(index='intel',
-                          body=q,
-                          size=10000)
-        return res['hits']
 
     def get_index_from_alias(self, index_alias):
         aliases = self.cat.aliases(name=[index_alias]).split(' ')
@@ -473,43 +462,43 @@ class Client(Elasticsearch):
 
         return False
 
-    def query_related_phrases(self, keyword_list):
-        keyword_query_fields = [
-            "description",
-            "name",
-            "labels",
-            "value",
-        ]
-        match_phrases = []
-        for keyword in keyword_list:
-            match_phrases.append({
-                "multi_match": {
-                    "query": keyword,
-                    "type": "phrase",
-                    "fields": keyword_query_fields
-                }
-            })
+    # def query_related_phrases(self, keyword_list):
+    #     keyword_query_fields = [
+    #         "description",
+    #         "name",
+    #         "labels",
+    #         "value",
+    #     ]
+    #     match_phrases = []
+    #     for keyword in keyword_list:
+    #         match_phrases.append({
+    #             "multi_match": {
+    #                 "query": keyword,
+    #                 "type": "phrase",
+    #                 "fields": keyword_query_fields
+    #             }
+    #         })
 
-            q = {
-                "query": {
-                    "bool": {
-                        "should": [{
-                            "bool": {
-                                "should": match_phrases,
-                            },
-                        }],
-                    }
-                }
-            }
+    #         q = {
+    #             "query": {
+    #                 "bool": {
+    #                     "should": [{
+    #                         "bool": {
+    #                             "should": match_phrases,
+    #                         },
+    #                     }],
+    #                 }
+    #             }
+    #         }
 
-        res = self.search(index='sdo', body=q, size=10000)
-        return res
+    #     res = self.search(index='sdo', body=q, size=10000)
+    #     return res
 
-    def query_exposure(self, attack_pattern_id, keyword_list, molecule=None):
-        results = self.query_related_phrases(keyword_list)
-        results['neighbours'] = self.get_molecule_rels(
-            attack_pattern_id, molecule)
-        return results
+    # def query_exposure(self, attack_pattern_id, keyword_list, molecule=None):
+    #     results = self.query_related_phrases(keyword_list)
+    #     results['neighbours'] = self.get_molecule_rels(
+    #         attack_pattern_id, molecule)
+    #     return results
 
     def get_molecule_rels(self, stixid, molecule):
         obj_type = stixid.split('--')[0]
