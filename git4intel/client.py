@@ -4,6 +4,7 @@ from taxii2client import Collection
 import sys
 import inspect
 import re
+import json
 from stix2.v21 import CustomMarking
 from stix2.properties import ListProperty, ReferenceProperty
 from pprint import pprint
@@ -58,12 +59,8 @@ class Client(Elasticsearch):
         id_parts = str(obj['id']).split('--')
         index_name = id_parts[0]
         doc_id = id_parts[1]
-        try:
-            doc = obj.serialize()
-        except AttributeError:
-            doc = obj
         return self.index(index=index_name,
-                          body=doc,
+                          body=obj,
                           doc_type="_doc",
                           id=doc_id)
 
@@ -71,7 +68,7 @@ class Client(Elasticsearch):
         if is_commit:
             if not self.check_commit(bundle):
                 return False
-        for stix_object in bundle.objects:
+        for stix_object in bundle['objects']:
             res = self.store_obj(stix_object)
             if res['result'] != 'created' and res['result'] != 'updated':
                 return False
@@ -79,23 +76,23 @@ class Client(Elasticsearch):
 
     def store_core_data(self):
         system_id_bundle = get_system_id()
-        for obj in system_id_bundle.objects:
-            if obj.type == 'identity':
+        for obj in system_id_bundle['objects']:
+            if obj['type'] == 'identity':
                 self.identity = obj
         if not self.register_ident(system_id_bundle, 'system'):
             return False
 
-        org_id_bundle = get_system_org(self.identity.id)
-        for obj in org_id_bundle.objects:
-            if obj.type == 'identity':
+        org_id_bundle = get_system_org(self.identity['id'])
+        for obj in org_id_bundle['objects']:
+            if obj['type'] == 'identity':
                 self.org = obj
         if not self.register_ident(org_id_bundle, 'organization'):
             return False
 
-        org_rel = get_system_to_org(self.identity.id, self.org.id)
+        org_rel = get_system_to_org(self.identity['id'], self.org['id'])
         self.store_obj(org_rel)
 
-        static_data = refresh_static_data(self.identity.id)
+        static_data = refresh_static_data(self.identity['id'])
         if not self.store_intel(static_data):
             return False
 
@@ -114,7 +111,11 @@ class Client(Elasticsearch):
         attack = tc_source.query()
 
         for obj in attack:
-            res = self.store_obj(obj)
+            try:
+                doc = json.loads(obj.serialize())
+            except AttributeError:
+                doc = obj
+            res = self.store_obj(doc)
             if res['result'] != 'created' and res['result'] != 'updated':
                 return False
         return True
@@ -122,12 +123,12 @@ class Client(Elasticsearch):
     def register_ident(self, id_bundle, _type):
         # Must only contain a id obj and a location ref
         # _type must be the relevant class (org or individual)
-        if len(id_bundle.objects) != 2:
+        if len(id_bundle['objects']) != 2:
             return False
 
-        for obj in id_bundle.objects:
-            obj_type = str(obj.id).split('--')[0]
-            if obj_type == 'identity' and obj.identity_class != _type:
+        for obj in id_bundle['objects']:
+            obj_type = str(obj['id']).split('--')[0]
+            if obj_type == 'identity' and obj['identity_class'] != _type:
                 return False
             if obj_type == 'identity' or obj_type == 'relationship':
                 res = self.store_obj(obj)
@@ -137,8 +138,8 @@ class Client(Elasticsearch):
 
     def add_user_to_org(self, org_rel):
         # Must only contain rel object for user_id to org_id
-        org_id = org_rel.target_ref.split('--')[1]
-        ind_id = org_rel.source_ref.split('--')[1]
+        org_id = org_rel['target_ref'].split('--')[1]
+        ind_id = org_rel['source_ref'].split('--')[1]
         org_obj = self.get(index='identity',
                            id=org_id,
                            _source_includes='identity_class')
@@ -166,7 +167,7 @@ class Client(Elasticsearch):
                 "bool": {
                     "must": [{
                         "match": {
-                            "created_by_ref": self.identity.id
+                            "created_by_ref": self.identity['id']
                         },
                     }],
                     "filter": [{
@@ -431,17 +432,17 @@ class Client(Elasticsearch):
         ident_ids = []
         group_obj_lst = []
 
-        for obj in bundle.objects:
-            if obj.type == 'grouping':
+        for obj in bundle['objects']:
+            if obj['type'] == 'grouping':
                 grouping_count += 1
-                group_author = obj.created_by_ref
-                group_obj_lst = obj.object_refs
-            elif obj.type == 'identity':
-                ident_ids.append(obj.id)
-                ids.append(obj.id)
+                group_author = obj['created_by_ref']
+                group_obj_lst = obj['object_refs']
+            elif obj['type'] == 'identity':
+                ident_ids.append(obj['id'])
+                ids.append(obj['id'])
             else:
                 try:
-                    ids.append(obj.id)
+                    ids.append(obj['id'])
                 except AttributeError:
                     pass
 
@@ -461,44 +462,6 @@ class Client(Elasticsearch):
         # Otherwise, not enough info for commit - bad
 
         return False
-
-    # def query_related_phrases(self, keyword_list):
-    #     keyword_query_fields = [
-    #         "description",
-    #         "name",
-    #         "labels",
-    #         "value",
-    #     ]
-    #     match_phrases = []
-    #     for keyword in keyword_list:
-    #         match_phrases.append({
-    #             "multi_match": {
-    #                 "query": keyword,
-    #                 "type": "phrase",
-    #                 "fields": keyword_query_fields
-    #             }
-    #         })
-
-    #         q = {
-    #             "query": {
-    #                 "bool": {
-    #                     "should": [{
-    #                         "bool": {
-    #                             "should": match_phrases,
-    #                         },
-    #                     }],
-    #                 }
-    #             }
-    #         }
-
-    #     res = self.search(index='sdo', body=q, size=10000)
-    #     return res
-
-    # def query_exposure(self, attack_pattern_id, keyword_list, molecule=None):
-    #     results = self.query_related_phrases(keyword_list)
-    #     results['neighbours'] = self.get_molecule_rels(
-    #         attack_pattern_id, molecule)
-    #     return results
 
     def get_molecule_rels(self, stixid, molecule):
         obj_type = stixid.split('--')[0]
@@ -555,11 +518,11 @@ class Client(Elasticsearch):
                         molecules[molecule][source][rel])
             overall_score[molecule].append(target_score)
 
-        for obj in bundle.objects:
-            if obj.type == 'relationship':
-                source_type = obj.source_ref.split('--')[0]
-                target_type = obj.target_ref.split('--')[0]
-                rel_type = obj.relationship_type
+        for obj in bundle['objects']:
+            if obj['type'] == 'relationship':
+                source_type = obj['source_ref'].split('--')[0]
+                target_type = obj['target_ref'].split('--')[0]
+                rel_type = obj['relationship_type']
                 for molecule in molecules:
                     try:
                         if (target_type in

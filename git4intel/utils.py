@@ -46,7 +46,7 @@ def get_system_id():
                 source_ref=system_id.id,
                 target_ref=hard_loc,
                 relationship_type='located_at')
-    return stix2.v21.Bundle([system_id, loc_rel])
+    return json.loads(stix2.v21.Bundle([system_id, loc_rel]).serialize())
 
 
 def get_system_org(system_id):
@@ -69,7 +69,7 @@ def get_system_org(system_id):
             source_ref=org_id.id,
             target_ref=hard_loc,
             relationship_type='located_at')
-    return stix2.v21.Bundle([org_id, loc_rel])
+    return json.loads(stix2.v21.Bundle([org_id, loc_rel]).serialize())
 
 
 def get_system_to_org(system_id, org_id):
@@ -82,7 +82,7 @@ def get_system_to_org(system_id, org_id):
             target_ref=org_id,
             relationship_type='relates_to'
     )
-    return org_rel
+    return json.loads(org_rel.serialize())
 
 
 def get_molecules(config_file=None):
@@ -123,8 +123,8 @@ def get_molecules(config_file=None):
 def refresh_static_data(created_by_ref):
     location_bundle = get_locations(created_by_ref)
     marking_bundle = get_marking_definitions(created_by_ref)
-    bundle = stix2.v21.Bundle(location_bundle.objects + marking_bundle.objects)
-    return bundle
+    bundle = stix2.v21.Bundle(location_bundle['objects'] + marking_bundle['objects'])
+    return json.loads(bundle.serialize())
 
 
 def update(d, u):
@@ -284,21 +284,21 @@ def get_external_refs(bundle):
     # Returns None if no extrefs
     rel_lst = []
     id_lst = []
-    for obj in bundle.objects:
+    for obj in bundle['objects']:
         for field in obj:
             if field[-4:] == '_ref':
                 rel_lst.append(obj[field])
             elif field[-5:] == '_refs':
                 for rel in obj[field]:
                     rel_lst.append(rel)
-        if obj.type == 'relationship':
-            if obj.source_ref not in rel_lst:
-                rel_lst.append(obj.source_ref)
-            if obj.target_ref not in rel_lst:
-                rel_lst.append(obj.target_ref)
+        if obj['type'] == 'relationship':
+            if obj['source_ref'] not in rel_lst:
+                rel_lst.append(obj['source_ref'])
+            if obj['target_ref'] not in rel_lst:
+                rel_lst.append(obj['target_ref'])
         else:
-            if obj.id not in id_lst:
-                id_lst.append(obj.id)
+            if obj['id'] not in id_lst:
+                id_lst.append(obj['id'])
     diff = list(set(rel_lst) - set(id_lst))
     return diff
 
@@ -372,7 +372,7 @@ def get_marking_definitions(created_by_ref):
         pii_dm,
         os_licence
     ]
-    bundle = stix2.v21.Bundle(objs)
+    bundle = json.loads(stix2.v21.Bundle(objs).serialize())
     return bundle
 
 
@@ -1124,5 +1124,5 @@ def get_locations(created_by_ref):
                         upper -= 1
                         lower -= 1
 
-    bundle = stix2.v21.Bundle(all_objs)
+    bundle = json.loads(stix2.v21.Bundle(all_objs).serialize())
     return bundle

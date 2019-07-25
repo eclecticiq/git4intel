@@ -3,6 +3,7 @@ import stix2
 from datetime import datetime
 import random
 import uuid
+import json
 from slugify import slugify
 from pprint import pprint
 import time
@@ -34,7 +35,7 @@ def make_valid_commit(user_id):
                                   object_refs=objs,
                                   created_by_ref=user_id)
     objs.append(grouping)
-    bundle = stix2.v21.Bundle(objs)
+    bundle = json.loads(stix2.v21.Bundle(objs).serialize())
     return bundle
 
 
@@ -52,7 +53,7 @@ def new_user(username):
                         source_ref=user_id.id,
                         target_ref=user_loc_id,
                         relationship_type='located_at')
-    bundle = stix2.v21.Bundle([user_id, loc_rel])
+    bundle = json.loads(stix2.v21.Bundle([user_id, loc_rel]).serialize())
     return user_id, bundle
 
 
@@ -70,7 +71,7 @@ def new_org(created_by_ref):
                         source_ref=org_id.id,
                         target_ref=org_loc_id,
                         relationship_type='located_at')
-    bundle = stix2.v21.Bundle([org_id, loc_rel])
+    bundle = json.loads(stix2.v21.Bundle([org_id, loc_rel]).serialize())
     return org_id, bundle
 
 
@@ -97,8 +98,8 @@ def main():
     #   data set
     # Ingest is a 'just get' policy for stix2, commit and molecule management
     #    happen with background analytics to avoid ingestion slowness
-    # print('Loading data primer (Mitre Att&ck)...')
-    # print(g4i.data_primer())
+    print('Loading data primer (Mitre Att&ck)...')
+    print(g4i.data_primer())
 
     # Setup client user information - using the included dummy data for testing
     print('Creating dummy user account...')
@@ -114,6 +115,7 @@ def main():
                                       source_ref=user_id1,
                                       target_ref=org_id,
                                       relationship_type='relates_to')
+    org_rel1 = json.loads(org_rel1.serialize())
     print(g4i.add_user_to_org(org_rel1))
 
     print('Create a second user account...')
@@ -125,6 +127,7 @@ def main():
                                       source_ref=user_id2,
                                       target_ref=org_id,
                                       relationship_type='relates_to')
+    org_rel2 = json.loads(org_rel2.serialize())
     print(g4i.add_user_to_org(org_rel2))
 
     # Indexing is much slower than search, so wait 1 second to catch up
@@ -142,10 +145,10 @@ def main():
     # Try finding a term that we know is in there...
     #   the user has the grouping id already and provides the userid for
     #   future filtering
-    for obj in bundle.objects:
-        if obj.type == 'grouping':
-            group_id = obj.id
-            author = obj.created_by_ref
+    for obj in bundle['objects']:
+        if obj['type'] == 'grouping':
+            group_id = obj['id']
+            author = obj['created_by_ref']
 
     # Indexing is much slower than search, so wait 1 second to catch up
     time.sleep(1)
@@ -188,7 +191,7 @@ def main():
 
     # Get all objects created by user/org/members
     start = time.time()
-    pprint(g4i.get_content(user_id=user_id1.id))
+    pprint(g4i.get_content(user_id=user_id1['id']))
     end = time.time()
     print(end - start)
 
