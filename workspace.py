@@ -39,6 +39,35 @@ def make_valid_commit(user_id):
     return bundle
 
 
+def make_valid_commit2(user_id):
+    ipv4 = stix2.v21.IPv4Address(value='8.8.8.8')
+    domain_name = stix2.v21.EmailAddress(value='admin@local.host')
+    obs_data = stix2.v21.ObservedData(first_observed=datetime.now(),
+                                      last_observed=datetime.now(),
+                                      number_observed=1,
+                                      object_refs=[ipv4.id, domain_name.id],
+                                      created_by_ref=user_id)
+
+    objs = [obs_data, domain_name, ipv4]
+    grouping = stix2.v21.Grouping(context='m_event',
+                                  object_refs=objs,
+                                  created_by_ref=user_id)
+    objs.append(grouping)
+    bundle = json.loads(stix2.v21.Bundle(objs).serialize())
+    return bundle
+
+
+def make_report(user_id):
+    report = stix2.v21.Report(
+              name="Single IP address",
+              created_by_ref=user_id,
+              description="62.171.220.83",
+              published=datetime.now(),
+              report_types='threat-report',
+              object_refs=['location--53c87d5c-a55c-4f4c-a98e-e216e91ef895'])
+    return json.loads(report.serialize())
+
+
 def new_user(username):
     # Feel free to add any details you like to the user/org,
     #   these are just the basics...
@@ -139,8 +168,13 @@ def main():
     pprint(g4i.get_org_info(org_id.id, user_id1.id))
 
     # Make a valid commit from Adam's suggested 'event' data as a grouping
-    bundle = make_valid_commit(user_id2.id)
+    bundle = make_valid_commit(user_id1.id)
     print(g4i.store_intel(bundle=bundle, is_commit=True))
+    bundle = make_valid_commit2(user_id2.id)
+    print(g4i.store_intel(bundle=bundle, is_commit=True))
+    # Make random report containing relevant string
+    report = make_report(user_id1.id)
+    print(g4i.store_obj(report))
 
     # Try finding a term that we know is in there...
     #   the user has the grouping id already and provides the userid for
@@ -185,16 +219,17 @@ def main():
 
     start = time.time()
     pprint(g4i.get_content(user_id=author,
-                           types=['observed-data', 'identity'],
-                           values=[]))
+                           types=['grouping', 'report'],
+                           values=['62.171.220.83'],
+                           group_contexts=['m_event']))
     end = time.time()
     print(end - start)
 
     # Get all objects created by user/org/members
-    start = time.time()
-    pprint(g4i.get_content(user_id=user_id1['id']))
-    end = time.time()
-    print(end - start)
+    # start = time.time()
+    # pprint(g4i.get_content(user_id=user_id1['id']))
+    # end = time.time()
+    # print(end - start)
 
 
 if __name__ == "__main__":

@@ -320,8 +320,8 @@ class Client(Elasticsearch):
             docs.append(hit['_source'])
         return docs
 
-    def get_content(self, user_id, my_org_only=True,
-                    types=None, values=None, expand_refs=True, group_contexts=None):
+    def get_content(self, user_id, my_org_only=True, types=None, values=None,
+                    expand_refs=True, group_contexts=None):
         # Get objects by type and/or value
         if user_id.split('--')[0] != 'identity':
             return False
@@ -380,15 +380,13 @@ class Client(Elasticsearch):
                         top_group['bool']['must'].append({"match":
                                                          {"context": context}})
                         type_q['bool']['should'].append(top_group)
-                else:
-                    type_q["bool"]["should"].append({"match": {"type": _type}})
+                    continue
+                type_q["bool"]["should"].append({"match": {"type": _type}})
 
             q["query"]["bool"]["must"].append(type_q)
-
         res = self.search(index='intel',
                           body=q,
                           size=10000)
-
         child_ids = []
         parent_ids = []
         hit_ids = []
@@ -415,9 +413,10 @@ class Client(Elasticsearch):
                 child_objs = self.get_objects(obj_ids=child_ids,
                                               user_id=user_id,
                                               values=values)
-                tmp_obj[new_field] = []
-                for obj in child_objs:
-                    tmp_obj[new_field].append(obj)
+                if child_objs:
+                    tmp_obj[new_field] = []
+                    for obj in child_objs:
+                        tmp_obj[new_field].append(obj)
             if not tmp_obj:
                 hit_ids.append(hit['_source']['id'])
                 continue
