@@ -321,7 +321,7 @@ class Client(Elasticsearch):
         return docs
 
     def get_content(self, user_id, my_org_only=True,
-                    types=None, values=None, expand_refs=True):
+                    types=None, values=None, expand_refs=True, group_contexts=None):
         # Get objects by type and/or value
         if user_id.split('--')[0] != 'identity':
             return False
@@ -369,7 +369,20 @@ class Client(Elasticsearch):
         if types:
             type_q = {"bool": {"should": []}}
             for _type in types:
-                type_q["bool"]["should"].append({"match": {"type": _type}})
+                if _type != 'grouping':
+                    type_q["bool"]["should"].append({"match": {"type": _type}})
+                    continue
+                if group_contexts:
+                    for context in group_contexts:
+                        top_group = {"bool": {"must": []}}
+                        top_group['bool']['must'].append({"match":
+                                                         {"type": _type}})
+                        top_group['bool']['must'].append({"match":
+                                                         {"context": context}})
+                        type_q['bool']['should'].append(top_group)
+                else:
+                    type_q["bool"]["should"].append({"match": {"type": _type}})
+
             q["query"]["bool"]["must"].append(type_q)
 
         res = self.search(index='intel',
