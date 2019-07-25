@@ -184,24 +184,54 @@ class Client(Elasticsearch):
             countries[hit['_source']['id']] = hit['_source']['name']
         return countries
 
-    def get_objects(self, obj_ids, user_id):
+    def get_objects(self, obj_ids, user_id, values=None):
         # Get objects by stix_id ref (list of) and filtered by what I
         #   can see based on my user_id (id of individual identity object)
         #   ie: to include the org-walk of marking definitions in future
-        # Currently does not apply filtering...
+        # Currently does not apply filtering (based on marking definitions)
+        # Also assumes that if you are referencing a specific id then it is
+        #   because you got the id from something you can see, so org relevance
+        #   filtering is not applicable (marking definition still is though!)
         if not obj_ids:
             return False
         if user_id.split('--')[0] != 'identity':
             return False
+
+        docs = []
+        if values:
+            if not isinstance(values, list):
+                return False
+            q = {"query": {"bool": {"must": []}}}
+            id_q = {"bool": {"should": []}}
+            for obj_id in obj_ids:
+                id_q["bool"]["should"].append(
+                                    {"match":
+                                        {"id": obj_id.split('--')[1]}})
+            value_q = {"bool": {"should": []}}
+            for value in values:
+                value_q["bool"]["should"].append({"multi_match": {"query": value}})
+
+            q["query"]["bool"]["must"].append(value_q)
+            q["query"]["bool"]["must"].append(id_q)
+            res = self.search(index='intel',
+                              body=q,
+                              size=10000)
+            for hit in res['hits']['hits']:
+                docs.append(hit['_source'])
+            return docs
+
         g = {"docs": []}
         for obj_id in obj_ids:
             g['docs'].append({"_index": obj_id.split('--')[0],
                               "_id": obj_id.split('--')[1]})
 
         res = self.mget(body=g)
-        return res['docs']
+        for hit in res['docs']:
+            docs.append(hit['_source'])
+        return docs
 
-    def get_content(self, user_id, my_org_only=True, types=None, values=None):
+    def get_content(self, user_id, my_org_only=True,
+                    types=None, values=None, expand_refs=True):
         # Get objects by type and/or value
         if user_id.split('--')[0] != 'identity':
             return False
@@ -215,50 +245,88 @@ class Client(Elasticsearch):
                 if obj_type != 'identity':
                     continue
                 res = self.get_objects([_id], user_id)
-                if res[0]['_source']['identity_class'] != 'organization':
+                if res[0]['identity_class'] != 'organization':
                     continue
-                valid_authors.append(res[0]['_source']['id'])
-                org_info = self.get_molecule_rels(stixid=res[0]['_source']['id'],
-                                                  molecule=self.molecules['m_org'])
+                valid_authors.append(res[0]['id'])
+                org_info = self.get_molecule_rels(
+                                              stixid=res[0]['id'],
+                                              molecule=self.molecules['m_org'])
                 for other_user in org_info:
                     user_type = other_user.split('--')[0]
                     if user_type != 'identity':
                         continue
                     res = self.get_objects([other_user], user_id)
-                    if res[0]['_source']['identity_class'] != 'individual':
+                    if res[0]['identity_class'] != 'individual':
                         continue
-                    valid_authors.append(res[0]['_source']['id'])
+                    valid_authors.append(res[0]['id'])
+            valid_authors = list(set(valid_authors))
         else:
             # Future: same walk but get marking definitions as filter rather
             #   than created_by_ref, so 'everything I can see' rather than
             #   just what me/my org/other members created (but includes that)
             pass
 
-        valid_authors = list(set(valid_authors))
-
         q = {"query": {"bool": {"must": []}}}
-        auth_q = {"bool": {"should": []}}
-        for author in valid_authors:
-            auth_q["bool"]["should"].append(
-                                {"match":
-                                    {"created_by_ref": author.split('--')[1]}})
-        if values:
-            value_q = {"bool": {"should": []}}
-            for value in values:
-                value_q["bool"]["should"].append({"multi_match": {"query": value}})
-            q["query"]["bool"]["must"].append(value_q)
+        if my_org_only:
+            auth_q = {"bool": {"should": []}}
+            for author in valid_authors:
+                auth_q["bool"]["should"].append(
+                                    {"match":
+                                        {"created_by_ref": author.split('--')[1]}})
+            q["query"]["bool"]["must"].append(auth_q)
         if types:
             type_q = {"bool": {"should": []}}
             for _type in types:
                 type_q["bool"]["should"].append({"match": {"type": _type}})
             q["query"]["bool"]["must"].append(type_q)
 
-        q["query"]["bool"]["must"].append(auth_q)
-        pprint(q)
         res = self.search(index='intel',
                           body=q,
                           size=10000)
-        return res['hits']['hits']
+
+        child_ids = []
+        parent_ids = []
+        hit_ids = []
+        results = []
+        for hit in res['hits']['hits']:
+            if hit['_source']['type'] == 'relationship':
+                hit_ids.append(hit['_source']['id'])
+                continue
+            tmp_obj = {}
+            for field in hit['_source']:
+                child_ids = []
+                if field == "created_by_ref":
+                    continue
+                if field[-4:] == '_ref':
+                    child_ids = [hit['_source'][field]]
+                    new_field = 'x_eiq_' + field + '_object'
+                elif field[-5:] == '_refs':
+                    child_ids = hit['_source'][field]
+                    new_field = 'x_eiq_' + field + '_objects'
+                if not child_ids:
+                    continue
+                parent_ids.append(hit['_source']['id'])
+
+                child_objs = self.get_objects(obj_ids=child_ids, user_id=user_id, values=values)
+                tmp_obj[new_field] = []
+                for obj in child_objs:
+                    tmp_obj[new_field].append(obj)
+            if not tmp_obj:
+                hit_ids.append(hit['_source']['id'])
+                continue
+            new_obj = {}
+            new_obj.update(hit['_source'])
+            new_obj.update(tmp_obj)
+            results.append(new_obj)
+
+        hit_ids = list(set(hit_ids))
+        res = self.get_objects(hit_ids, user_id, values)
+        if res:
+            for hit in res:
+                if hit['id'] not in child_ids:
+                    results.append(hit)
+
+        return results
 
     def find_value_in_grouping(self, group_id, values, user_id):
         res = self.get_objects([group_id], user_id)

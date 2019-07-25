@@ -85,18 +85,18 @@ def main():
     # Setup the indices...
     # Use the stix2 version number specified - calls the current installed
     #   stix2 from running environment
-    # print('Setting up indices...')
-    # g4i.setup_es('21')
+    print('Setting up indices...')
+    g4i.setup_es('21')
 
-    # # Setup the core data (system idents, locations and default data markings)
-    # # - hard coded config
-    # print('Loading core data sets...')
-    # print(g4i.store_core_data())
+    # Setup the core data (system idents, locations and default data markings)
+    # - hard coded config
+    print('Loading core data sets...')
+    print(g4i.store_core_data())
 
-    # # Download latest Mitre Att&ck data from their taxii server as default
-    # #   data set
-    # # Ingest is a 'just get' policy for stix2, commit and molecule management
-    # #    happen with background analytics to avoid ingestion slowness
+    # Download latest Mitre Att&ck data from their taxii server as default
+    #   data set
+    # Ingest is a 'just get' policy for stix2, commit and molecule management
+    #    happen with background analytics to avoid ingestion slowness
     # print('Loading data primer (Mitre Att&ck)...')
     # print(g4i.data_primer())
 
@@ -174,7 +174,7 @@ def main():
     #   contain the value
     start = time.time()
     pprint(g4i.get_content(user_id=author,
-                           types=['grouping'],
+                           types=['grouping', 'identity'],
                            values=['62.171.220.83']))
     end = time.time()
     print(end - start)
@@ -188,7 +188,7 @@ def main():
 
     # Get all objects created by user/org/members
     start = time.time()
-    pprint(g4i.get_content(user_id=author))
+    pprint(g4i.get_content(user_id=user_id1.id))
     end = time.time()
     print(end - start)
 
