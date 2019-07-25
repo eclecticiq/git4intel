@@ -185,8 +185,9 @@ class Client(Elasticsearch):
         return countries
 
     def get_objects(self, obj_ids, user_id):
-        # Get an object by stix_id ref (of the object) and filtered by what I
+        # Get objects by stix_id ref (list of) and filtered by what I
         #   can see based on my user_id (id of individual identity object)
+        #   ie: to include the org-walk of marking definitions in future
         # Currently does not apply filtering...
         if not obj_ids:
             return False
@@ -200,42 +201,60 @@ class Client(Elasticsearch):
         res = self.mget(body=g)
         return res['docs']
 
-    def get_myorgs_content(self, user_id, types=None):
-        if not isinstance(types, list):
+    def get_content(self, user_id, my_org_only=True, types=None, values=None):
+        # Get objects by type and/or value
+        if user_id.split('--')[0] != 'identity':
             return False
         valid_authors = [user_id]
         user_info = self.get_molecule_rels(stixid=user_id,
                                            molecule=self.molecules['m_org'])
-        for _id in user_info:
-            obj_type = _id.split('--')[0]
-            if obj_type != 'identity':
-                continue
-            res = self.get_objects([_id], user_id)
-            if res[0]['_source']['identity_class'] != 'organization':
-                continue
-            valid_authors.append(res[0]['_source']['id'])
-            org_info = self.get_molecule_rels(stixid=res[0]['_source']['id'],
-                                              molecule=self.molecules['m_org'])
-            for other_user in org_info:
-                user_type = other_user.split('--')[0]
-                if user_type != 'identity':
+        if my_org_only:
+            # Specify just objects created by you/your org/other org members
+            for _id in user_info:
+                obj_type = _id.split('--')[0]
+                if obj_type != 'identity':
                     continue
-                res = self.get_objects([other_user], user_id)
-                if res[0]['_source']['identity_class'] != 'individual':
+                res = self.get_objects([_id], user_id)
+                if res[0]['_source']['identity_class'] != 'organization':
                     continue
                 valid_authors.append(res[0]['_source']['id'])
+                org_info = self.get_molecule_rels(stixid=res[0]['_source']['id'],
+                                                  molecule=self.molecules['m_org'])
+                for other_user in org_info:
+                    user_type = other_user.split('--')[0]
+                    if user_type != 'identity':
+                        continue
+                    res = self.get_objects([other_user], user_id)
+                    if res[0]['_source']['identity_class'] != 'individual':
+                        continue
+                    valid_authors.append(res[0]['_source']['id'])
+        else:
+            # Future: same walk but get marking definitions as filter rather
+            #   than created_by_ref, so 'everything I can see' rather than
+            #   just what me/my org/other members created (but includes that)
+            pass
+
+        valid_authors = list(set(valid_authors))
 
         q = {"query": {"bool": {"must": []}}}
         auth_q = {"bool": {"should": []}}
-        type_q = {"bool": {"should": []}}
         for author in valid_authors:
             auth_q["bool"]["should"].append(
                                 {"match":
                                     {"created_by_ref": author.split('--')[1]}})
-        for _type in types:
-            type_q["bool"]["should"].append({"match": {"type": _type}})
+        if values:
+            value_q = {"bool": {"should": []}}
+            for value in values:
+                value_q["bool"]["should"].append({"multi_match": {"query": value}})
+            q["query"]["bool"]["must"].append(value_q)
+        if types:
+            type_q = {"bool": {"should": []}}
+            for _type in types:
+                type_q["bool"]["should"].append({"match": {"type": _type}})
+            q["query"]["bool"]["must"].append(type_q)
+
         q["query"]["bool"]["must"].append(auth_q)
-        q["query"]["bool"]["must"].append(type_q)
+        pprint(q)
         res = self.search(index='intel',
                           body=q,
                           size=10000)

@@ -85,20 +85,20 @@ def main():
     # Setup the indices...
     # Use the stix2 version number specified - calls the current installed
     #   stix2 from running environment
-    print('Setting up indices...')
-    g4i.setup_es('21')
+    # print('Setting up indices...')
+    # g4i.setup_es('21')
 
-    # Setup the core data (system idents, locations and default data markings)
-    # - hard coded config
-    print('Loading core data sets...')
-    print(g4i.store_core_data())
+    # # Setup the core data (system idents, locations and default data markings)
+    # # - hard coded config
+    # print('Loading core data sets...')
+    # print(g4i.store_core_data())
 
-    # Download latest Mitre Att&ck data from their taxii server as default
-    #   data set
-    # Ingest is a 'just get' policy for stix2, commit and molecule management
-    #    happen with background analytics to avoid ingestion slowness
-    print('Loading data primer (Mitre Att&ck)...')
-    print(g4i.data_primer())
+    # # Download latest Mitre Att&ck data from their taxii server as default
+    # #   data set
+    # # Ingest is a 'just get' policy for stix2, commit and molecule management
+    # #    happen with background analytics to avoid ingestion slowness
+    # print('Loading data primer (Mitre Att&ck)...')
+    # print(g4i.data_primer())
 
     # Setup client user information - using the included dummy data for testing
     print('Creating dummy user account...')
@@ -150,35 +150,47 @@ def main():
     # Indexing is much slower than search, so wait 1 second to catch up
     time.sleep(1)
 
+    # Get all content that user/org/members of org created that contain
+    #   a value. NOTE: my_org_only defaults to True and False turns off
+    #   all filtering and relies on marking definition filtering (not
+    #   implemented yet - so currently runs on everything...turn off at
+    #   your own risk!)
     start = time.time()
-    pprint(g4i.find_value_in_grouping(group_id, ['62.171.220.83'], author))
+    pprint(g4i.get_content(user_id=author,
+                           types=[],
+                           values=['62.171.220.83']))
     end = time.time()
     print(end - start)
 
-    # Try searching for something that isn't there _as well_...
+    # Get all grouping objects created by user/org/members
     start = time.time()
-    pprint(g4i.find_value_in_grouping(
-                           group_id,
-                           ['www.altavista.com', 'st-stephens.staffs.sch.uk'],
-                           author))
+    pprint(g4i.get_content(user_id=author,
+                           types=['grouping'],
+                           values=[]))
     end = time.time()
     print(end - start)
 
-    # Try searching for something that just isn't there_...
+    # Get all grouping objects created by user/org/members that
+    #   contain the value
     start = time.time()
-    pprint(g4i.find_value_in_grouping(group_id,
-                                      ['st-stephens.staffs.sch.uk'],
-                                      author))
-
+    pprint(g4i.get_content(user_id=author,
+                           types=['grouping'],
+                           values=['62.171.220.83']))
     end = time.time()
     print(end - start)
 
     start = time.time()
-    pprint(g4i.get_myorgs_content(
-                          'identity--b5507574-736b-4909-a997-634407b4c4ba',
-                          ['observed-data', 'identity']))
+    pprint(g4i.get_content(user_id=author,
+                           types=['observed-data', 'identity'],
+                           values=[]))
     end = time.time()
-    print(end-start)
+    print(end - start)
+
+    # Get all objects created by user/org/members
+    start = time.time()
+    pprint(g4i.get_content(user_id=author))
+    end = time.time()
+    print(end - start)
 
 
 if __name__ == "__main__":
