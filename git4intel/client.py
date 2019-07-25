@@ -55,6 +55,7 @@ class Client(Elasticsearch):
         self.molecules = get_molecules(molecule_file)
         Elasticsearch.__init__(self, uri)
 
+    # SETS:
     def store_obj(self, obj):
         id_parts = str(obj['id']).split('--')
         index_name = id_parts[0]
@@ -98,28 +99,6 @@ class Client(Elasticsearch):
 
         return True
 
-    def data_primer(self):
-        # Get Mitre Att&ck as a basis
-        # Note: We don't apply commit control on ingest - it runs in the
-        #   background so as not to slow down ingestion
-        # If it's stix2.x - let it in.
-        attack = {}
-        collection = Collection(
-            "https://cti-taxii.mitre.org/stix/collections/"
-            "95ecc380-afe9-11e4-9b6c-751b66dd541e")
-        tc_source = stix2.TAXIICollectionSource(collection)
-        attack = tc_source.query()
-
-        for obj in attack:
-            try:
-                doc = json.loads(obj.serialize())
-            except AttributeError:
-                doc = obj
-            res = self.store_obj(doc)
-            if res['result'] != 'created' and res['result'] != 'updated':
-                return False
-        return True
-
     def register_ident(self, id_bundle, _type):
         # Must only contain a id obj and a location ref
         # _type must be the relevant class (org or individual)
@@ -154,6 +133,115 @@ class Client(Elasticsearch):
         if res['result'] != 'created' and res['result'] != 'updated':
             return False
         return True
+
+    # CHECKS:
+    def check_commit(self, bundle):
+        grouping_count = 0
+        ids = []
+        ident_ids = []
+        group_obj_lst = []
+
+        for obj in bundle['objects']:
+            if obj['type'] == 'grouping':
+                grouping_count += 1
+                group_author = obj['created_by_ref']
+                group_obj_lst = obj['object_refs']
+            elif obj['type'] == 'identity':
+                ident_ids.append(obj['id'])
+                ids.append(obj['id'])
+            else:
+                try:
+                    ids.append(obj['id'])
+                except AttributeError:
+                    pass
+
+        if grouping_count == 1 and ids.sort() == group_obj_lst.sort():
+            # Only 1 grouping and it refers to all objects in the commit - good
+            if group_author in ident_ids:
+                # Regardless of supplied identities, id of group author exists
+                #   in kb - good
+                return True
+            elif self.exists(
+                             index='identity',
+                             id=group_author.split('--')[1],
+                             _source=False,
+                             ignore=[400, 404]):
+                # Explicit inclusion of id entity in commit - good
+                return True
+        # Otherwise, not enough info for commit - bad
+
+        return False
+
+    def compare_bundle_to_molecule(self, bundle):
+        molecules = self.molecules
+
+        overall_score = {}
+        for molecule in molecules:
+            target_score = 0
+            overall_score[molecule] = [0]
+            for source in molecules[molecule]:
+                for rel in molecules[molecule][source]:
+                    target_score += len(
+                        molecules[molecule][source][rel])
+            overall_score[molecule].append(target_score)
+
+        for obj in bundle['objects']:
+            if obj['type'] == 'relationship':
+                source_type = obj['source_ref'].split('--')[0]
+                target_type = obj['target_ref'].split('--')[0]
+                rel_type = obj['relationship_type']
+                for molecule in molecules:
+                    try:
+                        if (target_type in
+                                molecules[molecule][source_type][rel_type]):
+                            overall_score[molecule][0] += 1
+                    except KeyError:
+                        pass
+
+        return overall_score
+
+    # GETS:
+    def get_molecule_rels(self, stixid, molecule):
+        obj_type = stixid.split('--')[0]
+        obj_id = stixid.split('--')[1]
+        q = {"query": {"bool": {"should": []}}}
+
+        for from_type in molecule:
+            for rel_type in molecule[from_type]:
+                for to_type in molecule[from_type][rel_type]:
+                    hits = 0
+                    if from_type == obj_type:
+                        source_field = obj_id
+                        target_field = to_type
+                        hits = 1
+                    if to_type == obj_type:
+                        source_field = from_type
+                        target_field = obj_id
+                        hits = 1
+                    if to_type == from_type and to_type == obj_type:
+                        hits = 2
+
+                    for i in range(hits):
+                        field_q = {"bool": {"must": [
+                                    {"match": {"target_ref": target_field}},
+                                    {"match": {"relationship_type": rel_type}},
+                                    {"match": {"source_ref": source_field}}
+                                ]}}
+                        q['query']['bool']['should'].append(field_q)
+                        # Swap fields in case second iteration (reverse rel)
+                        target_field, source_field = source_field, target_field
+        ids = []
+        res = self.search(index='relationship',
+                          body=q,
+                          _source_includes=["source_ref", "target_ref"],
+                          size=10000)
+        for hit in res['hits']['hits']:
+            if hit['_source']['source_ref'] != stixid:
+                ids.append(hit['_source']['source_ref'])
+            if hit['_source']['target_ref'] != stixid:
+                ids.append(hit['_source']['target_ref'])
+
+        return list(set(ids))
 
     def get_org_info(self, org_id, user_id):
         org_info = self.get_molecule_rels(stixid=org_id,
@@ -334,6 +422,7 @@ class Client(Elasticsearch):
 
         return results
 
+    # SETUP:
     def get_index_from_alias(self, index_alias):
         aliases = self.cat.aliases(name=[index_alias]).split(' ')
         for alias in aliases:
@@ -388,168 +477,54 @@ class Client(Elasticsearch):
             '_Observable',
             # '_Extension',
         ]
-        # master_mapping = {}
-        for name, obj in inspect.getmembers(sys.modules[
-                                            get_stix_ver_name(stix_ver)]):
-            if inspect.isclass(obj):
-                class_type = inspect.getmro(obj)[1].__name__
-                if class_type in supported_types:
-                    index_name = obj._type
-                    new_es_mapping = stix_to_elk(obj, stix_ver)
-                    # update(master_mapping, new_es_mapping)
+        module_name = sys.modules[get_stix_ver_name(stix_ver)]
+        for name, obj in inspect.getmembers(module_name):
+            if not inspect.isclass(obj):
+                continue
+            class_type = inspect.getmro(obj)[1].__name__
+            if class_type not in supported_types:
+                continue
+            index_name = obj._type
+            new_es_mapping = stix_to_elk(obj, stix_ver)
+            tmp_mapping = self.indices.get_mapping(
+                index=[index_name], ignore_unavailable=True)
 
-                    # index_name = 'intel'
-                    # new_es_mapping = master_mapping
-                    tmp_mapping = self.indices.get_mapping(
-                        index=[index_name], ignore_unavailable=True)
-
-                    try:
-                        current_mapping = next(iter(tmp_mapping.values()))
-                        if not compare_mappings(current_mapping,
-                                                new_es_mapping):
-                            print(index_name + ' mapping is up to date!')
-                            pass
-                        else:
-                            if not self.update_es_indexmapping(index_name,
-                                                               new_es_mapping):
-                                print(
-                                    index_name + ' was already updated today. '
-                                    'Try again tomorrow.')
-                            else:
-                                print('Index refreshed for ' + index_name)
-                    except StopIteration:
-                        resp = self.new_index(index_name, new_es_mapping)
-                        try:
-                            if resp['acknowledged']:
-                                print('Created new index for ' + index_name)
-                        except KeyError:
-                            print('Failed to create new index for '
-                                  + index_name)
-
-    def check_commit(self, bundle):
-        grouping_count = 0
-        ids = []
-        ident_ids = []
-        group_obj_lst = []
-
-        for obj in bundle['objects']:
-            if obj['type'] == 'grouping':
-                grouping_count += 1
-                group_author = obj['created_by_ref']
-                group_obj_lst = obj['object_refs']
-            elif obj['type'] == 'identity':
-                ident_ids.append(obj['id'])
-                ids.append(obj['id'])
-            else:
+            try:
+                current_mapping = next(iter(tmp_mapping.values()))
+                if not compare_mappings(current_mapping, new_es_mapping):
+                    print(index_name + ' mapping is up to date!')
+                    continue
+                if not self.update_es_indexmapping(index_name, new_es_mapping):
+                    print(index_name +
+                          ' was already updated today. Try again tomorrow.')
+                    continue
+                print('Index refreshed for ' + index_name)
+            except StopIteration:
+                resp = self.new_index(index_name, new_es_mapping)
                 try:
-                    ids.append(obj['id'])
-                except AttributeError:
-                    pass
+                    if resp['acknowledged']:
+                        print('Created new index for ' + index_name)
+                except KeyError:
+                    print('Failed to create new index for ' + index_name)
 
-        if grouping_count == 1 and ids.sort() == group_obj_lst.sort():
-            # Only 1 grouping and it refers to all objects in the commit - good
-            if group_author in ident_ids:
-                # Regardless of supplied identities, id of group author exists
-                #   in kb - good
-                return True
-            elif self.exists(
-                             index='identity',
-                             id=group_author.split('--')[1],
-                             _source=False,
-                             ignore=[400, 404]):
-                # Explicit inclusion of id entity in commit - good
-                return True
-        # Otherwise, not enough info for commit - bad
+    def data_primer(self):
+        # Get Mitre Att&ck as a basis
+        # Note: We don't apply commit control on ingest - it runs in the
+        #   background so as not to slow down ingestion
+        # If it's stix2.x - let it in.
+        attack = {}
+        collection = Collection(
+            "https://cti-taxii.mitre.org/stix/collections/"
+            "95ecc380-afe9-11e4-9b6c-751b66dd541e")
+        tc_source = stix2.TAXIICollectionSource(collection)
+        attack = tc_source.query()
 
-        return False
-
-    def get_molecule_rels(self, stixid, molecule):
-        obj_type = stixid.split('--')[0]
-        obj_id = stixid.split('--')[1]
-        q = {"query": {"bool": {"should": []}}}
-
-        for from_type in molecule:
-            for rel_type in molecule[from_type]:
-                for to_type in molecule[from_type][rel_type]:
-                    hits = 0
-                    if from_type == obj_type:
-                        source_field = obj_id
-                        target_field = to_type
-                        hits = 1
-                    if to_type == obj_type:
-                        source_field = from_type
-                        target_field = obj_id
-                        hits = 1
-                    if to_type == from_type and to_type == obj_type:
-                        hits = 2
-
-                    for i in range(hits):
-                        field_q = {"bool": {"must": [
-                                    {"match": {"target_ref": target_field}},
-                                    {"match": {"relationship_type": rel_type}},
-                                    {"match": {"source_ref": source_field}}
-                                ]}}
-                        q['query']['bool']['should'].append(field_q)
-                        # Swap fields in case second iteration (reverse rel)
-                        target_field, source_field = source_field, target_field
-        ids = []
-        res = self.search(index='relationship',
-                          body=q,
-                          _source_includes=["source_ref", "target_ref"],
-                          size=10000)
-        for hit in res['hits']['hits']:
-            if hit['_source']['source_ref'] != stixid:
-                ids.append(hit['_source']['source_ref'])
-            if hit['_source']['target_ref'] != stixid:
-                ids.append(hit['_source']['target_ref'])
-
-        return list(set(ids))
-
-    def compare_bundle_to_molecule(self, bundle):
-        molecules = self.molecules
-
-        overall_score = {}
-        for molecule in molecules:
-            target_score = 0
-            overall_score[molecule] = [0]
-            for source in molecules[molecule]:
-                for rel in molecules[molecule][source]:
-                    target_score += len(
-                        molecules[molecule][source][rel])
-            overall_score[molecule].append(target_score)
-
-        for obj in bundle['objects']:
-            if obj['type'] == 'relationship':
-                source_type = obj['source_ref'].split('--')[0]
-                target_type = obj['target_ref'].split('--')[0]
-                rel_type = obj['relationship_type']
-                for molecule in molecules:
-                    try:
-                        if (target_type in
-                                molecules[molecule][source_type][rel_type]):
-                            overall_score[molecule][0] += 1
-                    except KeyError:
-                        pass
-
-        return overall_score
-
-    def check_user(self, bundle):
-        # Assume correct org-suborg-individual and tooling structure is used to
-        #   register a user
-        # An end user can also be an automated system
-        # Expect at least 1 related location to declare geographic interest
-        # This function can be used to store a new user or update an existing
-        #   one...maybe I should clean up old relationships too?
-        # System should automatically data mark these entities as PII and
-        #   otherwise there should be no marking references
-        scores = self.compare_bundle_to_molecule(bundle)
-
-        if scores['m_user'][1] > scores['m_user'][0]:
-            return False
-
-        extrefs = get_external_refs(bundle)
-        for extref in extrefs:
-            res = self.exists(index=extref.split('--')[0],
-                              id=str(extref.split('--')[1]),
-                              _source=False)
-            return res
+        for obj in attack:
+            try:
+                doc = json.loads(obj.serialize())
+            except AttributeError:
+                doc = obj
+            res = self.store_obj(doc)
+            if res['result'] != 'created' and res['result'] != 'updated':
+                return False
+        return True

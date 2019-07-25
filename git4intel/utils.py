@@ -10,10 +10,12 @@ from slugify import slugify
 hard_loc = "location--3fc1c688-c7e9-4609-ac72-01ac8b4afbc1"
 
 
-def load_data(path):
-    with open(path) as f:
-        data = json.load(f)
-    return data
+# BITS AND PIECES:
+def get_stix_ver_name(stix_ver):
+    if stix_ver == '21':
+        return stix2.v21.__name__
+    else:
+        return stix2.v20.__name__
 
 
 def get_deterministic_uuid(prefix=None, seed=None):
@@ -28,6 +30,55 @@ def get_deterministic_uuid(prefix=None, seed=None):
     return "{}{}".format(prefix, stix_id)
 
 
+def update(d, u):
+    for k, v in u.items():
+        if isinstance(v, collections.Mapping):
+            d[k] = update(d.get(k, {}), v)
+        else:
+            d[k] = v
+    return d
+
+
+def ordered(obj):
+    if isinstance(obj, dict):
+        return sorted((k, ordered(v)) for k, v in obj.items())
+    if isinstance(obj, list):
+        return sorted(ordered(x) for x in obj)
+    else:
+        return obj
+
+
+def todays_index(index_alias):
+    return (index_alias + '-' + datetime.now().strftime("%y%m%d"))
+
+
+def get_external_refs(bundle):
+    # Returns True if bundle has external refs that are resolvable in
+    #   g4i backend
+    # Returns False if bundle contains extrefs that are unresolvable
+    # Returns None if no extrefs
+    rel_lst = []
+    id_lst = []
+    for obj in bundle['objects']:
+        for field in obj:
+            if field[-4:] == '_ref':
+                rel_lst.append(obj[field])
+            elif field[-5:] == '_refs':
+                for rel in obj[field]:
+                    rel_lst.append(rel)
+        if obj['type'] == 'relationship':
+            if obj['source_ref'] not in rel_lst:
+                rel_lst.append(obj['source_ref'])
+            if obj['target_ref'] not in rel_lst:
+                rel_lst.append(obj['target_ref'])
+        else:
+            if obj['id'] not in id_lst:
+                id_lst.append(obj['id'])
+    diff = list(set(rel_lst) - set(id_lst))
+    return diff
+
+
+# SYSTEM INFO:
 def get_system_id():
     system_id = stix2.v21.Identity(
                 id=get_deterministic_uuid(
@@ -120,31 +171,7 @@ def get_molecules(config_file=None):
     }
 
 
-def refresh_static_data(created_by_ref):
-    location_bundle = get_locations(created_by_ref)
-    marking_bundle = get_marking_definitions(created_by_ref)
-    bundle = stix2.v21.Bundle(location_bundle['objects'] + marking_bundle['objects'])
-    return json.loads(bundle.serialize())
-
-
-def update(d, u):
-    for k, v in u.items():
-        if isinstance(v, collections.Mapping):
-            d[k] = update(d.get(k, {}), v)
-        else:
-            d[k] = v
-    return d
-
-
-def ordered(obj):
-    if isinstance(obj, dict):
-        return sorted((k, ordered(v)) for k, v in obj.items())
-    if isinstance(obj, list):
-        return sorted(ordered(x) for x in obj)
-    else:
-        return obj
-
-
+# ES SETUP:
 def stixprop_to_field(prop_name, prop):
     schema_map = {
         'ListProperty': {
@@ -217,13 +244,6 @@ def stixprop_to_field(prop_name, prop):
         return {prop_name: {'type': es_type}}
 
 
-def get_stix_ver_name(stix_ver):
-    if stix_ver == '21':
-        return stix2.v21.__name__
-    else:
-        return stix2.v20.__name__
-
-
 def compare_mappings(current_mapping, new_mapping):
     # Return True if there are differences
     # pprint(current_mapping)
@@ -273,34 +293,12 @@ def stix_to_elk(obj, stix_ver):
     return mapping
 
 
-def todays_index(index_alias):
-    return (index_alias + '-' + datetime.now().strftime("%y%m%d"))
-
-
-def get_external_refs(bundle):
-    # Returns True if bundle has external refs that are resolvable in
-    #   g4i backend
-    # Returns False if bundle contains extrefs that are unresolvable
-    # Returns None if no extrefs
-    rel_lst = []
-    id_lst = []
-    for obj in bundle['objects']:
-        for field in obj:
-            if field[-4:] == '_ref':
-                rel_lst.append(obj[field])
-            elif field[-5:] == '_refs':
-                for rel in obj[field]:
-                    rel_lst.append(rel)
-        if obj['type'] == 'relationship':
-            if obj['source_ref'] not in rel_lst:
-                rel_lst.append(obj['source_ref'])
-            if obj['target_ref'] not in rel_lst:
-                rel_lst.append(obj['target_ref'])
-        else:
-            if obj['id'] not in id_lst:
-                id_lst.append(obj['id'])
-    diff = list(set(rel_lst) - set(id_lst))
-    return diff
+# STATIC DATA
+def refresh_static_data(created_by_ref):
+    location_bundle = get_locations(created_by_ref)
+    marking_bundle = get_marking_definitions(created_by_ref)
+    bundle = stix2.v21.Bundle(location_bundle['objects'] + marking_bundle['objects'])
+    return json.loads(bundle.serialize())
 
 
 def get_marking_definitions(created_by_ref):
