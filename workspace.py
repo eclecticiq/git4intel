@@ -122,8 +122,8 @@ def main():
     #   data set
     # Ingest is a 'just get' policy for stix2, commit and molecule management
     #    happen with background analytics to avoid ingestion slowness
-    print('Loading data primer (Mitre Att&ck)...')
-    print(g4i.data_primer())
+    # print('Loading data primer (Mitre Att&ck)...')
+    # print(g4i.data_primer())
 
     # Setup client user information - using the included dummy data for testing
     print('Creating dummy user account...')
@@ -167,9 +167,6 @@ def main():
     print(g4i.store_intel(bundle=bundle, is_commit=True))
     bundle = make_valid_commit2(user_id2.id)
     print(g4i.store_intel(bundle=bundle, is_commit=True))
-    # Make random report containing relevant string
-    report = make_report(user_id1.id)
-    print(g4i.store_obj(report))
 
     # Try finding a term that we know is in there...
     #   the user has the grouping id already and provides the userid for
