@@ -285,11 +285,6 @@ class Client(Elasticsearch):
         q = {
             "query": {
                 "bool": {
-                    "must": [{
-                        "match": {
-                            "created_by_ref": self.identity['id']
-                        },
-                    }],
                     "filter": [{
                         "exists": {
                             "field": "country"
