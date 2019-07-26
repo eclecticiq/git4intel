@@ -49,7 +49,7 @@ def ordered(obj):
 
 
 def todays_index(index_alias):
-    return (index_alias + '-' + datetime.now().strftime("%y%m%d"))
+    return (index_alias + '--' + datetime.now().strftime("%y%m%d"))
 
 
 def get_external_refs(bundle):
@@ -79,7 +79,7 @@ def get_external_refs(bundle):
 
 
 # SYSTEM INFO:
-def get_system_id():
+def get_system_id(id_only=False):
     system_id = stix2.v21.Identity(
                 id=get_deterministic_uuid(
                     prefix="identity--",
@@ -87,6 +87,8 @@ def get_system_id():
                 identity_class='system',
                 name='git4intel Setup',
                 sectors=[slugify("IT Consulting & Other Services")])
+    if id_only:
+        return json.loads(system_id.serialize())
     loc_rel = stix2.v21.Relationship(
                 created_by_ref=system_id.id,
                 id=get_deterministic_uuid(
@@ -100,7 +102,7 @@ def get_system_id():
     return json.loads(stix2.v21.Bundle([system_id, loc_rel]).serialize())
 
 
-def get_system_org(system_id):
+def get_system_org(system_id, org_only=False):
     org_id = stix2.v21.Identity(
             created_by_ref=system_id,
             id=get_deterministic_uuid(
@@ -109,7 +111,8 @@ def get_system_org(system_id):
             identity_class='organization',
             name='EclecticIQ',
             sectors=[slugify("IT Consulting & Other Services")])
-
+    if org_only:
+        return json.loads(org_id.serialize())
     loc_rel = stix2.v21.Relationship(
             created_by_ref=system_id,
             id=get_deterministic_uuid(

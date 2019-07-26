@@ -27,11 +27,17 @@ sdo_indices = [
     'attack-pattern',
     'campaign',
     'course-of-action',
+    'grouping',
     'identity',
     'indicator',
+    'infrastructure',
     'intrusion-set',
+    'location',
     'malware',
+    'malware-analysis',
+    'note',
     'observed-data',
+    'opinion',
     'report',
     'threat-actor',
     'tool',
@@ -52,10 +58,11 @@ class TLPPlusMarking(object):
 class Client(Elasticsearch):
 
     def __init__(self, uri, molecule_file=None):
-        Elasticsearch.__init__(self, uri)
+        self.stix_ver = '21'
         self.molecules = get_molecules(molecule_file)
-        if not self.set_system_data():
-            raise ValueError('Uable to load system config.')
+        self.identity = get_system_id(id_only=True)
+        self.org = get_system_org(system_id=self.identity['id'], org_only=True)
+        Elasticsearch.__init__(self, uri)
 
     # SETS:
     def store_obj(self, obj):
@@ -66,38 +73,32 @@ class Client(Elasticsearch):
                          body=obj,
                          doc_type="_doc",
                          id=doc_id)
-        return res
+        if res['result'] == 'created' or res['result'] == 'updated':
+            return True
+        return False
 
     def store_intel(self, bundle, is_commit=None):
         if is_commit:
             if not self.check_commit(bundle):
                 return False
         for stix_object in bundle['objects']:
-            res = self.store_obj(stix_object)
-            if res['result'] != 'created' and res['result'] != 'updated':
+            if not self.store_obj(stix_object):
                 return False
         return True
 
-    def set_system_data(self):
+    def store_core_data(self):
+        self.setup_es(self.stix_ver)
         system_id_bundle = get_system_id()
-        for obj in system_id_bundle['objects']:
-            if obj['type'] == 'identity':
-                self.identity = obj
+        org_id_bundle = get_system_org(self.identity['id'])
         if not self.register_ident(system_id_bundle, 'system'):
             return False
-
-        org_id_bundle = get_system_org(self.identity['id'])
-        for obj in org_id_bundle['objects']:
-            if obj['type'] == 'identity':
-                self.org = obj
         if not self.register_ident(org_id_bundle, 'organization'):
             return False
 
         org_rel = get_system_to_org(self.identity['id'], self.org['id'])
-        self.store_obj(org_rel)
-        return True
+        if not self.store_obj(org_rel):
+            return False
 
-    def store_core_data(self):
         static_data = refresh_static_data(self.identity['id'])
         if not self.store_intel(static_data):
             return False
@@ -115,8 +116,7 @@ class Client(Elasticsearch):
             if obj_type == 'identity' and obj['identity_class'] != _type:
                 return False
             if obj_type == 'identity' or obj_type == 'relationship':
-                res = self.store_obj(obj)
-                if res['result'] != 'created' and res['result'] != 'updated':
+                if not self.store_obj(obj):
                     return False
         return True
 
@@ -134,12 +134,11 @@ class Client(Elasticsearch):
                            _source_includes='identity_class')
         if ind_obj['_source']['identity_class'] != 'individual':
             return False
-        res = self.store_obj(org_rel)
-        if res['result'] != 'created' and res['result'] != 'updated':
+        if not self.store_obj(org_rel):
             return False
         return True
 
-    def set_TLPPlus(self, user_id, tlp_marking_def_ref, distribution_refs):
+    def set_tlpplus(self, user_id, tlp_marking_def_ref, distribution_refs):
         if user_id.split('--')[0] != 'identity':
             return False
         if not isinstance(distribution_refs, list):
@@ -156,7 +155,7 @@ class Client(Elasticsearch):
                        id=md_id.split('--')[1],
                        _source=False,
                        ignore=[400, 404]):
-            return [md_id]
+            return md_id
         tlp_plus = TLPPlusMarking(tlp_marking_def_ref=tlp_marking_def_ref,
                                   distribution_refs=ref_list)
         new_md = stix2.v21.MarkingDefinition(definition_type='tlp-plus',
@@ -166,7 +165,7 @@ class Client(Elasticsearch):
         if not self.store_obj(json.loads(new_md.serialize())):
             return False
 
-        return [md_id]
+        return md_id
 
     # CHECKS:
     def check_commit(self, bundle):
@@ -279,9 +278,10 @@ class Client(Elasticsearch):
     def get_org_info(self, user_id, org_id):
         org_info = self.get_molecule_rels(stixid=org_id,
                                           molecule=self.molecules['m_org'])
-        return self.get_objects(org_info, user_id)
+        return self.get_objects(user_id=user_id, obj_ids=org_info)
 
     def get_countries(self):
+
         q = {
             "query": {
                 "bool": {
@@ -308,7 +308,7 @@ class Client(Elasticsearch):
     def get_object(self, user_id, obj_id, values=None):
         if not isinstance(obj_id, str):
             return False
-        docs = self.get_objects(user_id, [obj_id], values)
+        docs = self.get_objects(user_id=user_id, obj_ids=[obj_id], values=values)
         if len(docs) > 1:
             return False
         return docs[0]
@@ -356,8 +356,8 @@ class Client(Elasticsearch):
                               "_id": obj_id.split('--')[1]})
 
         res = self.mget(body=g)
-        for hit in res['docs']:
-            docs.append(hit['_source'])
+        for doc in res['docs']:
+            docs.append(doc['_source'])
         return docs
 
     def get_content(self, user_id, my_org_only=True, types=None, values=None,
@@ -374,7 +374,7 @@ class Client(Elasticsearch):
                 obj_type = _id.split('--')[0]
                 if obj_type != 'identity':
                     continue
-                res = self.get_objects([_id], user_id)
+                res = self.get_objects(user_id=user_id, obj_ids=[_id])
                 if res[0]['identity_class'] != 'organization':
                     continue
                 valid_authors.append(res[0]['id'])
@@ -385,7 +385,7 @@ class Client(Elasticsearch):
                     user_type = other_user.split('--')[0]
                     if user_type != 'identity':
                         continue
-                    res = self.get_objects([other_user], user_id)
+                    res = self.get_objects(user_id=user_id, obj_ids=[other_user])
                     if res[0]['identity_class'] != 'individual':
                         continue
                     valid_authors.append(res[0]['id'])
@@ -450,8 +450,8 @@ class Client(Elasticsearch):
                     continue
                 parent_ids.append(hit['_source']['id'])
 
-                child_objs = self.get_objects(obj_ids=child_ids,
-                                              user_id=user_id,
+                child_objs = self.get_objects(user_id=user_id,
+                                              obj_ids=child_ids,
                                               values=values)
                 if child_objs:
                     tmp_obj[new_field] = []
@@ -466,7 +466,7 @@ class Client(Elasticsearch):
             results.append(new_obj)
 
         hit_ids = list(set(hit_ids))
-        res = self.get_objects(hit_ids, user_id, values)
+        res = self.get_objects(user_id=user_id, obj_ids=hit_ids, values=values)
         if res:
             for hit in res:
                 if hit['id'] not in child_ids:
@@ -592,7 +592,6 @@ class Client(Elasticsearch):
                 doc = json.loads(obj.serialize())
             except AttributeError:
                 doc = obj
-            res = self.store_obj(doc)
-            if res['result'] != 'created' and res['result'] != 'updated':
+            if not self.store_obj(doc):
                 return False
         return True
