@@ -65,7 +65,7 @@ class Client(Elasticsearch):
         Elasticsearch.__init__(self, uri)
 
     # SETS:
-    def _store_obj(self, obj):
+    def __store_obj(self, obj):
         id_parts = str(obj['id']).split('--')
         index_name = id_parts[0]
         doc_id = id_parts[1]
@@ -79,15 +79,15 @@ class Client(Elasticsearch):
 
     def store_intel(self, bundle, is_commit=None):
         if is_commit:
-            if not self._check_commit(bundle):
+            if not self.__check_commit(bundle):
                 return False
         for stix_object in bundle['objects']:
-            if not self._store_obj(stix_object):
+            if not self.__store_obj(stix_object):
                 return False
         return True
 
     def store_core_data(self):
-        self._setup_es(self.stix_ver)
+        self.__setup_es(self.stix_ver)
         system_id_bundle = get_system_id()
         org_id_bundle = get_system_org(self.identity['id'])
         if not self.register_ident(system_id_bundle, 'system'):
@@ -96,7 +96,7 @@ class Client(Elasticsearch):
             return False
 
         org_rel = get_system_to_org(self.identity['id'], self.org['id'])
-        if not self._store_obj(org_rel):
+        if not self.__store_obj(org_rel):
             return False
 
         static_data = refresh_static_data(self.identity['id'])
@@ -116,7 +116,7 @@ class Client(Elasticsearch):
             if obj_type == 'identity' and obj['identity_class'] != _type:
                 return False
             if obj_type == 'identity' or obj_type == 'relationship':
-                if not self._store_obj(obj):
+                if not self.__store_obj(obj):
                     return False
         return True
 
@@ -134,7 +134,7 @@ class Client(Elasticsearch):
                            _source_includes='identity_class')
         if ind_obj['_source']['identity_class'] != 'individual':
             return False
-        if not self._store_obj(org_rel):
+        if not self.__store_obj(org_rel):
             return False
         return True
 
@@ -162,13 +162,13 @@ class Client(Elasticsearch):
                                              definition=tlp_plus,
                                              id=md_id,
                                              created_by_ref=user_id)
-        if not self._store_obj(json.loads(new_md.serialize())):
+        if not self.__store_obj(json.loads(new_md.serialize())):
             return False
 
         return md_id
 
     # CHECKS:
-    def _check_commit(self, bundle):
+    def __check_commit(self, bundle):
         grouping_count = 0
         ids = []
         ident_ids = []
@@ -204,7 +204,7 @@ class Client(Elasticsearch):
 
         return False
 
-    def _compare_bundle_to_molecule(self, bundle):
+    def __compare_bundle_to_molecule(self, bundle):
         molecules = self.molecules
 
         overall_score = {}
@@ -233,7 +233,7 @@ class Client(Elasticsearch):
         return overall_score
 
     # GETS:
-    def _get_molecule_rels(self, stixid, molecule):
+    def __get_molecule_rels(self, stixid, molecule):
         obj_type = stixid.split('--')[0]
         obj_id = stixid.split('--')[1]
         q = {"query": {"bool": {"should": []}}}
@@ -276,8 +276,8 @@ class Client(Elasticsearch):
         return list(set(ids))
 
     def get_org_info(self, user_id, org_id):
-        org_info = self._get_molecule_rels(stixid=org_id,
-                                           molecule=self.molecules['m_org'])
+        org_info = self.__get_molecule_rels(stixid=org_id,
+                                            molecule=self.molecules['m_org'])
         return self.get_objects(user_id=user_id, obj_ids=org_info)
 
     def get_countries(self):
@@ -368,8 +368,8 @@ class Client(Elasticsearch):
         if user_id.split('--')[0] != 'identity':
             return False
         valid_authors = [user_id]
-        user_info = self._get_molecule_rels(stixid=user_id,
-                                            molecule=self.molecules['m_org'])
+        user_info = self.__get_molecule_rels(stixid=user_id,
+                                             molecule=self.molecules['m_org'])
         if my_org_only:
             # Specify just objects created by you/your org/other org members
             for _id in user_info:
@@ -380,7 +380,7 @@ class Client(Elasticsearch):
                 if res[0]['identity_class'] != 'organization':
                     continue
                 valid_authors.append(res[0]['id'])
-                org_info = self._get_molecule_rels(
+                org_info = self.__get_molecule_rels(
                                               stixid=res[0]['id'],
                                               molecule=self.molecules['m_org'])
                 for other_user in org_info:
@@ -478,7 +478,7 @@ class Client(Elasticsearch):
         return results
 
     # SETUP:
-    def _get_index_from_alias(self, index_alias):
+    def __get_index_from_alias(self, index_alias):
         aliases = self.cat.aliases(name=[index_alias]).split(' ')
         for alias in aliases:
             if re.match(r'.+-[0-9]+', alias):
@@ -492,14 +492,14 @@ class Client(Elasticsearch):
             return False
         else:
             # Strip aliases from old index
-            old_index_name = self._get_index_from_alias(index_alias)
+            old_index_name = self.__get_index_from_alias(index_alias)
             if old_index_name:
                 self.indices.delete_alias(index=[old_index_name], name=[
                     index_alias, 'intel'])
             if index_alias in sdo_indices:
                 self.indices.delete_alias(index=[old_index_name], name=['sdo'])
 
-            self._new_index(index_alias, new_mapping)
+            self.__new_index(index_alias, new_mapping)
 
             # Reindexing requires at least 1 document in the index...
             num_indices = self.cat.count(index=[new_index_name])
@@ -516,7 +516,7 @@ class Client(Elasticsearch):
 
             return True
 
-    def _new_index(self, index_alias, mapping=None):
+    def __new_index(self, index_alias, mapping=None):
         index_name = todays_index(index_alias)
         self.indices.create(index=index_name, body=mapping)
         self.indices.put_alias(index=[index_name], name='intel')
@@ -524,7 +524,7 @@ class Client(Elasticsearch):
             self.indices.put_alias(index=[index_name], name='sdo')
         return self.indices.put_alias(index=[index_name], name=index_alias)
 
-    def _setup_es(self, stix_ver):
+    def __setup_es(self, stix_ver):
         unsupported_types = [
             'archive-ext',
             'bundle',
@@ -572,7 +572,7 @@ class Client(Elasticsearch):
                     continue
                 print('Index refreshed for ' + index_name)
             except StopIteration:
-                resp = self._new_index(index_name, new_es_mapping)
+                resp = self.__new_index(index_name, new_es_mapping)
                 try:
                     if resp['acknowledged']:
                         print('Created new index for ' + index_name)
@@ -596,6 +596,6 @@ class Client(Elasticsearch):
                 doc = json.loads(obj.serialize())
             except AttributeError:
                 doc = obj
-            if not self._store_obj(doc):
+            if not self.__store_obj(doc):
                 return False
         return True
