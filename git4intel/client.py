@@ -243,7 +243,7 @@ class Client(Elasticsearch):
 
         return list(set(ids))
 
-    def get_org_info(self, org_id, user_id):
+    def get_org_info(self, user_id, org_id):
         org_info = self.get_molecule_rels(stixid=org_id,
                                           molecule=self.molecules['m_org'])
         return self.get_objects(org_info, user_id)
@@ -273,7 +273,13 @@ class Client(Elasticsearch):
             countries[hit['_source']['id']] = hit['_source']['name']
         return countries
 
-    def get_objects(self, obj_ids, user_id, values=None):
+    def get_object(self, user_id, obj_id, values=None):
+        if not isinstance(obj_id, str):
+            return False
+        docs = self.get_objects(user_id, [obj_id], values)
+        return docs[0]
+
+    def get_objects(self, user_id, obj_ids, values=None):
         # Get objects by stix_id ref (list of) and filtered by what I
         #   can see based on my user_id (id of individual identity object)
         #   ie: to include the org-walk of marking definitions in future
