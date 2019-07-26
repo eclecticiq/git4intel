@@ -10,16 +10,16 @@ from stix2.properties import ListProperty, ReferenceProperty
 from pprint import pprint
 
 from .utils import (
+    compare_mappings,
+    get_deterministic_uuid,
+    get_molecules,
+    get_stix_ver_name,
     get_system_id,
     get_system_org,
     get_system_to_org,
-    get_molecules,
     refresh_static_data,
-    todays_index,
-    compare_mappings,
-    get_stix_ver_name,
     stix_to_elk,
-    get_external_refs,
+    todays_index,
 )
 
 
@@ -43,7 +43,7 @@ sdo_indices = [
     ('tlp_marking_def_ref', ReferenceProperty(
         type='marking-definition', required=True)),
     ('distribution_refs', ListProperty(
-        ReferenceProperty(type='identity'), required=True)),
+        ReferenceProperty(type='identity'), required=True))
 ])
 class TLPPlusMarking(object):
     pass
@@ -52,18 +52,21 @@ class TLPPlusMarking(object):
 class Client(Elasticsearch):
 
     def __init__(self, uri, molecule_file=None):
-        self.molecules = get_molecules(molecule_file)
         Elasticsearch.__init__(self, uri)
+        self.molecules = get_molecules(molecule_file)
+        if not self.set_system_data():
+            raise ValueError('Uable to load system config.')
 
     # SETS:
     def store_obj(self, obj):
         id_parts = str(obj['id']).split('--')
         index_name = id_parts[0]
         doc_id = id_parts[1]
-        return self.index(index=index_name,
-                          body=obj,
-                          doc_type="_doc",
-                          id=doc_id)
+        res = self.index(index=index_name,
+                         body=obj,
+                         doc_type="_doc",
+                         id=doc_id)
+        return res
 
     def store_intel(self, bundle, is_commit=None):
         if is_commit:
@@ -75,7 +78,7 @@ class Client(Elasticsearch):
                 return False
         return True
 
-    def store_core_data(self):
+    def set_system_data(self):
         system_id_bundle = get_system_id()
         for obj in system_id_bundle['objects']:
             if obj['type'] == 'identity':
@@ -92,7 +95,9 @@ class Client(Elasticsearch):
 
         org_rel = get_system_to_org(self.identity['id'], self.org['id'])
         self.store_obj(org_rel)
+        return True
 
+    def store_core_data(self):
         static_data = refresh_static_data(self.identity['id'])
         if not self.store_intel(static_data):
             return False
@@ -134,6 +139,35 @@ class Client(Elasticsearch):
             return False
         return True
 
+    def set_new_TLPPlus(self, user_id, tlp_marking_def_ref, distribution_refs):
+        if user_id.split('--')[0] != 'identity':
+            return False
+        if not isinstance(distribution_refs, list):
+            return False
+        if (tlp_marking_def_ref != stix2.TLP_AMBER.id and
+                tlp_marking_def_ref != stix2.TLP_RED.id):
+            return False
+        ref_list = distribution_refs[:]
+        distribution_refs.append(tlp_marking_def_ref)
+        distribution_refs = sorted(set(distribution_refs))
+        md_id = get_deterministic_uuid(prefix='marking-definition--',
+                                       seed=str(ref_list))
+        if self.exists(index='marking-definition',
+                       id=md_id.split('--')[1],
+                       _source=False,
+                       ignore=[400, 404]):
+            return [md_id]
+        tlp_plus = TLPPlusMarking(tlp_marking_def_ref=tlp_marking_def_ref,
+                                  distribution_refs=ref_list)
+        new_md = stix2.v21.MarkingDefinition(definition_type='tlp-plus',
+                                             definition=tlp_plus,
+                                             id=md_id,
+                                             created_by_ref=user_id)
+        if not self.store_obj(json.loads(new_md.serialize())):
+            return False
+
+        return [md_id]
+
     # CHECKS:
     def check_commit(self, bundle):
         grouping_count = 0
@@ -161,8 +195,7 @@ class Client(Elasticsearch):
                 # Regardless of supplied identities, id of group author exists
                 #   in kb - good
                 return True
-            elif self.exists(
-                             index='identity',
+            elif self.exists(index='identity',
                              id=group_author.split('--')[1],
                              _source=False,
                              ignore=[400, 404]):
@@ -249,7 +282,6 @@ class Client(Elasticsearch):
         return self.get_objects(org_info, user_id)
 
     def get_countries(self):
-
         q = {
             "query": {
                 "bool": {
@@ -490,21 +522,37 @@ class Client(Elasticsearch):
         return self.indices.put_alias(index=[index_name], name=index_alias)
 
     def setup_es(self, stix_ver):
-        supported_types = [
-            # '_STIXBase',
-            'STIXDomainObject',
-            'STIXRelationshipObject',
-            '_Observable',
-            # '_Extension',
+        unsupported_types = [
+            'archive-ext',
+            'bundle',
+            'http-request-ext',
+            'icmp-ext',
+            'language-content',
+            'ntfs-ext',
+            'pdf-ext',
+            'raster-image-ext',
+            'socket-ext',
+            'statement',
+            'tcp-ext',
+            'tlp',
+            'tlp-plus',
+            'unix-account-ext',
+            'windows-pebinary-ext',
+            'windows-process-ext',
+            'windows-registry-value-type',
+            'windows-service-ext',
+            'x509-v3-extensions-type'
         ]
         module_name = sys.modules[get_stix_ver_name(stix_ver)]
         for name, obj in inspect.getmembers(module_name):
             if not inspect.isclass(obj):
                 continue
-            class_type = inspect.getmro(obj)[1].__name__
-            if class_type not in supported_types:
+            try:
+                index_name = obj._type
+            except AttributeError:
                 continue
-            index_name = obj._type
+            if index_name in unsupported_types:
+                continue
             new_es_mapping = stix_to_elk(obj, stix_ver)
             tmp_mapping = self.indices.get_mapping(
                 index=[index_name], ignore_unavailable=True)

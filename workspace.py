@@ -58,6 +58,8 @@ def make_valid_commit2(user_id):
 
 
 def make_report(user_id):
+    tlp_plus = git4intel.TLPPlusMarking(tlp_marking_def_ref=stix2.TLP_AMBER.id,
+                                        distribution_refs=['identity--1b5c8217-869d-4bed-bd92-2fdb0b3d2abe'])
     report = stix2.v21.Report(
               name="Single IP address",
               created_by_ref=user_id,
@@ -111,18 +113,25 @@ def main():
 
     # Initialise client
     g4i = git4intel.Client('localhost:9200')
-    pprint(g4i.get_object('identity--831fead5-1cb6-490c-aafd-fc4702c085c6', 'location--53c87d5c-a55c-4f4c-a98e-e216e91ef895'))
+    
+    # new_stuff = g4i.set_new_TLPPlus(user_id='identity--1b5c8217-869d-4bed-bd92-2fdb0b3d2abe',
+    #                                 tlp_marking_def_ref=stix2.TLP_AMBER.id,
+    #                                 distribution_refs=['identity--1f5c8217-869d-4bed-bd92-2fdb0b3d2abe'])
+    # print(new_stuff)
 
     # Setup the indices...
     # Use the stix2 version number specified - calls the current installed
     #   stix2 from running environment
-    # print('Setting up indices...')
-    # g4i.setup_es('21')
+    print('Setting up indices...')
+    g4i.setup_es('21')
 
-    # # Setup the core data (system idents, locations and default data markings)
-    # # - hard coded config
-    # print('Loading core data sets...')
-    # print(g4i.store_core_data())
+    # Setup the core data (system idents, locations and default data markings)
+    # - hard coded config
+    print('Loading core data sets...')
+    print(g4i.store_core_data())
+
+    countries = g4i.get_countries()
+    pprint(countries)
 
     # # Download latest Mitre Att&ck data from their taxii server as default
     # #   data set
