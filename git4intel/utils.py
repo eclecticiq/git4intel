@@ -300,7 +300,8 @@ def stix_to_elk(obj, stix_ver):
 def refresh_static_data(created_by_ref):
     location_bundle = get_locations(created_by_ref)
     marking_bundle = get_marking_definitions(created_by_ref)
-    bundle = stix2.v21.Bundle(location_bundle['objects'] + marking_bundle['objects'])
+    bundle = stix2.v21.Bundle(location_bundle['objects'] +
+                              marking_bundle['objects'])
     return json.loads(bundle.serialize())
 
 

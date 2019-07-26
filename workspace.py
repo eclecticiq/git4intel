@@ -173,7 +173,7 @@ def main():
     #   future filtering
     for obj in bundle['objects']:
         if obj['type'] == 'grouping':
-            group_id = obj['id']
+            # group_id = obj['id']
             author = obj['created_by_ref']
 
     # Indexing is much slower than search, so wait 1 second to catch up

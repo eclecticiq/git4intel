@@ -308,7 +308,9 @@ class Client(Elasticsearch):
     def get_object(self, user_id, obj_id, values=None):
         if not isinstance(obj_id, str):
             return False
-        docs = self.get_objects(user_id=user_id, obj_ids=[obj_id], values=values)
+        docs = self.get_objects(user_id=user_id,
+                                obj_ids=[obj_id],
+                                values=values)
         if len(docs) > 1:
             return False
         return docs[0]
@@ -385,7 +387,8 @@ class Client(Elasticsearch):
                     user_type = other_user.split('--')[0]
                     if user_type != 'identity':
                         continue
-                    res = self.get_objects(user_id=user_id, obj_ids=[other_user])
+                    res = self.get_objects(user_id=user_id,
+                                           obj_ids=[other_user])
                     if res[0]['identity_class'] != 'individual':
                         continue
                     valid_authors.append(res[0]['id'])
@@ -562,7 +565,8 @@ class Client(Elasticsearch):
                 if not compare_mappings(current_mapping, new_es_mapping):
                     print(index_name + ' mapping is up to date!')
                     continue
-                if not self._update_es_indexmapping(index_name, new_es_mapping):
+                if not self._update_es_indexmapping(index_name,
+                                                    new_es_mapping):
                     print(index_name +
                           ' was already updated today. Try again tomorrow.')
                     continue
