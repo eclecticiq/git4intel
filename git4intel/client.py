@@ -139,7 +139,7 @@ class Client(Elasticsearch):
             return False
         return True
 
-    def set_new_TLPPlus(self, user_id, tlp_marking_def_ref, distribution_refs):
+    def set_TLPPlus(self, user_id, tlp_marking_def_ref, distribution_refs):
         if user_id.split('--')[0] != 'identity':
             return False
         if not isinstance(distribution_refs, list):
