@@ -111,6 +111,7 @@ def main():
 
     # Initialise client
     g4i = git4intel.Client('localhost:9200')
+    pprint(g4i.get_object('identity--831fead5-1cb6-490c-aafd-fc4702c085c6', 'location--53c87d5c-a55c-4f4c-a98e-e216e91ef895'))
 
     # Setup the indices...
     # Use the stix2 version number specified - calls the current installed
@@ -131,99 +132,99 @@ def main():
     # print(g4i.data_primer())
 
     # Setup client user information - using the included dummy data for testing
-    print('Creating dummy user account...')
-    user_id1, user_bundle1 = new_user('NEW UZ3R')
-    print(g4i.register_ident(user_bundle1, 'individual'))
+    # print('Creating dummy user account...')
+    # user_id1, user_bundle1 = new_user('NEW UZ3R')
+    # print(g4i.register_ident(user_bundle1, 'individual'))
 
-    print('Creating dummy organisation account...')
-    org_id, org_bundle = new_org(user_id1.id)
-    print(g4i.register_ident(org_bundle, 'organization'))
+    # print('Creating dummy organisation account...')
+    # org_id, org_bundle = new_org(user_id1.id)
+    # print(g4i.register_ident(org_bundle, 'organization'))
 
-    print('Assigning created user to the created organisation...')
-    org_rel1 = stix2.v21.Relationship(created_by_ref=user_id1.id,
-                                      source_ref=user_id1,
-                                      target_ref=org_id,
-                                      relationship_type='relates_to')
-    org_rel1 = json.loads(org_rel1.serialize())
-    print(g4i.add_user_to_org(org_rel1))
+    # print('Assigning created user to the created organisation...')
+    # org_rel1 = stix2.v21.Relationship(created_by_ref=user_id1.id,
+    #                                   source_ref=user_id1,
+    #                                   target_ref=org_id,
+    #                                   relationship_type='relates_to')
+    # org_rel1 = json.loads(org_rel1.serialize())
+    # print(g4i.add_user_to_org(org_rel1))
 
-    print('Create a second user account...')
-    user_id2, user_bundle2 = new_user('Another NEW UZ3R')
-    print(g4i.register_ident(user_bundle2, 'individual'))
+    # print('Create a second user account...')
+    # user_id2, user_bundle2 = new_user('Another NEW UZ3R')
+    # print(g4i.register_ident(user_bundle2, 'individual'))
 
-    print('Invite second user to same organisation...')
-    org_rel2 = stix2.v21.Relationship(created_by_ref=user_id2.id,
-                                      source_ref=user_id2,
-                                      target_ref=org_id,
-                                      relationship_type='relates_to')
-    org_rel2 = json.loads(org_rel2.serialize())
-    print(g4i.add_user_to_org(org_rel2))
+    # print('Invite second user to same organisation...')
+    # org_rel2 = stix2.v21.Relationship(created_by_ref=user_id2.id,
+    #                                   source_ref=user_id2,
+    #                                   target_ref=org_id,
+    #                                   relationship_type='relates_to')
+    # org_rel2 = json.loads(org_rel2.serialize())
+    # print(g4i.add_user_to_org(org_rel2))
 
-    # Indexing is much slower than search, so wait 1 second to catch up
-    time.sleep(1)
+    # # Indexing is much slower than search, so wait 1 second to catch up
+    # time.sleep(1)
 
-    # Registered org and user data can be retrieved as objects...
-    print('Check that the org information contains the new users...')
-    print(user_id1.id, user_id2.id)
-    pprint(g4i.get_org_info(org_id.id, user_id1.id))
+    # # Registered org and user data can be retrieved as objects...
+    # print('Check that the org information contains the new users...')
+    # print(user_id1.id, user_id2.id)
+    # pprint(g4i.get_org_info(org_id.id, user_id1.id))
 
-    # Make a valid commit from Adam's suggested 'event' data as a grouping
-    bundle = make_valid_commit(user_id1.id)
-    print(g4i.store_intel(bundle=bundle, is_commit=True))
-    bundle = make_valid_commit2(user_id2.id)
-    print(g4i.store_intel(bundle=bundle, is_commit=True))
-    # Make random report containing relevant string
-    report = make_report(user_id1.id)
-    print(g4i.store_obj(report))
+    # # Make a valid commit from Adam's suggested 'event' data as a grouping
+    # bundle = make_valid_commit(user_id1.id)
+    # print(g4i.store_intel(bundle=bundle, is_commit=True))
+    # bundle = make_valid_commit2(user_id2.id)
+    # print(g4i.store_intel(bundle=bundle, is_commit=True))
+    # # Make random report containing relevant string
+    # report = make_report(user_id1.id)
+    # print(g4i.store_obj(report))
 
-    # Try finding a term that we know is in there...
-    #   the user has the grouping id already and provides the userid for
-    #   future filtering
-    for obj in bundle['objects']:
-        if obj['type'] == 'grouping':
-            group_id = obj['id']
-            author = obj['created_by_ref']
+    # # Try finding a term that we know is in there...
+    # #   the user has the grouping id already and provides the userid for
+    # #   future filtering
+    # for obj in bundle['objects']:
+    #     if obj['type'] == 'grouping':
+    #         group_id = obj['id']
+    #         author = obj['created_by_ref']
 
-    # Indexing is much slower than search, so wait 1 second to catch up
-    time.sleep(1)
+    # # Indexing is much slower than search, so wait 1 second to catch up
+    # time.sleep(1)
 
-    # Get all content that user/org/members of org created that contain
-    #   a value. NOTE: my_org_only defaults to True and False turns off
-    #   all filtering and relies on marking definition filtering (not
-    #   implemented yet - so currently runs on everything...turn off at
-    #   your own risk!)
-    start = time.time()
-    pprint(g4i.get_content(user_id=author,
-                           types=[],
-                           values=['62.171.220.83']))
-    end = time.time()
-    print(end - start)
+    # # Get all content that user/org/members of org created that contain
+    # #   a value. NOTE: my_org_only defaults to True and False turns off
+    # #   all filtering and relies on marking definition filtering (not
+    # #   implemented yet - so currently runs on everything...turn off at
+    # #   your own risk!)
+    # start = time.time()
+    # pprint(g4i.get_content(user_id=author,
+    #                        types=[],
+    #                        values=['62.171.220.83']))
+    # end = time.time()
+    # print(end - start)
 
-    # Get all grouping objects created by user/org/members
-    start = time.time()
-    pprint(g4i.get_content(user_id=author,
-                           types=['grouping'],
-                           values=[],
-                           group_contexts=['m_event']))
-    end = time.time()
-    print(end - start)
+    # # Get all grouping objects created by user/org/members
+    # start = time.time()
+    # pprint(g4i.get_content(user_id=author,
+    #                        types=['grouping'],
+    #                        values=[],
+    #                        group_contexts=['m_event']))
+    # end = time.time()
+    # print(end - start)
 
-    # Get all grouping objects created by user/org/members that
-    #   contain the value
-    start = time.time()
-    pprint(g4i.get_content(user_id=author,
-                           types=['grouping', 'identity'],
-                           values=['62.171.220.83']))
-    end = time.time()
-    print(end - start)
+    # # Get all grouping objects created by user/org/members that
+    # #   contain the value
+    # start = time.time()
+    # pprint(g4i.get_content(user_id=author,
+    #                        types=['grouping', 'identity'],
+    #                        values=['62.171.220.83']))
+    # end = time.time()
+    # print(end - start)
 
-    start = time.time()
-    pprint(g4i.get_content(user_id=author,
-                           types=['grouping', 'report'],
-                           values=['62.171.220.83'],
-                           group_contexts=['m_event']))
-    end = time.time()
-    print(end - start)
+    # start = time.time()
+    # pprint(g4i.get_content(user_id=author,
+    #                        types=['grouping', 'report'],
+    #                        values=['62.171.220.83'],
+    #                        group_contexts=['m_event']))
+    # end = time.time()
+    # print(end - start)
 
     # Get all objects created by user/org/members
     # start = time.time()

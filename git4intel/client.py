@@ -277,6 +277,8 @@ class Client(Elasticsearch):
         if not isinstance(obj_id, str):
             return False
         docs = self.get_objects(user_id, [obj_id], values)
+        if len(docs) > 1:
+            return False
         return docs[0]
 
     def get_objects(self, user_id, obj_ids, values=None):
