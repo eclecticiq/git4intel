@@ -138,6 +138,21 @@ class Client(Elasticsearch):
             return False
         return True
 
+    def add_contact(self, user_id, contact_username):
+        # Assume inviting and accepting invite is handled by tooling, submit
+        #   the username of the contact after both parties consent. Don't need
+        #   to know the actual identity, just that there is a relationship.
+        # Will handle PII and filtering as next step.
+        contact_id = get_deterministic_uuid(prefix='identity',
+                                            seed=contact_username)
+
+        contact_rel = stix2.v21.Relationship(source_ref=user_id,
+                                             target_ref=contact_id,
+                                             relationship_type='contact')
+        if not self.__store_obj(contact_rel):
+            return False
+        return True
+
     def set_tlpplus(self, user_id, tlp_marking_def_ref, distribution_refs):
         if user_id.split('--')[0] != 'identity':
             return False
