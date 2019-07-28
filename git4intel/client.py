@@ -108,8 +108,6 @@ class Client(Elasticsearch):
     def register_ident(self, id_bundle, _type):
         # Must only contain a id obj and a location ref
         # _type must be the relevant class (org or individual)
-        if len(id_bundle['objects']) != 2:
-            return False
 
         for obj in id_bundle['objects']:
             obj_type = str(obj['id']).split('--')[0]
