@@ -5,7 +5,7 @@ user = {
     "maxItems": 2,
     "items": [
         {
-            "title": "user_identity",
+            "title": "identity--user",
             "description": "Identity object that must indicate an individual user.",
             "type": "object",
             "allOf": [
@@ -28,7 +28,7 @@ user = {
                 }
             ]
         }, {
-            "title": "user_locationref",
+            "title": "relationship--operatinglocationref",
             "description": "Relationship that indicates the user operating location.",
             "type": "object",
             "allOf": [
@@ -71,7 +71,7 @@ org = {
     "maxItems": 2,
     "items": [
         {
-            "title": "org_identity",
+            "title": "identity--organization",
             "description": "Identity object that must indicate an organization.",
             "type": "object",
             "allOf": [
@@ -91,7 +91,7 @@ org = {
                 }
             ]
         }, {
-            "title": "org_locationref",
+            "title": "relationship--incoporatedlocref",
             "description": "Relationship that indicates the location that the organization is incorporated at.",
             "type": "object",
             "allOf": [
@@ -133,7 +133,7 @@ area_of_operation = {
     "description": "List of relationships from identities to locations to define an AO.",
     "items": [
         {
-            "title": "ao_relationship",
+            "title": "relationship--ao",
             "description": "Relationship that indicates the location that the identity operates at.",
             "type": "object",
             "allOf": [
@@ -175,7 +175,7 @@ org_member = {
     "description": "List of relationships from identities to locations to define an AO.",
     "items": [
         {
-            "title": "org_membership",
+            "title": "relationship--membership",
             "description": "Relationship that indicates an an identity's membership of an organization.",
             "type": "object",
             "allOf": [
