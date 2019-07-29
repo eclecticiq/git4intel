@@ -6,11 +6,27 @@ from datetime import datetime
 import random
 import uuid
 from slugify import slugify
+import fastjsonschema
+from pprint import pprint
+
+from .schemas import (
+    area_of_operation,
+    org,
+    org_member,
+    user,
+)
+
+schema_map = {
+    'area_of_operation': area_of_operation,
+    'org': org,
+    'org_member': org_member,
+    'user': user,
+}
 
 hard_loc = "location--3fc1c688-c7e9-4609-ac72-01ac8b4afbc1"
 
 
-# BITS AND PIECES:
+# BITS AND BOBS:
 def get_stix_ver_name(stix_ver):
     if stix_ver == '21':
         return stix2.v21.__name__
@@ -78,6 +94,37 @@ def get_external_refs(bundle):
     return diff
 
 
+def validate(objects, schema_name):
+    if isinstance(schema_name, list):
+        schema = {
+            "type": "array",
+            "items": []
+        }
+        for _schema in schema_name:
+            schema['items'].append(schema_map[_schema])
+    else:
+        schema = schema_map[schema_name]
+    try:
+        _validate = fastjsonschema.compile(schema)
+        _validate(objects)
+    except fastjsonschema.JsonSchemaException as e:
+        print(e)
+        return False
+    return True
+
+
+def handle_data(thingy):
+    if isinstance(thingy, list):
+        # If list, assume list of stix (json) objects
+        return thingy
+    try:
+        # If Bundle, return the objects list
+        return thingy['objects']
+    except KeyError:
+        # Otherwise, assume a single stix (json) object
+        return [thingy]
+
+
 # SYSTEM INFO:
 def get_system_id(id_only=False):
     system_id = stix2.v21.Identity(
@@ -95,10 +142,10 @@ def get_system_id(id_only=False):
                     prefix="relationship--",
                     seed=(str(system_id.id) +
                           hard_loc +
-                          'located_at')),
+                          'operates_at')),
                 source_ref=system_id.id,
                 target_ref=hard_loc,
-                relationship_type='located_at')
+                relationship_type='operates_at')
     return json.loads(stix2.v21.Bundle([system_id, loc_rel]).serialize())
 
 
@@ -119,10 +166,10 @@ def get_system_org(system_id, org_only=False):
                 prefix="relationship--",
                 seed=(str(org_id.id) +
                       hard_loc +
-                      'located_at')),
+                      'incorporated_at')),
             source_ref=org_id.id,
             target_ref=hard_loc,
-            relationship_type='located_at')
+            relationship_type='incorporated_at')
     return json.loads(stix2.v21.Bundle([org_id, loc_rel]).serialize())
 
 
@@ -131,10 +178,10 @@ def get_system_to_org(system_id, org_id):
             created_by_ref=system_id,
             id=get_deterministic_uuid(
                 prefix="relationship--",
-                seed=(str(system_id) + str(org_id) + 'relates_to')),
+                seed=(str(system_id) + str(org_id) + 'member_of')),
             source_ref=system_id,
             target_ref=org_id,
-            relationship_type='relates_to'
+            relationship_type='member_of'
     )
     return json.loads(org_rel.serialize())
 
@@ -164,8 +211,8 @@ def get_molecules(config_file=None):
         },
         "m_org": {
             "identity": {
-                "relates_to": ["identity"],
-                "located_at": ["location"]
+                "member_of": ["identity"],
+                "operates_at": ["location"]
             },
             "location": {
                 "located_at": ["location"]

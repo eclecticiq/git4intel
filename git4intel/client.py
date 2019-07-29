@@ -8,6 +8,7 @@ import json
 from stix2.v21 import CustomMarking
 from stix2.properties import ListProperty, ReferenceProperty
 from pprint import pprint
+import fastjsonschema
 
 from .utils import (
     compare_mappings,
@@ -17,9 +18,11 @@ from .utils import (
     get_system_id,
     get_system_org,
     get_system_to_org,
+    handle_data,
     refresh_static_data,
     stix_to_elk,
     todays_index,
+    validate,
 )
 
 
@@ -65,7 +68,26 @@ class Client(Elasticsearch):
         Elasticsearch.__init__(self, uri)
 
     # SETS:
-    def __store_obj(self, obj):
+    def store_core_data(self):
+        self.__setup_es(self.stix_ver)
+        system_id_bundle = get_system_id()
+        org_id_bundle = get_system_org(self.identity['id'])
+        if not self.set_molecule(system_id_bundle, 'user'):
+            return False
+        if not self.set_molecule(org_id_bundle, 'org'):
+            return False
+
+        org_rel = get_system_to_org(self.identity['id'], self.org['id'])
+        if not self.__store_object(org_rel):
+            return False
+
+        static_data = refresh_static_data(self.identity['id'])
+        static_data = handle_data(static_data)
+        if not self.store_objects(static_data):
+            return False
+        return True
+
+    def __store_object(self, obj):
         id_parts = str(obj['id']).split('--')
         index_name = id_parts[0]
         doc_id = id_parts[1]
@@ -77,79 +99,22 @@ class Client(Elasticsearch):
             return True
         return False
 
-    def store_intel(self, bundle, is_commit=None):
-        if is_commit:
-            if not self.__check_commit(bundle):
+    def store_objects(self, objects, commit=False):
+        objects = handle_data(objects)
+        if commit:
+            if not self.__check_commit(objects):
                 return False
-        for stix_object in bundle['objects']:
-            if not self.__store_obj(stix_object):
+
+        for obj in objects:
+            if not self.__store_object(obj):
                 return False
         return True
 
-    def store_core_data(self):
-        self.__setup_es(self.stix_ver)
-        system_id_bundle = get_system_id()
-        org_id_bundle = get_system_org(self.identity['id'])
-        if not self.register_ident(system_id_bundle, 'system'):
+    def set_molecule(self, data, molecule_types):
+        objects = handle_data(data)
+        if not validate(objects, molecule_types):
             return False
-        if not self.register_ident(org_id_bundle, 'organization'):
-            return False
-
-        org_rel = get_system_to_org(self.identity['id'], self.org['id'])
-        if not self.__store_obj(org_rel):
-            return False
-
-        static_data = refresh_static_data(self.identity['id'])
-        if not self.store_intel(static_data):
-            return False
-
-        return True
-
-    def register_ident(self, id_bundle, _type):
-        # Must only contain a id obj and a location ref
-        # _type must be the relevant class (org or individual)
-        if len(id_bundle['objects']) != 2:
-            return False
-
-        for obj in id_bundle['objects']:
-            obj_type = str(obj['id']).split('--')[0]
-            if obj_type == 'identity' and obj['identity_class'] != _type:
-                return False
-            if obj_type == 'identity' or obj_type == 'relationship':
-                if not self.__store_obj(obj):
-                    return False
-        return True
-
-    def add_user_to_org(self, org_rel):
-        # Must only contain rel object for user_id to org_id
-        org_id = org_rel['target_ref'].split('--')[1]
-        ind_id = org_rel['source_ref'].split('--')[1]
-        org_obj = self.get(index='identity',
-                           id=org_id,
-                           _source_includes='identity_class')
-        if org_obj['_source']['identity_class'] != 'organization':
-            return False
-        ind_obj = self.get(index='identity',
-                           id=ind_id,
-                           _source_includes='identity_class')
-        if ind_obj['_source']['identity_class'] != 'individual':
-            return False
-        if not self.__store_obj(org_rel):
-            return False
-        return True
-
-    def add_contact(self, user_id, contact_username):
-        # Assume inviting and accepting invite is handled by tooling, submit
-        #   the username of the contact after both parties consent. Don't need
-        #   to know the actual identity, just that there is a relationship.
-        # Will handle PII and filtering as next step.
-        contact_id = get_deterministic_uuid(prefix='identity',
-                                            seed=contact_username)
-
-        contact_rel = stix2.v21.Relationship(source_ref=user_id,
-                                             target_ref=contact_id,
-                                             relationship_type='contact')
-        if not self.__store_obj(contact_rel):
+        if not self.store_objects(objects):
             return False
         return True
 
@@ -177,19 +142,19 @@ class Client(Elasticsearch):
                                              definition=tlp_plus,
                                              id=md_id,
                                              created_by_ref=user_id)
-        if not self.__store_obj(json.loads(new_md.serialize())):
+        if not self.__store_object(json.loads(new_md.serialize())):
             return False
 
         return md_id
 
     # CHECKS:
-    def __check_commit(self, bundle):
+    def __check_commit(self, objects):
         grouping_count = 0
         ids = []
         ident_ids = []
         group_obj_lst = []
 
-        for obj in bundle['objects']:
+        for obj in objects:
             if obj['type'] == 'grouping':
                 grouping_count += 1
                 group_author = obj['created_by_ref']
@@ -500,7 +465,7 @@ class Client(Elasticsearch):
                 return alias
         return False
 
-    def _update_es_indexmapping(self, index_alias, new_mapping):
+    def __update_es_indexmapping(self, index_alias, new_mapping):
         new_index_name = todays_index(index_alias)
 
         if self.indices.exists(index=[new_index_name]):
@@ -580,8 +545,8 @@ class Client(Elasticsearch):
                 if not compare_mappings(current_mapping, new_es_mapping):
                     print(index_name + ' mapping is up to date!')
                     continue
-                if not self._update_es_indexmapping(index_name,
-                                                    new_es_mapping):
+                if not self.__update_es_indexmapping(index_name,
+                                                     new_es_mapping):
                     print(index_name +
                           ' was already updated today. Try again tomorrow.')
                     continue
@@ -611,6 +576,6 @@ class Client(Elasticsearch):
                 doc = json.loads(obj.serialize())
             except AttributeError:
                 doc = obj
-            if not self.__store_obj(doc):
+            if not self.__store_object(doc):
                 return False
         return True
