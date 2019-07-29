@@ -345,7 +345,9 @@ class Client(Elasticsearch):
         if values:
             if not isinstance(values, list):
                 return False
-            q = {"query": {"bool": {"must": []}}}
+            q = {
+                "query": {"bool": {"must": []}},
+            }
             id_q = {"bool": {"should": []}}
             for obj_id in obj_ids:
                 id_q["bool"]["should"].append(
