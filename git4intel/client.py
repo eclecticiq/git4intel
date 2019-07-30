@@ -208,7 +208,7 @@ class Client(Elasticsearch):
         return overall_score
 
     # GETS:
-    def __get_molecule_rels(self, stixid, molecule, fwd=True):
+    def __get_molecule_rels(self, stixid, molecule, fwd=True, rels=False):
         obj_id = stixid.split('--')[1]
         if fwd:
             a = "source_ref"
@@ -220,19 +220,36 @@ class Client(Elasticsearch):
         res = self.search(index='relationship',
                           body=q,
                           size=10000)
-        ids = []
+        output = []
         for hit in res['hits']['hits']:
             if not validate(hit["_source"], molecule):
                 continue
-            ids.append(hit['_source'][b])
+            if rels:
+                output.append(hit['_source'])
+            else:
+                output.append(hit['_source'][b])
 
-        return list(set(ids))
+        if rels:
+            return output
+        else:
+            return list(set(output))
 
-    def get_org_info(self, user_id, org_id):
-        org_info = self.__get_molecule_rels(stixid=org_id,
-                                            molecule='org_member',
-                                            fwd=False)
-        return self.get_objects(user_id=user_id, obj_ids=org_info)
+    def get_my_org_info(self, user_id):
+        org_ids = self.__get_molecule_rels(stixid=user_id,
+                                           molecule='org_member')
+        output = []
+        for org_id in org_ids:
+            mem_rels = self.__get_molecule_rels(stixid=org_id,
+                                                molecule='org_member',
+                                                fwd=False,
+                                                rels=True)
+            org = self.get_object(user_id=user_id, obj_id=org_id)
+            output += mem_rels
+            output.append(org)
+        for rel in mem_rels:
+            mem = self.get_object(user_id=user_id, obj_id=rel['source_ref'])
+            output.append(mem)
+        return output
 
     def get_countries(self):
 
@@ -332,6 +349,7 @@ class Client(Elasticsearch):
                                                    fwd=False)
                 tmp_list += members
             valid_authors = tmp_list + orgs + [user_id]
+            print(valid_authors)
             auth_list = []
             for author in valid_authors:
                 auth_list.append({"match": {"created_by_ref":
