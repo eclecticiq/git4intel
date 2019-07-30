@@ -37,15 +37,15 @@
                         "pattern": "^identity--",
                         "required": true
                     },
-                    "x_sla": {
+                    "x_eiq_sla": {
                         "type": "integer",
                         "required": true
                     },
-                    "x_priority": {
+                    "x_eiq_priority": {
                         "type": "string",
                         "required": true
                     },
-                    "x_assigned_to": {
+                    "x_eiq_assigned_to": {
                         "type": "string",
                         "pattern": "^identity--",
                         "required": false
