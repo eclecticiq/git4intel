@@ -37,10 +37,6 @@
                         "pattern": "^identity--",
                         "required": true
                     },
-                    "x_eiq_sla": {
-                        "type": "integer",
-                        "required": true
-                    },
                     "x_eiq_priority": {
                         "type": "string",
                         "required": true
