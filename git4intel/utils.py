@@ -11,15 +11,21 @@ from pprint import pprint
 
 from .schemas import (
     area_of_operation,
+    event,
     org,
     org_member,
+    register_org,
+    register_user,
     user,
 )
 
 schema_map = {
     'area_of_operation': area_of_operation,
+    'event': event,
     'org': org,
     'org_member': org_member,
+    'register_org': register_org,
+    'register_user': register_user,
     'user': user,
 }
 
@@ -94,16 +100,19 @@ def get_external_refs(bundle):
     return diff
 
 
-def validate(objects, schema_name):
-    if isinstance(schema_name, list):
+def validate(objects, schema_names):
+    # Get the called schemas and compound them if needed
+    if isinstance(schema_names, list):
         schema = {
             "type": "array",
             "items": []
         }
-        for _schema in schema_name:
+        for _schema in schema_names:
             schema['items'].append(schema_map[_schema])
     else:
-        schema = schema_map[schema_name]
+        schema = schema_map[schema_names]
+
+    # Future: add an ability to check if missing objects can be got from kb
     try:
         _validate = fastjsonschema.compile(schema)
         _validate(objects)
@@ -121,8 +130,8 @@ def handle_data(thingy):
         # If Bundle, return the objects list
         return thingy['objects']
     except KeyError:
-        # Otherwise, assume a single stix (json) object
-        return [thingy]
+        # Otherwise, don't assume anything...
+        return thingy
 
 
 # SYSTEM INFO:
@@ -146,7 +155,7 @@ def get_system_id(id_only=False):
                 source_ref=system_id.id,
                 target_ref=hard_loc,
                 relationship_type='operates_at')
-    return json.loads(stix2.v21.Bundle([system_id, loc_rel]).serialize())
+    return json.loads(stix2.v21.Bundle([system_id, loc_rel]).serialize())['objects']
 
 
 def get_system_org(system_id, org_only=False):
@@ -170,7 +179,7 @@ def get_system_org(system_id, org_only=False):
             source_ref=org_id.id,
             target_ref=hard_loc,
             relationship_type='incorporated_at')
-    return json.loads(stix2.v21.Bundle([org_id, loc_rel]).serialize())
+    return json.loads(stix2.v21.Bundle([org_id, loc_rel]).serialize())['objects']
 
 
 def get_system_to_org(system_id, org_id):
@@ -345,11 +354,9 @@ def stix_to_elk(obj, stix_ver):
 
 # STATIC DATA
 def refresh_static_data(created_by_ref):
-    location_bundle = get_locations(created_by_ref)
-    marking_bundle = get_marking_definitions(created_by_ref)
-    bundle = stix2.v21.Bundle(location_bundle['objects'] +
-                              marking_bundle['objects'])
-    return json.loads(bundle.serialize())
+    locations = get_locations(created_by_ref)
+    markings = get_marking_definitions(created_by_ref)
+    return locations + markings
 
 
 def get_marking_definitions(created_by_ref):
@@ -422,7 +429,7 @@ def get_marking_definitions(created_by_ref):
         os_licence
     ]
     bundle = json.loads(stix2.v21.Bundle(objs).serialize())
-    return bundle
+    return bundle['objects']
 
 
 def get_2from3(code3_in):
@@ -1174,4 +1181,4 @@ def get_locations(created_by_ref):
                         lower -= 1
 
     bundle = json.loads(stix2.v21.Bundle(all_objs).serialize())
-    return bundle
+    return bundle['objects']

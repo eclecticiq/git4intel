@@ -26,3 +26,9 @@ def upgrade_20_to_21():
     #   mandated `spec_version` field) and create a new version with new
     #   authorship that is stx2
     pass
+
+
+def add_data_marking():
+    # For any objects that have _no_ data marking, upversion and assume
+    #   TLP GREEN
+    pass

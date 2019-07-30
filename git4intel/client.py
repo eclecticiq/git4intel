@@ -72,23 +72,23 @@ class Client(Elasticsearch):
         self.__setup_es(self.stix_ver)
         system_id_bundle = get_system_id()
         org_id_bundle = get_system_org(self.identity['id'])
-        if not self.set_molecule(system_id_bundle, 'user'):
+        if not self.store_objects(system_id_bundle, 'register_user'):
             return False
-        if not self.set_molecule(org_id_bundle, 'org'):
+        if not self.store_objects(org_id_bundle, 'register_org'):
             return False
 
         org_rel = get_system_to_org(self.identity['id'], self.org['id'])
-        if not self.__store_object(org_rel):
+        if not self.store_objects(org_rel, 'org_member'):
             return False
 
         static_data = refresh_static_data(self.identity['id'])
-        static_data = handle_data(static_data)
-        if not self.store_objects(static_data):
-            return False
+        for obj in static_data:
+            if not self.__store_object(obj):
+                return False
         return True
 
     def __store_object(self, obj):
-        id_parts = str(obj['id']).split('--')
+        id_parts = obj['id'].split('--')
         index_name = id_parts[0]
         doc_id = id_parts[1]
         res = self.index(index=index_name,
@@ -99,24 +99,24 @@ class Client(Elasticsearch):
             return True
         return False
 
-    def store_objects(self, objects, commit=False):
-        objects = handle_data(objects)
-        if commit:
-            if not self.__check_commit(objects):
+    def store_objects(self, objects, molecule_types=None):
+        # objects = handle_data(objects)
+        # if commit:
+        #     # Eventually move commit checks to json schema
+        #     if not self.__check_commit(objects):
+        #         return False
+
+        if molecule_types:
+            if not validate(objects, molecule_types):
                 return False
 
-        for obj in objects:
-            if not self.__store_object(obj):
-                return False
-        return True
+        if isinstance(objects, list):
+            for obj in objects:
+                if not self.__store_object(obj):
+                    return False
+            return True
 
-    def set_molecule(self, data, molecule_types):
-        objects = handle_data(data)
-        if not validate(objects, molecule_types):
-            return False
-        if not self.store_objects(objects):
-            return False
-        return True
+        return self.__store_object(objects)
 
     def set_tlpplus(self, user_id, tlp_marking_def_ref, distribution_refs):
         if user_id.split('--')[0] != 'identity':
@@ -142,47 +142,47 @@ class Client(Elasticsearch):
                                              definition=tlp_plus,
                                              id=md_id,
                                              created_by_ref=user_id)
-        if not self.__store_object(json.loads(new_md.serialize())):
+        if not self.store_objects(json.loads(new_md.serialize())):
             return False
 
         return md_id
 
     # CHECKS:
-    def __check_commit(self, objects):
-        grouping_count = 0
-        ids = []
-        ident_ids = []
-        group_obj_lst = []
+    # def __check_commit(self, objects):
+    #     grouping_count = 0
+    #     ids = []
+    #     ident_ids = []
+    #     group_obj_lst = []
 
-        for obj in objects:
-            if obj['type'] == 'grouping':
-                grouping_count += 1
-                group_author = obj['created_by_ref']
-                group_obj_lst = obj['object_refs']
-            elif obj['type'] == 'identity':
-                ident_ids.append(obj['id'])
-                ids.append(obj['id'])
-            else:
-                try:
-                    ids.append(obj['id'])
-                except AttributeError:
-                    pass
+    #     for obj in objects:
+    #         if obj['type'] == 'grouping':
+    #             grouping_count += 1
+    #             group_author = obj['created_by_ref']
+    #             group_obj_lst = obj['object_refs']
+    #         elif obj['type'] == 'identity':
+    #             ident_ids.append(obj['id'])
+    #             ids.append(obj['id'])
+    #         else:
+    #             try:
+    #                 ids.append(obj['id'])
+    #             except AttributeError:
+    #                 pass
 
-        if grouping_count == 1 and ids.sort() == group_obj_lst.sort():
-            # Only 1 grouping and it refers to all objects in the commit - good
-            if group_author in ident_ids:
-                # Regardless of supplied identities, id of group author exists
-                #   in kb - good
-                return True
-            elif self.exists(index='identity',
-                             id=group_author.split('--')[1],
-                             _source=False,
-                             ignore=[400, 404]):
-                # Explicit inclusion of id entity in commit - good
-                return True
-        # Otherwise, not enough info for commit - bad
+    #     if grouping_count == 1 and ids.sort() == group_obj_lst.sort():
+    #         # Only 1 grouping and it refers to all objects in the commit - good
+    #         if group_author in ident_ids:
+    #             # Regardless of supplied identities, id of group author exists
+    #             #   in kb - good
+    #             return True
+    #         elif self.exists(index='identity',
+    #                          id=group_author.split('--')[1],
+    #                          _source=False,
+    #                          ignore=[400, 404]):
+    #             # Explicit inclusion of id entity in commit - good
+    #             return True
+    #     # Otherwise, not enough info for commit - bad
 
-        return False
+    #     return False
 
     def __compare_bundle_to_molecule(self, bundle):
         molecules = self.molecules
@@ -213,51 +213,77 @@ class Client(Elasticsearch):
         return overall_score
 
     # GETS:
-    def __get_molecule_rels(self, stixid, molecule):
-        obj_type = stixid.split('--')[0]
+    # OLD molecule rels is probably faster at scale because the query
+    #   is more precise. However, json schemas as inputs provide a better
+    #   protocol for structure and are more difficult to parse.
+    # def get_molecule_rels(self, stixid, molecule):
+    #     obj_type = stixid.split('--')[0]
+    #     obj_id = stixid.split('--')[1]
+    #     q = {"query": {"bool": {"should": []}}}
+
+    #     for from_type in molecule:
+    #         for rel_type in molecule[from_type]:
+    #             for to_type in molecule[from_type][rel_type]:
+    #                 hits = 0
+    #                 if from_type == obj_type:
+    #                     source_field = obj_id
+    #                     target_field = to_type
+    #                     hits = 1
+    #                 if to_type == obj_type:
+    #                     source_field = from_type
+    #                     target_field = obj_id
+    #                     hits = 1
+    #                 if to_type == from_type and to_type == obj_type:
+    #                     hits = 2
+
+    #                 for i in range(hits):
+    #                     field_q = {"bool": {"must": [
+    #                                 {"match": {"target_ref": target_field}},
+    #                                 {"match": {"relationship_type": rel_type}},
+    #                                 {"match": {"source_ref": source_field}}
+    #                             ]}}
+    #                     q['query']['bool']['should'].append(field_q)
+    #                     # Swap fields in case second iteration (reverse rel)
+    #                     target_field, source_field = source_field, target_field
+    #     ids = []
+    #     res = self.search(index='relationship',
+    #                       body=q,
+    #                       _source_includes=["source_ref", "target_ref"],
+    #                       size=10000)
+    #     for hit in res['hits']['hits']:
+    #         if not validate(hit["_source"], 'org_member'):
+    #             continue
+    #         if hit['_source']['source_ref'] != stixid:
+    #             ids.append(hit['_source']['source_ref'])
+    #         if hit['_source']['target_ref'] != stixid:
+    #             ids.append(hit['_source']['target_ref'])
+
+    #     return list(set(ids))
+
+    def __get_molecule_rels(self, stixid, molecule, fwd=True):
         obj_id = stixid.split('--')[1]
-        q = {"query": {"bool": {"should": []}}}
-
-        for from_type in molecule:
-            for rel_type in molecule[from_type]:
-                for to_type in molecule[from_type][rel_type]:
-                    hits = 0
-                    if from_type == obj_type:
-                        source_field = obj_id
-                        target_field = to_type
-                        hits = 1
-                    if to_type == obj_type:
-                        source_field = from_type
-                        target_field = obj_id
-                        hits = 1
-                    if to_type == from_type and to_type == obj_type:
-                        hits = 2
-
-                    for i in range(hits):
-                        field_q = {"bool": {"must": [
-                                    {"match": {"target_ref": target_field}},
-                                    {"match": {"relationship_type": rel_type}},
-                                    {"match": {"source_ref": source_field}}
-                                ]}}
-                        q['query']['bool']['should'].append(field_q)
-                        # Swap fields in case second iteration (reverse rel)
-                        target_field, source_field = source_field, target_field
-        ids = []
+        if fwd:
+            a = "source_ref"
+            b = "target_ref"
+        else:
+            a = "target_ref"
+            b = "source_ref"
+        q = {"query": {"match": {a: obj_id}}}
         res = self.search(index='relationship',
                           body=q,
-                          _source_includes=["source_ref", "target_ref"],
                           size=10000)
+        ids = []
         for hit in res['hits']['hits']:
-            if hit['_source']['source_ref'] != stixid:
-                ids.append(hit['_source']['source_ref'])
-            if hit['_source']['target_ref'] != stixid:
-                ids.append(hit['_source']['target_ref'])
+            if not validate(hit["_source"], molecule):
+                continue
+            ids.append(hit['_source'][b])
 
         return list(set(ids))
 
     def get_org_info(self, user_id, org_id):
         org_info = self.__get_molecule_rels(stixid=org_id,
-                                            molecule=self.molecules['m_org'])
+                                            molecule='org_member',
+                                            fwd=False)
         return self.get_objects(user_id=user_id, obj_ids=org_info)
 
     def get_countries(self):
@@ -347,47 +373,56 @@ class Client(Elasticsearch):
         # Get objects by type and/or value
         if user_id.split('--')[0] != 'identity':
             return False
-        valid_authors = [user_id]
-        user_info = self.__get_molecule_rels(stixid=user_id,
-                                             molecule=self.molecules['m_org'])
-        if my_org_only:
-            # Specify just objects created by you/your org/other org members
-            for _id in user_info:
-                obj_type = _id.split('--')[0]
-                if obj_type != 'identity':
-                    continue
-                res = self.get_objects(user_id=user_id, obj_ids=[_id])
-                if res[0]['identity_class'] != 'organization':
-                    continue
-                valid_authors.append(res[0]['id'])
-                org_info = self.__get_molecule_rels(
-                                              stixid=res[0]['id'],
-                                              molecule=self.molecules['m_org'])
-                for other_user in org_info:
-                    user_type = other_user.split('--')[0]
-                    if user_type != 'identity':
-                        continue
-                    res = self.get_objects(user_id=user_id,
-                                           obj_ids=[other_user])
-                    if res[0]['identity_class'] != 'individual':
-                        continue
-                    valid_authors.append(res[0]['id'])
-            valid_authors = list(set(valid_authors))
-        else:
-            # Future: same walk but get marking definitions as filter rather
-            #   than created_by_ref, so 'everything I can see' rather than
-            #   just what me/my org/other members created (but includes that)
-            # That will probably be just the same search with author removed
-            #   and rely on the future overloaded search function to filter
-            pass
+        # valid_authors = [user_id]
+        # user_info = self.__get_molecule_rels(stixid=user_id,
+        #                                      molecule=self.molecules['m_org'])
+        # if my_org_only:
+        #     # Specify just objects created by you/your org/other org members
+        #     for _id in user_info:
+        #         obj_type = _id.split('--')[0]
+        #         if obj_type != 'identity':
+        #             continue
+        #         res = self.get_objects(user_id=user_id, obj_ids=[_id])
+        #         if res[0]['identity_class'] != 'organization':
+        #             continue
+        #         valid_authors.append(res[0]['id'])
+        #         org_info = self.__get_molecule_rels(
+        #                                       stixid=res[0]['id'],
+        #                                       molecule=self.molecules['m_org'])
+        #         for other_user in org_info:
+        #             user_type = other_user.split('--')[0]
+        #             if user_type != 'identity':
+        #                 continue
+        #             res = self.get_objects(user_id=user_id,
+        #                                    obj_ids=[other_user])
+        #             if res[0]['identity_class'] != 'individual':
+        #                 continue
+        #             valid_authors.append(res[0]['id'])
+        #     valid_authors = list(set(valid_authors))
+        # else:
+        #     # Future: same walk but get marking definitions as filter rather
+        #     #   than created_by_ref, so 'everything I can see' rather than
+        #     #   just what me/my org/other members created (but includes that)
+        #     # That will probably be just the same search with author removed
+        #     #   and rely on the future overloaded search function to filter
+        #     pass
 
         q = {"query": {"bool": {"must": []}}}
         if my_org_only:
-            auth_q = {"bool": {"should": []}}
+            orgs = self.__get_molecule_rels(stixid=user_id,
+                                            molecule='org_member')
+            tmp_list = []
+            for org in orgs:
+                members = self.__get_molecule_rels(stixid=org,
+                                                   molecule='org_member',
+                                                   fwd=False)
+                tmp_list += members
+            valid_authors = tmp_list + orgs + [user_id]
+            auth_list = []
             for author in valid_authors:
-                auth_q["bool"]["should"].append(
-                                {"match":
-                                    {"created_by_ref": author.split('--')[1]}})
+                auth_list.append({"match": {"created_by_ref":
+                                            author.split('--')[1]}})
+            auth_q = {"bool": {"should": auth_list}}
             q["query"]["bool"]["must"].append(auth_q)
         if types:
             type_q = {"bool": {"should": []}}
@@ -576,6 +611,6 @@ class Client(Elasticsearch):
                 doc = json.loads(obj.serialize())
             except AttributeError:
                 doc = obj
-            if not self.__store_object(doc):
+            if not self.store_objects(doc):
                 return False
         return True

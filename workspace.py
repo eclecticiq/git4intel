@@ -11,74 +11,6 @@ import fastjsonschema
 
 from git4intel import utils
 
-user_schema = {
-    "type": "object",
-    "title": "user",
-    "description": "Single user.",
-    "allOf": [
-        {
-            "title": "user_identity",
-            "description": "Identity object that must indicate an individual user.",
-            "type": "object",
-            "allOf": [
-                {
-                    "properties": {
-                        "type": {
-                            "type": "string",
-                            "description": "The type of this object, which MUST be the literal `identity`.",
-                            "const": "identity"
-                        },
-                        "identity_class": {
-                            "type": "string",
-                            "description": "The type of entity that this Identity describes, e.g., an individual or organization. Open Vocab - identity-class-ov",
-                            "enum": [
-                                "individual",
-                                "system"
-                            ]
-                        }
-                    }
-                }
-            ]
-        }
-    ]
-}
-
-user_loc_schema = {
-    "title": "user_locationref",
-    "description": "Relationship that indicates the user operating location.",
-    "type": "object",
-    "allOf": [
-        {
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "description": "The type of this object, which MUST be the literal `relationship`.",
-                    "const": "relationship"
-                },
-                "source_ref": {
-                    "description": "The ID of the source (from) object.",
-                    "allOf": [
-                        {"pattern": "^identity--.+$"}
-                    ]
-                },
-                "target_ref": {
-                    "description": "The ID of the target (to) object.",
-                    "allOf": [
-                        {"pattern": "^location--.+$"}
-                    ]
-                },
-                "relationship_type": {
-                    "title": "relationship_type",
-                    "type": "string",
-                    "description": "The name used to identify the type of relationship.",
-                    "const": "operates_at"
-                }
-            }
-        }
-    ]
-}
-
-
 def get_deterministic_uuid(prefix=None, seed=None):
     if seed is None:
         stix_id = uuid.uuid4()
@@ -101,7 +33,7 @@ def make_valid_commit(user_id):
                                       created_by_ref=user_id)
 
     objs = [obs_data, domain_name, ipv4]
-    grouping = stix2.v21.Grouping(context='m_event',
+    grouping = stix2.v21.Grouping(context='event',
                                   object_refs=objs,
                                   created_by_ref=user_id)
     objs.append(grouping)
@@ -119,7 +51,7 @@ def make_valid_commit2(user_id):
                                       created_by_ref=user_id)
 
     objs = [obs_data, domain_name, ipv4]
-    grouping = stix2.v21.Grouping(context='m_event',
+    grouping = stix2.v21.Grouping(context='event',
                                   object_refs=objs,
                                   created_by_ref=user_id)
     objs.append(grouping)
@@ -182,6 +114,22 @@ def main():
     # Initialise client
     g4i = git4intel.Client('localhost:9200')
 
+    # start = time.time()
+    # res2 = g4i.get_molecule_rels2(stixid="identity--7c3e12e0-44d3-440e-8af6-2224ee92dc4c",
+    #                       molecule='org_member', fwd=True)
+    # res3 = g4i.get_molecule_rels2(stixid="identity--7c3e12e0-44d3-440e-8af6-2224ee92dc4c",
+    #                       molecule='org_member', fwd=False)
+    # end = time.time()
+    # print(res2, res3, end-start)
+
+    # time.sleep(5)
+
+    # start = time.time()
+    # res1 = g4i.get_molecule_rels(stixid="identity--7c3e12e0-44d3-440e-8af6-2224ee92dc4c",
+    #                       molecule=g4i.molecules['m_org'])
+    # end = time.time()
+    # print(res1, end-start)
+
     # Setup the core data (system idents, locations and default data markings)
     # - hard coded config
     # Also sets up indices to make sure they are done before data is added.
@@ -196,13 +144,13 @@ def main():
     # print(g4i.data_primer())
 
     # Setup client user information - using the included dummy data for testing
-    # print('Creating dummy user account...')
+    print('Creating dummy user account...')
     user_id1, user_bundle1 = new_user('NEW UZ3R')
-    print(g4i.set_molecule(user_bundle1, 'user'))
+    print(g4i.store_objects(user_bundle1['objects'], 'register_user'))
 
     print('Creating dummy organisation account...')
     org_id, org_bundle = new_org(user_id1['id'])
-    print(g4i.set_molecule(org_bundle, 'org'))
+    print(g4i.store_objects(org_bundle['objects'], 'register_org'))
 
     print('Assigning created user to the created organisation...')
     org_rel1 = stix2.v21.Relationship(created_by_ref=user_id1['id'],
@@ -210,11 +158,11 @@ def main():
                                       target_ref=org_id['id'],
                                       relationship_type='member_of')
     org_rel1 = json.loads(org_rel1.serialize())
-    print(g4i.set_molecule(org_rel1, 'org_member'))
+    print(g4i.store_objects(org_rel1, 'org_member'))
 
     print('Create a second user account...')
     user_id2, user_bundle2 = new_user('Another NEW UZ3R')
-    print(g4i.set_molecule(user_bundle2, 'user'))
+    print(g4i.store_objects(user_bundle2['objects'], 'register_user'))
 
     print('Invite second user to same organisation...')
     org_rel2 = stix2.v21.Relationship(created_by_ref=user_id2['id'],
@@ -222,7 +170,7 @@ def main():
                                       target_ref=org_id['id'],
                                       relationship_type='member_of')
     org_rel2 = json.loads(org_rel2.serialize())
-    print(g4i.set_molecule(org_rel2, 'org_member'))
+    print(g4i.store_objects(org_rel2, 'org_member'))
 
     print('Set a new area of operations for the org...')
     ao_rel = stix2.v21.Relationship(created_by_ref=user_id2['id'],
@@ -230,7 +178,7 @@ def main():
                                     target_ref='location--70924011-7eb0-452d-aaca-15b0979791c6',
                                     relationship_type='operates_at')
     ao_rel = json.loads(ao_rel.serialize())
-    print(g4i.set_molecule(ao_rel, 'area_of_operation'))
+    print(g4i.store_objects(ao_rel, 'area_of_operation'))
 
     # Indexing is much slower than search, so wait 1 second to catch up
     time.sleep(2)
@@ -241,18 +189,15 @@ def main():
     pprint(g4i.get_org_info(user_id=user_id1['id'], org_id=org_id['id']))
 
     # Make a valid commit from Adam's suggested 'event' data as a grouping
+    print('Making 2 event commits...')
     bundle = make_valid_commit(user_id1['id'])
-    print(g4i.store_objects(objects=bundle, commit=True))
+    print(g4i.store_objects(objects=bundle['objects'], molecule_types='event'))
     bundle = make_valid_commit2(user_id2['id'])
-    print(g4i.store_objects(objects=bundle, commit=True))
+    print(g4i.store_objects(objects=bundle['objects'], molecule_types='event'))
 
-    # Try finding a term that we know is in there...
-    #   the user has the grouping id already and provides the userid for
-    #   future filtering
-    for obj in bundle['objects']:
-        if obj['type'] == 'grouping':
-            # group_id = obj['id']
-            author = obj['created_by_ref']
+    print('Making random report...')
+    report = make_report(user_id1['id'])
+    print(g4i.store_objects(objects=report))
 
     # Indexing is much slower than search, so wait 1 second to catch up
     time.sleep(1)
@@ -263,7 +208,7 @@ def main():
     #   implemented yet - so currently runs on everything...turn off at
     #   your own risk!)
     start = time.time()
-    pprint(g4i.get_content(user_id=author,
+    pprint(g4i.get_content(user_id=user_id2['id'],
                            types=[],
                            values=['62.171.220.83']))
     end = time.time()
@@ -271,27 +216,27 @@ def main():
 
     # Get all grouping objects created by user/org/members
     start = time.time()
-    pprint(g4i.get_content(user_id=author,
+    pprint(g4i.get_content(user_id=user_id1['id'],
                            types=['grouping'],
                            values=[],
-                           group_contexts=['m_event']))
+                           group_contexts=['event']))
     end = time.time()
     print(end - start)
 
     # Get all grouping objects created by user/org/members that
     #   contain the value
     start = time.time()
-    pprint(g4i.get_content(user_id=author,
+    pprint(g4i.get_content(user_id=user_id1['id'],
                            types=['grouping', 'identity'],
                            values=['62.171.220.83']))
     end = time.time()
     print(end - start)
 
     start = time.time()
-    pprint(g4i.get_content(user_id=author,
+    pprint(g4i.get_content(user_id=user_id2['id'],
                            types=['grouping', 'report'],
                            values=['62.171.220.83'],
-                           group_contexts=['m_event']))
+                           group_contexts=['event']))
     end = time.time()
     print(end - start)
 
