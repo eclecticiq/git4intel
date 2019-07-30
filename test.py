@@ -287,11 +287,27 @@ class TestGit4intel(unittest.TestCase):
     def test_5_get_objects(self):
         # Test for search where objid is known
         # Include searches for values within
+        g4i = git4intel.Client('localhost:9200')
+        g4i.store_core_data()
 
+        user_id1, user_bundle1 = new_user('NEW UZ3R')
+        report = make_report(user_id1['id'])
+        g4i.store_objects(objects=report)
+
+        # Give enough time to index...
+        time.sleep(2)
+
+        obj_id = report['id']
         # Search just objid (test correct id)
+        res = g4i.get_objects(user_id=user_id1['id'], obj_ids=[obj_id])
+        self.assertTrue(res[0]['id'] == obj_id)
 
+        value = '62.171.220.83'
         # Search objid with values (test value contained - str search)
-        pass
+        res = g4i.get_objects(user_id=user_id1['id'],
+                              obj_ids=[obj_id],
+                              values=[value])
+        self.assertTrue(value in str(res))
 
     def test_6_get_content(self):
         # Test for search where objid is not known
@@ -301,24 +317,117 @@ class TestGit4intel(unittest.TestCase):
         # - searches for grouping special case
         # - Combinations of above
 
-        # Values only - observable value (report and sco)
+        g4i = git4intel.Client('localhost:9200')
+        g4i.store_core_data()
 
-        # Types only - domain-name type
+        user_id1, user_bundle1 = new_user('NEW UZ3R')
+        bundle = make_valid_commit(user_id1['id'])
+        g4i.store_objects(objects=bundle['objects'], molecule_types='event')
+        org_id, org_bundle = new_org(user_id1['id'])
+        g4i.store_objects(org_bundle['objects'], 'register_org')
+        user_id2, user_bundle2 = new_user('Another NEW UZ3R')
+        bundle = make_valid_commit2(user_id2['id'])
+        g4i.store_objects(objects=bundle['objects'], molecule_types='event')
+
+        report = make_report(user_id1['id'])
+        self.assertTrue(g4i.store_objects(objects=report))
+
+        time.sleep(2)
+
+        # Values only - observable value (report and sco)
+        value = '62.171.220.83'
+        res = g4i.get_content(user_id=user_id1['id'],
+                              values=[value])
+
+        for obj in res:
+            if obj['id'] == report['id']:
+                self.assertTrue(value in str(obj))
+            elif obj['type'] == 'grouping' or obj['type'] == 'observed-data':
+                test_value = obj['x_eiq_object_refs_objects'][0]['value']
+                self.assertTrue(test_value == value)
+            else:
+                self.assertTrue(False)
+        self.assertTrue(len(res) == 3)
+
+        # Types only
+        _type = 'observed-data'
+        res = g4i.get_content(user_id=user_id1['id'],
+                              types=[_type])
+        for obj in res:
+            if obj['type'] == 'observed-data':
+                test_value = obj['x_eiq_object_refs_objects']
+                self.assertTrue(len(test_value) == 2)
+            else:
+                self.assertTrue(False)
+        self.assertTrue(len(res) == 1)
 
         # Grouping with context set - event
+        group_type = 'event'
+        res = g4i.get_content(user_id=user_id1['id'],
+                              types=['grouping'],
+                              group_contexts=[group_type])
+        for obj in res:
+            if obj['type'] == 'grouping':
+                self.assertTrue(obj['context'] == 'event')
 
         # Values and types - report/sco filter
+        res = g4i.get_content(user_id=user_id1['id'],
+                              types=[_type],
+                              values=[value])
+        for obj in res:
+            if obj['type'] == 'observed-data':
+                test_value = obj['x_eiq_object_refs_objects'][0]['value']
+                self.assertTrue(test_value == value)
+            else:
+                self.assertTrue(False)
 
         # Values and grouping with context - ip address from event
+        res = g4i.get_content(user_id=user_id1['id'],
+                              types=['grouping'],
+                              group_contexts=[group_type],
+                              values=[value])
+        for obj in res:
+            if obj['type'] == 'grouping':
+                self.assertTrue(obj['context'] == 'event')
+                test_value = obj['x_eiq_object_refs_objects'][0]['value']
+                self.assertTrue(test_value == value)
+            else:
+                self.assertTrue(False)
 
         # Additional types and grouping with context - grouping and identity
+        res = g4i.get_content(user_id=user_id1['id'],
+                              types=['grouping', 'identity'],
+                              group_contexts=[group_type])
+        for obj in res:
+            if obj['type'] == 'grouping':
+                self.assertTrue(obj['context'] == 'event')
+                self.assertTrue(len(obj['x_eiq_object_refs_objects']) == 3)
+                for obs in obj['x_eiq_object_refs_objects']:
+                    self.assertTrue(type(obs) is dict)
+            elif obj['type'] == 'identity':
+                self.assertTrue(True)
+            else:
+                self.assertTrue(False)
+        self.assertTrue(len(res) == 2)
 
         # Values, types and grouping with context - grouping, identity and sco
         #   value
+        res = g4i.get_content(user_id=user_id1['id'],
+                              types=['grouping', 'report'],
+                              group_contexts=[group_type],
+                              values=[value])
+        for obj in res:
+            if obj['type'] == 'grouping':
+                self.assertTrue(obj['context'] == 'event')
+                test_value = obj['x_eiq_object_refs_objects'][0]['value']
+                self.assertTrue(test_value == value)
+            elif obj['type'] == 'report':
+                self.assertTrue(value in str(obj))
+            else:
+                self.assertTrue(False)
+        self.assertTrue(len(res) == 2)
 
         # Eventually add my_org_only == False when md filtering applied
-
-        pass
 
 
 if __name__ == '__main__':

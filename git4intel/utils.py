@@ -119,7 +119,7 @@ def validate(objects, schema_name):
         _validate = fastjsonschema.compile(schema)
         _validate(objects)
     except fastjsonschema.JsonSchemaException as e:
-        print(e)
+        # print(e)
         return False
     return True
 
@@ -268,7 +268,9 @@ def compare_mappings(current_mapping, new_mapping):
         try:
             if (current_mapping['mappings']['properties'][field] !=
                     new_mapping['mappings']['properties'][field]):
-                return True
+                if (new_mapping['mappings']['properties'][field] !=
+                        {'type': 'object'}):
+                    return True
         except KeyError:
             return True
     return False

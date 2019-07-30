@@ -349,7 +349,6 @@ class Client(Elasticsearch):
                                                    fwd=False)
                 tmp_list += members
             valid_authors = tmp_list + orgs + [user_id]
-            print(valid_authors)
             auth_list = []
             for author in valid_authors:
                 auth_list.append({"match": {"created_by_ref":
