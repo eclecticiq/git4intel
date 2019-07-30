@@ -1,0 +1,42 @@
+{
+    "title": "incident",
+    "description": "Mission Control specific structure for security incidents, consisting of multiple phases.",
+    "type": "array",
+    "contains": [
+        {
+            "title": "grouping--incident",
+            "description": "Meta-object that represents the declaration of an incident context",
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "grouping"
+                },
+                "context": {
+                    "type": "string",
+                    "const": "incident"
+                },
+                "created_by_ref": {
+                    "type": "string",
+                    "pattern": "^identity--"
+                }
+            }
+        },
+        {
+                "title": "report--incident",
+                "description": "Uses the STIX 2.1 report object for the master incident object",
+                "type": "object",
+                "properties": {
+                    "report_type": {
+                        "type": "string",
+                        "const": "incident_report"
+                    },
+                    "created_by_ref": {
+                        "type": "string",
+                        "pattern": "^identity--"
+                    }
+                }
+        }
+
+    ]
+}
