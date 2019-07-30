@@ -9,25 +9,13 @@ from slugify import slugify
 import fastjsonschema
 from pprint import pprint
 
-from .schemas import (
-    area_of_operation,
-    event,
-    org,
-    org_member,
-    register_org,
-    register_user,
-    user,
-)
+try:
+    import importlib.resources as pkg_resources
+except ImportError:
+    # Try backported to PY<37 `importlib_resources`.
+    import importlib_resources as pkg_resources
 
-schema_map = {
-    'area_of_operation': area_of_operation,
-    'event': event,
-    'org': org,
-    'org_member': org_member,
-    'register_org': register_org,
-    'register_user': register_user,
-    'user': user,
-}
+from . import schemas
 
 hard_loc = "location--3fc1c688-c7e9-4609-ac72-01ac8b4afbc1"
 
@@ -100,17 +88,31 @@ def get_external_refs(bundle):
     return diff
 
 
-def validate(objects, schema_names):
+def validate(objects, schema_name):
+    schema_name = schema_name + '.json'
     # Get the called schemas and compound them if needed
-    if isinstance(schema_names, list):
-        schema = {
-            "type": "array",
-            "items": []
-        }
-        for _schema in schema_names:
-            schema['items'].append(schema_map[_schema])
-    else:
-        schema = schema_map[schema_names]
+    try:
+        schema = json.loads(pkg_resources.read_text(schemas, schema_name))
+    except FileNotFoundError:
+        if schema_name == 'register_user.json':
+            user = json.loads(pkg_resources.read_text(schemas, 'user.json'))
+            user_loc_ref = json.loads(pkg_resources.read_text(
+                                                          schemas,
+                                                          'user_loc_ref.json'))
+            schema = {"type": "array",
+                      "title": "user",
+                      "maxItems": 2,
+                      "items": [user, user_loc_ref]}
+        if schema_name == 'register_org.json':
+            org = json.loads(pkg_resources.read_text(schemas, 'org.json'))
+            org_loc_ref = json.loads(pkg_resources.read_text(
+                                                         schemas,
+                                                         'org_loc_ref.json'))
+            schema = {"type": "array",
+                      "title": "org",
+                      "description": "Single organization.",
+                      "maxItems": 2,
+                      "items": [org, org_loc_ref]}
 
     # Future: add an ability to check if missing objects can be got from kb
     try:
@@ -120,18 +122,6 @@ def validate(objects, schema_names):
         print(e)
         return False
     return True
-
-
-def handle_data(thingy):
-    if isinstance(thingy, list):
-        # If list, assume list of stix (json) objects
-        return thingy
-    try:
-        # If Bundle, return the objects list
-        return thingy['objects']
-    except KeyError:
-        # Otherwise, don't assume anything...
-        return thingy
 
 
 # SYSTEM INFO:
@@ -155,7 +145,8 @@ def get_system_id(id_only=False):
                 source_ref=system_id.id,
                 target_ref=hard_loc,
                 relationship_type='operates_at')
-    return json.loads(stix2.v21.Bundle([system_id, loc_rel]).serialize())['objects']
+    bundle = stix2.v21.Bundle([system_id, loc_rel])
+    return json.loads(bundle.serialize())['objects']
 
 
 def get_system_org(system_id, org_only=False):
@@ -179,7 +170,8 @@ def get_system_org(system_id, org_only=False):
             source_ref=org_id.id,
             target_ref=hard_loc,
             relationship_type='incorporated_at')
-    return json.loads(stix2.v21.Bundle([org_id, loc_rel]).serialize())['objects']
+    bundle = stix2.v21.Bundle([org_id, loc_rel])
+    return json.loads(bundle.serialize())['objects']
 
 
 def get_system_to_org(system_id, org_id):
@@ -193,41 +185,6 @@ def get_system_to_org(system_id, org_id):
             relationship_type='member_of'
     )
     return json.loads(org_rel.serialize())
-
-
-def get_molecules(config_file=None):
-    # If user supplied config file
-    if config_file:
-        with open(config_file, "r") as f:
-            return json.loads(f.read())
-
-    # Else return boilerplate
-    return {
-        "m_hunt": {
-            "attack-pattern": {
-                "relates_to": ["attack-pattern"]
-            },
-            "indicator": {
-                "indicates": ["attack-pattern"],
-                "based_on": ["observed-data"]
-            },
-            "course-of-action": {
-                "mitigates": ["attack-pattern"]
-            },
-            "malware": {
-                "uses": ["attack-pattern"]
-            }
-        },
-        "m_org": {
-            "identity": {
-                "member_of": ["identity"],
-                "operates_at": ["location"]
-            },
-            "location": {
-                "located_at": ["location"]
-            }
-        }
-    }
 
 
 # ES SETUP:

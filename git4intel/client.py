@@ -8,17 +8,14 @@ import json
 from stix2.v21 import CustomMarking
 from stix2.properties import ListProperty, ReferenceProperty
 from pprint import pprint
-import fastjsonschema
 
 from .utils import (
     compare_mappings,
     get_deterministic_uuid,
-    get_molecules,
     get_stix_ver_name,
     get_system_id,
     get_system_org,
     get_system_to_org,
-    handle_data,
     refresh_static_data,
     stix_to_elk,
     todays_index,
@@ -62,7 +59,6 @@ class Client(Elasticsearch):
 
     def __init__(self, uri, molecule_file=None):
         self.stix_ver = '21'
-        self.molecules = get_molecules(molecule_file)
         self.identity = get_system_id(id_only=True)
         self.org = get_system_org(system_id=self.identity['id'], org_only=True)
         Elasticsearch.__init__(self, uri)
@@ -100,7 +96,6 @@ class Client(Elasticsearch):
         return False
 
     def store_objects(self, objects, molecule_types=None):
-        # objects = handle_data(objects)
         # if commit:
         #     # Eventually move commit checks to json schema
         #     if not self.__check_commit(objects):
@@ -213,53 +208,6 @@ class Client(Elasticsearch):
         return overall_score
 
     # GETS:
-    # OLD molecule rels is probably faster at scale because the query
-    #   is more precise. However, json schemas as inputs provide a better
-    #   protocol for structure and are more difficult to parse.
-    # def get_molecule_rels(self, stixid, molecule):
-    #     obj_type = stixid.split('--')[0]
-    #     obj_id = stixid.split('--')[1]
-    #     q = {"query": {"bool": {"should": []}}}
-
-    #     for from_type in molecule:
-    #         for rel_type in molecule[from_type]:
-    #             for to_type in molecule[from_type][rel_type]:
-    #                 hits = 0
-    #                 if from_type == obj_type:
-    #                     source_field = obj_id
-    #                     target_field = to_type
-    #                     hits = 1
-    #                 if to_type == obj_type:
-    #                     source_field = from_type
-    #                     target_field = obj_id
-    #                     hits = 1
-    #                 if to_type == from_type and to_type == obj_type:
-    #                     hits = 2
-
-    #                 for i in range(hits):
-    #                     field_q = {"bool": {"must": [
-    #                                 {"match": {"target_ref": target_field}},
-    #                                 {"match": {"relationship_type": rel_type}},
-    #                                 {"match": {"source_ref": source_field}}
-    #                             ]}}
-    #                     q['query']['bool']['should'].append(field_q)
-    #                     # Swap fields in case second iteration (reverse rel)
-    #                     target_field, source_field = source_field, target_field
-    #     ids = []
-    #     res = self.search(index='relationship',
-    #                       body=q,
-    #                       _source_includes=["source_ref", "target_ref"],
-    #                       size=10000)
-    #     for hit in res['hits']['hits']:
-    #         if not validate(hit["_source"], 'org_member'):
-    #             continue
-    #         if hit['_source']['source_ref'] != stixid:
-    #             ids.append(hit['_source']['source_ref'])
-    #         if hit['_source']['target_ref'] != stixid:
-    #             ids.append(hit['_source']['target_ref'])
-
-    #     return list(set(ids))
-
     def __get_molecule_rels(self, stixid, molecule, fwd=True):
         obj_id = stixid.split('--')[1]
         if fwd:
@@ -373,40 +321,6 @@ class Client(Elasticsearch):
         # Get objects by type and/or value
         if user_id.split('--')[0] != 'identity':
             return False
-        # valid_authors = [user_id]
-        # user_info = self.__get_molecule_rels(stixid=user_id,
-        #                                      molecule=self.molecules['m_org'])
-        # if my_org_only:
-        #     # Specify just objects created by you/your org/other org members
-        #     for _id in user_info:
-        #         obj_type = _id.split('--')[0]
-        #         if obj_type != 'identity':
-        #             continue
-        #         res = self.get_objects(user_id=user_id, obj_ids=[_id])
-        #         if res[0]['identity_class'] != 'organization':
-        #             continue
-        #         valid_authors.append(res[0]['id'])
-        #         org_info = self.__get_molecule_rels(
-        #                                       stixid=res[0]['id'],
-        #                                       molecule=self.molecules['m_org'])
-        #         for other_user in org_info:
-        #             user_type = other_user.split('--')[0]
-        #             if user_type != 'identity':
-        #                 continue
-        #             res = self.get_objects(user_id=user_id,
-        #                                    obj_ids=[other_user])
-        #             if res[0]['identity_class'] != 'individual':
-        #                 continue
-        #             valid_authors.append(res[0]['id'])
-        #     valid_authors = list(set(valid_authors))
-        # else:
-        #     # Future: same walk but get marking definitions as filter rather
-        #     #   than created_by_ref, so 'everything I can see' rather than
-        #     #   just what me/my org/other members created (but includes that)
-        #     # That will probably be just the same search with author removed
-        #     #   and rely on the future overloaded search function to filter
-        #     pass
-
         q = {"query": {"bool": {"must": []}}}
         if my_org_only:
             orgs = self.__get_molecule_rels(stixid=user_id,

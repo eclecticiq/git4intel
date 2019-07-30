@@ -7,9 +7,7 @@ import json
 from slugify import slugify
 from pprint import pprint
 import time
-import fastjsonschema
 
-from git4intel import utils
 
 def get_deterministic_uuid(prefix=None, seed=None):
     if seed is None:
@@ -113,22 +111,6 @@ def main():
 
     # Initialise client
     g4i = git4intel.Client('localhost:9200')
-
-    # start = time.time()
-    # res2 = g4i.get_molecule_rels2(stixid="identity--7c3e12e0-44d3-440e-8af6-2224ee92dc4c",
-    #                       molecule='org_member', fwd=True)
-    # res3 = g4i.get_molecule_rels2(stixid="identity--7c3e12e0-44d3-440e-8af6-2224ee92dc4c",
-    #                       molecule='org_member', fwd=False)
-    # end = time.time()
-    # print(res2, res3, end-start)
-
-    # time.sleep(5)
-
-    # start = time.time()
-    # res1 = g4i.get_molecule_rels(stixid="identity--7c3e12e0-44d3-440e-8af6-2224ee92dc4c",
-    #                       molecule=g4i.molecules['m_org'])
-    # end = time.time()
-    # print(res1, end-start)
 
     # Setup the core data (system idents, locations and default data markings)
     # - hard coded config
