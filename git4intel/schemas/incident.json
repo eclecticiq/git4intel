@@ -29,12 +29,27 @@
                 "properties": {
                     "report_type": {
                         "type": "string",
-                        "const": "incident_report"
+                        "const": "incident_report",
+                        "required": true
                     },
                     "created_by_ref": {
                         "type": "string",
-                        "pattern": "^identity--"
-                    }
+                        "pattern": "^identity--",
+                        "required": true
+                    },
+                    "x_sla": {
+                        "type": "integer",
+                        "required": true
+                    },
+                    "x_priority": {
+                        "type": "string",
+                        "required": true
+                    },
+                    "x_assigned_to": {
+                        "type": "string",
+                        "pattern": "^identity--",
+                        "required": false
+                    },
                 }
         }
 
