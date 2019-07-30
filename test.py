@@ -152,8 +152,8 @@ class TestGit4intel(unittest.TestCase):
         # Initialize
         g4i = git4intel.Client('localhost:9200')
         # Optional cleanup...
-        g4i.indices.delete_alias(index='_all', name='_all')
-        g4i.indices.delete(index='_all')
+        # g4i.indices.delete_alias(index='_all', name='_all')
+        # g4i.indices.delete(index='_all')
 
         print('Setting up indices and loading core data sets...')
         self.assertTrue(g4i.store_core_data())
