@@ -1,0 +1,126 @@
+{
+    "title": "incident",
+    "description": "Mission Control specific structure for security incidents, consisting of multiple phases.",
+    "type": "array",
+    "contains": [
+        {
+            "title": "grouping--phase",
+            "description": "Meta-object that represents a single incident phase",
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "grouping"
+                },
+                "context": {
+                    "type": "string",
+                    "const": "phase"
+                },
+                "created_by_ref": {
+                    "type": "string",
+                    "pattern": "^identity--"
+                }
+            }
+        },
+        {
+            "title": "indicator--phase",
+            "description": "Indicator that points to the observed data of the event",
+            "type": "object",
+            "properties": {}
+        },
+        {
+            "title": "attack-pattern--micro",
+            "description": "Micro Attack Pattern that ties indicator to its ",
+            "type": "object",
+            "properties": {}
+        },
+        {
+            "title": "relationship--micro-to-macro",
+            "description": "Relationship linking micro attack pattern and macro library attack pattern (Mitre Att&ck).",
+            "type": "object",
+            "properties": {
+                "relationship_type": {
+                    "type": "string",
+                    "description": "Derived From.",
+                    "const": "derived-from"
+                },
+                "source_ref": {
+                    "type": "string",
+                    "pattern": "^attack-pattern--",
+                    "required": true
+                },
+                "target_ref": {
+                    "type": "string",
+                    "pattern": "^attack-pattern--",
+                    "required": true
+                }
+            }
+        },
+        {
+            "title": "relationship--indicator-to-micro",
+            "description": "Relationship linking indicator to micro attack pattern.",
+            "type": "object",
+            "properties": {
+                "relationship_type": {
+                    "type": "string",
+                    "description": "Derived From.",
+                    "const": "indicates"
+                },
+                "source_ref": {
+                    "type": "string",
+                    "pattern": "^indicator--",
+                    "required": true
+                },
+                "target_ref": {
+                    "type": "string",
+                    "pattern": "^attack-pattern--",
+                    "required": true
+                }
+            }
+        },
+        {
+            "title": "relationship--ap-to-incident-ap",
+            "description": "Relationship the micro attack pattern to the master incident attack pattern.",
+            "type": "object",
+            "properties": {
+                "relationship_type": {
+                    "type": "string",
+                    "description": "Using the related-to field here.",
+                    "const": "related-to"
+                },
+                "source_ref": {
+                    "type": "string",
+                    "pattern": "^attack-pattern--",
+                    "required": true
+                },
+                "target_ref": {
+                    "type": "string",
+                    "pattern": "^attack-pattern--",
+                    "required": true
+                }
+            }
+        },
+        {
+            "title": "relationship--indicator-to-observed-data",
+            "description": "Relationship to show the sourcing of the indicator from observed data in an event.",
+            "type": "object",
+            "properties": {
+                "relationship_type": {
+                    "type": "string",
+                    "description": "Using the related-to field here.",
+                    "const": "based-on"
+                },
+                "source_ref": {
+                    "type": "string",
+                    "pattern": "^attack-pattern--",
+                    "required": true
+                },
+                "target_ref": {
+                    "type": "string",
+                    "pattern": "^attack-pattern--",
+                    "required": true
+                }
+            }
+        }
+    ]
+}
