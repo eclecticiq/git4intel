@@ -26,13 +26,23 @@
             "title": "indicator--phase",
             "description": "Indicator that points to the observed data of the event",
             "type": "object",
-            "properties": {}
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "indicator"
+                }
+            }
         },
         {
             "title": "attack-pattern--micro",
             "description": "Micro Attack Pattern that ties indicator to its ",
             "type": "object",
-            "properties": {}
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "attack-pattern"
+                }
+            }
         },
         {
             "title": "relationship--micro-to-macro",
