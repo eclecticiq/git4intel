@@ -118,6 +118,8 @@ def validate(objects, schema_name):
     if schema['type'] == 'array' and not isinstance(objects, list):
         objects = [objects]
     try:
+        # pprint(objects)
+        # pprint(schema)
         _validate = fastjsonschema.compile(schema)
         _validate(objects)
     except fastjsonschema.JsonSchemaException as e:
@@ -143,10 +145,10 @@ def get_system_id(id_only=False):
                     prefix="relationship--",
                     seed=(str(system_id.id) +
                           hard_loc +
-                          'operates_at')),
+                          'operates-at')),
                 source_ref=system_id.id,
                 target_ref=hard_loc,
-                relationship_type='operates_at')
+                relationship_type='operates-at')
     bundle = stix2.v21.Bundle([system_id, loc_rel])
     return json.loads(bundle.serialize())['objects']
 
@@ -168,10 +170,10 @@ def get_system_org(system_id, org_only=False):
                 prefix="relationship--",
                 seed=(str(org_id.id) +
                       hard_loc +
-                      'incorporated_at')),
+                      'incorporated-at')),
             source_ref=org_id.id,
             target_ref=hard_loc,
-            relationship_type='incorporated_at')
+            relationship_type='incorporated-at')
     bundle = stix2.v21.Bundle([org_id, loc_rel])
     return json.loads(bundle.serialize())['objects']
 
@@ -181,10 +183,10 @@ def get_system_to_org(system_id, org_id):
             created_by_ref=system_id,
             id=get_deterministic_uuid(
                 prefix="relationship--",
-                seed=(str(system_id) + str(org_id) + 'member_of')),
+                seed=(str(system_id) + str(org_id) + 'member-of')),
             source_ref=system_id,
             target_ref=org_id,
-            relationship_type='member_of'
+            relationship_type='member-of'
     )
     return json.loads(org_rel.serialize())
 

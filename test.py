@@ -123,7 +123,7 @@ def new_user(username):
                         created_by_ref=user_id.id,
                         source_ref=user_id.id,
                         target_ref=user_loc_id,
-                        relationship_type='operates_at')
+                        relationship_type='operates-at')
     bundle = json.loads(stix2.v21.Bundle([user_id, loc_rel]).serialize())
     return json.loads(user_id.serialize()), bundle
 
@@ -141,7 +141,7 @@ def new_org(created_by_ref):
     loc_rel = stix2.v21.Relationship(
                         source_ref=org_id.id,
                         target_ref=org_loc_id,
-                        relationship_type='incorporated_at')
+                        relationship_type='incorporated-at')
     bundle = json.loads(stix2.v21.Bundle([org_id, loc_rel]).serialize())
     return org_id, bundle
 
@@ -198,7 +198,7 @@ class TestGit4intel(unittest.TestCase):
         print('Creating dummy organisation account...')
         org_id, org_bundle = new_org(user_id1['id'])
         self.assertTrue(g4i.store_objects(org_bundle['objects'],
-                                          'org'))
+                                          'new_org'))
 
         print('Assigning created user to the created organisation...')
         org_rel1 = stix2.v21.Relationship(created_by_ref=user_id1['id'],
@@ -206,12 +206,12 @@ class TestGit4intel(unittest.TestCase):
                                           target_ref=org_id['id'],
                                           relationship_type='member-of')
         org_rel1 = json.loads(org_rel1.serialize())
-        self.assertTrue(g4i.store_objects(org_rel1, 'org'))
+        self.assertTrue(g4i.store_objects(org_rel1, 'new_org'))
 
         print('Create a second user account...')
         user_id2, user_bundle2 = new_user('Another NEW UZ3R')
         self.assertTrue(g4i.store_objects(user_bundle2['objects'],
-                                          'org'))
+                                          'new_user'))
 
         print('Invite second user to same organisation...')
         org_rel2 = stix2.v21.Relationship(created_by_ref=user_id2['id'],
@@ -219,16 +219,16 @@ class TestGit4intel(unittest.TestCase):
                                           target_ref=org_id['id'],
                                           relationship_type='member-of')
         org_rel2 = json.loads(org_rel2.serialize())
-        self.assertTrue(g4i.store_objects(org_rel2, 'org'))
+        self.assertTrue(g4i.store_objects(org_rel2, 'new_org'))
 
-        print('Set a new area of operations for the org...')
+        print('Set a new incorporation location for the org...')
         ao_rel = stix2.v21.Relationship(
                 created_by_ref=user_id2['id'],
                 source_ref=org_id['id'],
                 target_ref='location--70924011-7eb0-452d-aaca-15b0979791c6',
-                relationship_type='operates-at')
+                relationship_type='incorporated-at')
         ao_rel = json.loads(ao_rel.serialize())
-        self.assertTrue(g4i.store_objects(ao_rel, 'area_of_operation'))
+        self.assertTrue(g4i.store_objects(ao_rel, 'new_org'))
 
         time.sleep(2)
 

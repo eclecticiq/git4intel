@@ -68,13 +68,13 @@ class Client(Elasticsearch):
         self.__setup_es(self.stix_ver)
         system_id_bundle = get_system_id()
         org_id_bundle = get_system_org(self.identity['id'])
-        if not self.store_objects(system_id_bundle, 'org'):
+        if not self.store_objects(system_id_bundle, 'new_user'):
             return False
-        if not self.store_objects(org_id_bundle, 'org'):
+        if not self.store_objects(org_id_bundle, 'new_org'):
             return False
 
         org_rel = get_system_to_org(self.identity['id'], self.org['id'])
-        if not self.store_objects(org_rel, 'org'):
+        if not self.store_objects(org_rel, 'new_org'):
             return False
 
         static_data = refresh_static_data(self.identity['id'])

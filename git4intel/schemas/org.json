@@ -1,6 +1,6 @@
 {
     "title": "molecule--organization",
-    "description": "Identity object that must indicate an organization.",
+    "description": "Organization and membership information for when getting my-org data.",
     "type": "array",
     "items": {
         "anyOf": [
