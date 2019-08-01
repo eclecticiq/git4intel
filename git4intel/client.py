@@ -137,95 +137,7 @@ class Client(Elasticsearch):
 
         return md_id
 
-    # CHECKS:
-    def __compare_bundle_to_molecule(self, bundle):
-        molecules = self.molecules
-
-        overall_score = {}
-        for molecule in molecules:
-            target_score = 0
-            overall_score[molecule] = [0]
-            for source in molecules[molecule]:
-                for rel in molecules[molecule][source]:
-                    target_score += len(
-                        molecules[molecule][source][rel])
-            overall_score[molecule].append(target_score)
-
-        for obj in bundle['objects']:
-            if obj['type'] == 'relationship':
-                source_type = obj['source_ref'].split('--')[0]
-                target_type = obj['target_ref'].split('--')[0]
-                rel_type = obj['relationship_type']
-                for molecule in molecules:
-                    try:
-                        if (target_type in
-                                molecules[molecule][source_type][rel_type]):
-                            overall_score[molecule][0] += 1
-                    except KeyError:
-                        pass
-
-        return overall_score
-
     # GETS:
-    def get_rels(self, stixid, schema=None, rels=False):
-        obj_id = stixid.split('--')[1]
-        q = {"query": {"bool": {"should": [{"match": {"source_ref": obj_id}},
-                                           {"match": {"target_ref": obj_id}}]}}}
-        res = self.search(index='relationship',
-                          body=q,
-                          size=10000)
-        rels = {}
-        for hit in res['hits']['hits']:
-            if schema:
-                if not validate([hit["_source"]], schema):
-                    continue
-            if hit['_source']['target_ref'] == stixid:
-                rels[hit['_source']['source_ref']] = hit['_source']
-            else:
-                rels[hit['_source']['target_ref']] = hit['_source']
-
-        return rels
-
-    def get_molecule(self, user_id, stix_id, schema, _record=None, _objs=None):
-        obj_type = stix_id.split('--')[0]
-        obj_id = stix_id.split('--')[1]
-        if not _record:
-            _record = [stix_id]
-            obj = self.get_objects(user_id=user_id, obj_ids=[stix_id])
-            _objs = []
-            if obj:
-                _objs.append(obj[0])
-
-        rels = self.get_rels(stixid=stix_id, schema=schema)
-        if rels:
-            id_lst = []
-            for rel in rels:
-                if rel not in _record:
-                    _record.append(rel)
-                    id_lst.append(rel)
-                    _objs.append(rels[rel])
-                    obj = self.get_objects(user_id=user_id, obj_ids=[rel])
-                    if obj:
-                        _objs.append(obj[0])
-            if id_lst:
-                for found in id_lst:
-                    self.get_molecule(user_id=user_id,
-                                       stix_id=found,
-                                       schema=schema,
-                                       _record=_record,
-                                       _objs=_objs)
-        return _objs
-
-    def get_countries(self):
-        q = {"query": {"bool": {"must": [{"match": {"created_by_ref": self.identity['id']}}],
-                                "filter": [{"exists": {"field": "country"},}]}}}
-        res = self.search(index='location', body=q, _source=[
-                          'name', 'id'], size=10000)
-        countries = {}
-        for hit in res['hits']['hits']:
-            countries[hit['_source']['id']] = hit['_source']['name']
-        return countries
-
     def get_object(self, user_id, obj_id, values=None):
         if not isinstance(obj_id, str):
             return False
@@ -237,13 +149,6 @@ class Client(Elasticsearch):
         return docs[0]
 
     def get_objects(self, user_id, obj_ids, values=None, expand_refs=True):
-        # Get objects by stix_id ref (list of) and filtered by what I
-        #   can see based on my user_id (id of individual identity object)
-        #   ie: to include the org-walk of marking definitions in future
-        # Currently does not apply filtering (based on marking definitions)
-        # Also assumes that if you are referencing a specific id then it is
-        #   because you got the id from something you can see, so org relevance
-        #   filtering is not applicable (marking definition still is though!)
         if not obj_ids:
             return False
         if user_id.split('--')[0] != 'identity':
@@ -289,95 +194,63 @@ class Client(Elasticsearch):
             return False
         return docs
 
-    # def get_content(self, user_id, my_org_only=True, types=None, values=None,
-    #                 expand_refs=True, group_contexts=None):
-    #     # Get objects by type and/or value
-    #     if user_id.split('--')[0] != 'identity':
-    #         return False
-    #     q = {"query": {"bool": {"must": []}}}
-    #     if my_org_only:
-    #         orgs = self.__get_molecule_rels(stixid=user_id,
-    #                                         molecule='org_member')
-    #         tmp_list = []
-    #         for org in orgs:
-    #             members = self.__get_molecule_rels(stixid=org,
-    #                                                molecule='org_member',
-    #                                                fwd=False)
-    #             tmp_list += members
-    #         valid_authors = tmp_list + orgs + [user_id]
-    #         auth_list = []
-    #         for author in valid_authors:
-    #             auth_list.append({"match": {"created_by_ref":
-    #                                         author.split('--')[1]}})
-    #         auth_q = {"bool": {"should": auth_list}}
-    #         q["query"]["bool"]["must"].append(auth_q)
-    #     if types:
-    #         type_q = {"bool": {"should": []}}
-    #         for _type in types:
-    #             if _type != 'grouping':
-    #                 type_q["bool"]["should"].append({"match": {"type": _type}})
-    #                 continue
-    #             if group_contexts:
-    #                 for context in group_contexts:
-    #                     top_group = {"bool": {"must": []}}
-    #                     top_group['bool']['must'].append({"match":
-    #                                                      {"type": _type}})
-    #                     top_group['bool']['must'].append({"match":
-    #                                                      {"context": context}})
-    #                     type_q['bool']['should'].append(top_group)
-    #                 continue
-    #             type_q["bool"]["should"].append({"match": {"type": _type}})
+    def get_rels(self, stixid, schema=None, rels=False):
+        obj_id = stixid.split('--')[1]
+        q = {"query": {"bool": {"should": [{"match": {"source_ref": obj_id}},
+                                           {"match": {"target_ref": obj_id}}]}}}
+        res = self.search(index='relationship',
+                          body=q,
+                          size=10000)
+        rels = {}
+        for hit in res['hits']['hits']:
+            if schema:
+                if not validate([hit["_source"]], schema):
+                    continue
+            if hit['_source']['target_ref'] == stixid:
+                rels[hit['_source']['source_ref']] = hit['_source']
+            else:
+                rels[hit['_source']['target_ref']] = hit['_source']
 
-    #         q["query"]["bool"]["must"].append(type_q)
-    #     res = self.search(index='intel',
-    #                       body=q,
-    #                       size=10000)
-    #     child_ids = []
-    #     parent_ids = []
-    #     hit_ids = []
-    #     results = []
-    #     for hit in res['hits']['hits']:
-    #         if hit['_source']['type'] == 'relationship':
-    #             hit_ids.append(hit['_source']['id'])
-    #             continue
-    #         tmp_obj = {}
-    #         for field in hit['_source']:
-    #             child_ids = []
-    #             if field == "created_by_ref":
-    #                 continue
-    #             if field[-4:] == '_ref':
-    #                 child_ids = [hit['_source'][field]]
-    #                 new_field = 'x_eiq_' + field + '_object'
-    #             elif field[-5:] == '_refs':
-    #                 child_ids = hit['_source'][field]
-    #                 new_field = 'x_eiq_' + field + '_objects'
-    #             if not child_ids:
-    #                 continue
-    #             parent_ids.append(hit['_source']['id'])
+        return rels
 
-    #             child_objs = self.get_objects(user_id=user_id,
-    #                                           obj_ids=child_ids,
-    #                                           values=values)
-    #             if child_objs:
-    #                 tmp_obj[new_field] = []
-    #                 for obj in child_objs:
-    #                     tmp_obj[new_field].append(obj)
-    #         if not tmp_obj:
-    #             hit_ids.append(hit['_source']['id'])
-    #             continue
-    #         new_obj = {}
-    #         new_obj.update(hit['_source'])
-    #         new_obj.update(tmp_obj)
-    #         results.append(new_obj)
+    def get_molecule(self, user_id, stix_id, schema, _record=None, _objs=None):
+        if not _record:
+            _record = [stix_id]
+            obj = self.get_objects(user_id=user_id, obj_ids=[stix_id])
+            _objs = []
+            if obj:
+                _objs.append(obj[0])
 
-    #     hit_ids = list(set(hit_ids))
-    #     res = self.get_objects(user_id=user_id, obj_ids=hit_ids, values=values)
-    #     if res:
-    #         for hit in res:
-    #             if hit['id'] not in child_ids:
-    #                 results.append(hit)
+        rels = self.get_rels(stixid=stix_id, schema=schema)
+        if rels:
+            id_lst = []
+            for rel in rels:
+                if rel not in _record:
+                    _record.append(rel)
+                    id_lst.append(rel)
+                    _objs.append(rels[rel])
+                    obj = self.get_objects(user_id=user_id, obj_ids=[rel])
+                    if obj:
+                        _objs.append(obj[0])
+            if id_lst:
+                for found in id_lst:
+                    self.get_molecule(user_id=user_id,
+                                      stix_id=found,
+                                      schema=schema,
+                                      _record=_record,
+                                      _objs=_objs)
+        return _objs
 
-    #     return results
+    def get_countries(self):
+        q = {"query": {"bool": {"must": [
+                {"match": {"created_by_ref": self.identity['id']}}],
+                "filter": [{"exists": {"field": "country"}}]}}}
+        res = self.search(index='location', body=q, _source=[
+                          'name', 'id'], size=10000)
+        countries = {}
+        for hit in res['hits']['hits']:
+            countries[hit['_source']['id']] = hit['_source']['name']
+        return countries
 
     # SETUP:
     def __get_index_from_alias(self, index_alias):
