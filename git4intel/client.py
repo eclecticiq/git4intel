@@ -333,6 +333,9 @@ class Client(Elasticsearch):
             docs.append(doc['_source'])
         return docs
 
+    def get_content_2(self):
+        pass
+
     def get_content(self, user_id, my_org_only=True, types=None, values=None,
                     expand_refs=True, group_contexts=None):
         # Get objects by type and/or value
