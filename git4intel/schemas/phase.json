@@ -1,5 +1,5 @@
 {
-    "title": "incident",
+    "title": "phase",
     "description": "Mission Control specific structure for security incidents, consisting of multiple phases.",
     "type": "array",
     "contains": [
