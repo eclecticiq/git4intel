@@ -1,12 +1,12 @@
 {
-    "title": "molecule--organization",
-    "description": "Identity object that must indicate an organization.",
+    "title": "molecule--new-user",
+    "description": "Minimum information for registering a new user.",
     "type": "array",
     "items": {
         "anyOf": [
             {
-                "title": "identity--organization",
-                "description": "Identity object that must indicate an organization.",
+                "title": "identity--user",
+                "description": "Identity object that must indicate an individual user.",
                 "type": "object",
                 "properties": {
                     "type": {
@@ -18,15 +18,14 @@
                         "type": "string",
                         "description": "The type of entity that this Identity describes, e.g., an individual or organization. Open Vocab - identity-class-ov",
                         "enum": [
-                            "organization",
                             "individual",
                             "system"
                         ]
                     }
                 }
             }, {
-                "title": "relationship--membership",
-                "description": "Relationship that indicates an an identity's membership of an organization.",
+                "title": "relationship--operatinglocationref",
+                "description": "Relationship that indicates the user operating location.",
                 "type": "object",
                 "properties": {
                     "type": {
@@ -36,19 +35,17 @@
                     },
                     "source_ref": {
                         "description": "The ID of the source (from) object.",
-                        "type": "string",
                         "pattern": "^identity--.+$"
                     },
                     "target_ref": {
                         "description": "The ID of the target (to) object.",
-                        "type": "string",
-                        "pattern": "^identity--.+$"
+                        "pattern": "^location--.+$"
                     },
                     "relationship_type": {
                         "title": "relationship_type",
                         "type": "string",
                         "description": "The name used to identify the type of relationship.",
-                        "const": "member-of"
+                        "const": "operates-at"
                     }
                 }
             }

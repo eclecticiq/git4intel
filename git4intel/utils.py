@@ -115,11 +115,13 @@ def validate(objects, schema_name):
                       "items": [org, org_loc_ref]}
 
     # Future: add an ability to check if missing objects can be got from kb
+    if schema['type'] == 'array' and not isinstance(objects, list):
+        objects = [objects]
     try:
         _validate = fastjsonschema.compile(schema)
         _validate(objects)
     except fastjsonschema.JsonSchemaException as e:
-        # print(e)
+        print(e)
         return False
     return True
 

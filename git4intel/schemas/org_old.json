@@ -1,7 +1,7 @@
 {
-    "title": "identity--user",
-    "description": "Identity object that must indicate an individual user.",
-    "type": "object",
+    "title": "identity--organization",
+   "description": "Identity object that must indicate an organization.",
+   "type": "object",
     "properties": {
         "type": {
             "type": "string",
@@ -11,10 +11,7 @@
         "identity_class": {
             "type": "string",
             "description": "The type of entity that this Identity describes, e.g., an individual or organization. Open Vocab - identity-class-ov",
-            "enum": [
-                "individual",
-                "system"
-            ]
+            "const": "organization"
         }
     }
 }

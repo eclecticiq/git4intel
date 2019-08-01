@@ -193,46 +193,49 @@ class TestGit4intel(unittest.TestCase):
 
         print('Creating dummy user account...')
         user_id1, user_bundle1 = new_user('NEW UZ3R')
-        self.assertTrue(g4i.store_objects(user_bundle1['objects'],
-                                          'register_user'))
+        self.assertTrue(g4i.store_objects(user_bundle1['objects'], 'new_user'))
 
         print('Creating dummy organisation account...')
         org_id, org_bundle = new_org(user_id1['id'])
         self.assertTrue(g4i.store_objects(org_bundle['objects'],
-                                          'register_org'))
+                                          'org'))
 
         print('Assigning created user to the created organisation...')
         org_rel1 = stix2.v21.Relationship(created_by_ref=user_id1['id'],
                                           source_ref=user_id1['id'],
                                           target_ref=org_id['id'],
-                                          relationship_type='member_of')
+                                          relationship_type='member-of')
         org_rel1 = json.loads(org_rel1.serialize())
-        self.assertTrue(g4i.store_objects(org_rel1, 'org_member'))
+        self.assertTrue(g4i.store_objects(org_rel1, 'org'))
 
         print('Create a second user account...')
         user_id2, user_bundle2 = new_user('Another NEW UZ3R')
         self.assertTrue(g4i.store_objects(user_bundle2['objects'],
-                                          'register_user'))
+                                          'org'))
 
         print('Invite second user to same organisation...')
         org_rel2 = stix2.v21.Relationship(created_by_ref=user_id2['id'],
                                           source_ref=user_id2['id'],
                                           target_ref=org_id['id'],
-                                          relationship_type='member_of')
+                                          relationship_type='member-of')
         org_rel2 = json.loads(org_rel2.serialize())
-        self.assertTrue(g4i.store_objects(org_rel2, 'org_member'))
+        self.assertTrue(g4i.store_objects(org_rel2, 'org'))
 
         print('Set a new area of operations for the org...')
         ao_rel = stix2.v21.Relationship(
                 created_by_ref=user_id2['id'],
                 source_ref=org_id['id'],
                 target_ref='location--70924011-7eb0-452d-aaca-15b0979791c6',
-                relationship_type='operates_at')
+                relationship_type='operates-at')
         ao_rel = json.loads(ao_rel.serialize())
         self.assertTrue(g4i.store_objects(ao_rel, 'area_of_operation'))
 
+        time.sleep(2)
+
         start = time.time()
-        org_info = g4i.get_my_org_info(user_id=user_id2['id'])
+        org_info = g4i.get_molecule(user_id=user_id2['id'],
+                                    stix_id=user_id2['id'],
+                                    schema='org')
         end = time.time()
         print('Get my org data took: ' + str(end-start))
 
@@ -309,125 +312,125 @@ class TestGit4intel(unittest.TestCase):
                               values=[value])
         self.assertTrue(value in str(res))
 
-    def test_6_get_content(self):
-        # Test for search where objid is not known
-        # Include:
-        # - searches for values within
-        # - searches for certain types
-        # - searches for grouping special case
-        # - Combinations of above
+    # def test_6_get_content(self):
+    #     # Test for search where objid is not known
+    #     # Include:
+    #     # - searches for values within
+    #     # - searches for certain types
+    #     # - searches for grouping special case
+    #     # - Combinations of above
 
-        g4i = git4intel.Client('localhost:9200')
-        g4i.store_core_data()
+    #     g4i = git4intel.Client('localhost:9200')
+    #     g4i.store_core_data()
 
-        user_id1, user_bundle1 = new_user('NEW UZ3R')
-        bundle = make_valid_commit(user_id1['id'])
-        g4i.store_objects(objects=bundle['objects'], molecule_types='event')
-        org_id, org_bundle = new_org(user_id1['id'])
-        g4i.store_objects(org_bundle['objects'], 'register_org')
-        user_id2, user_bundle2 = new_user('Another NEW UZ3R')
-        bundle = make_valid_commit2(user_id2['id'])
-        g4i.store_objects(objects=bundle['objects'], molecule_types='event')
+    #     user_id1, user_bundle1 = new_user('NEW UZ3R')
+    #     bundle = make_valid_commit(user_id1['id'])
+    #     g4i.store_objects(objects=bundle['objects'], molecule_types='event')
+    #     org_id, org_bundle = new_org(user_id1['id'])
+    #     g4i.store_objects(org_bundle['objects'], 'register_org')
+    #     user_id2, user_bundle2 = new_user('Another NEW UZ3R')
+    #     bundle = make_valid_commit2(user_id2['id'])
+    #     g4i.store_objects(objects=bundle['objects'], molecule_types='event')
 
-        report = make_report(user_id1['id'])
-        self.assertTrue(g4i.store_objects(objects=report))
+    #     report = make_report(user_id1['id'])
+    #     self.assertTrue(g4i.store_objects(objects=report))
 
-        time.sleep(2)
+    #     time.sleep(2)
 
-        # Values only - observable value (report and sco)
-        value = '62.171.220.83'
-        res = g4i.get_content(user_id=user_id1['id'],
-                              values=[value])
+    #     # Values only - observable value (report and sco)
+    #     value = '62.171.220.83'
+    #     res = g4i.get_content(user_id=user_id1['id'],
+    #                           values=[value])
 
-        for obj in res:
-            if obj['id'] == report['id']:
-                self.assertTrue(value in str(obj))
-            elif obj['type'] == 'grouping' or obj['type'] == 'observed-data':
-                test_value = obj['x_eiq_object_refs_objects'][0]['value']
-                self.assertTrue(test_value == value)
-            else:
-                self.assertTrue(False)
-        self.assertTrue(len(res) == 3)
+    #     for obj in res:
+    #         if obj['id'] == report['id']:
+    #             self.assertTrue(value in str(obj))
+    #         elif obj['type'] == 'grouping' or obj['type'] == 'observed-data':
+    #             test_value = obj['x_eiq_object_refs_objects'][0]['value']
+    #             self.assertTrue(test_value == value)
+    #         else:
+    #             self.assertTrue(False)
+    #     self.assertTrue(len(res) == 3)
 
-        # Types only
-        _type = 'observed-data'
-        res = g4i.get_content(user_id=user_id1['id'],
-                              types=[_type])
-        for obj in res:
-            if obj['type'] == 'observed-data':
-                test_value = obj['x_eiq_object_refs_objects']
-                self.assertTrue(len(test_value) == 2)
-            else:
-                self.assertTrue(False)
-        self.assertTrue(len(res) == 1)
+    #     # Types only
+    #     _type = 'observed-data'
+    #     res = g4i.get_content(user_id=user_id1['id'],
+    #                           types=[_type])
+    #     for obj in res:
+    #         if obj['type'] == 'observed-data':
+    #             test_value = obj['x_eiq_object_refs_objects']
+    #             self.assertTrue(len(test_value) == 2)
+    #         else:
+    #             self.assertTrue(False)
+    #     self.assertTrue(len(res) == 1)
 
-        # Grouping with context set - event
-        group_type = 'event'
-        res = g4i.get_content(user_id=user_id1['id'],
-                              types=['grouping'],
-                              group_contexts=[group_type])
-        for obj in res:
-            if obj['type'] == 'grouping':
-                self.assertTrue(obj['context'] == 'event')
+    #     # Grouping with context set - event
+    #     group_type = 'event'
+    #     res = g4i.get_content(user_id=user_id1['id'],
+    #                           types=['grouping'],
+    #                           group_contexts=[group_type])
+    #     for obj in res:
+    #         if obj['type'] == 'grouping':
+    #             self.assertTrue(obj['context'] == 'event')
 
-        # Values and types - report/sco filter
-        res = g4i.get_content(user_id=user_id1['id'],
-                              types=[_type],
-                              values=[value])
-        for obj in res:
-            if obj['type'] == 'observed-data':
-                test_value = obj['x_eiq_object_refs_objects'][0]['value']
-                self.assertTrue(test_value == value)
-            else:
-                self.assertTrue(False)
+    #     # Values and types - report/sco filter
+    #     res = g4i.get_content(user_id=user_id1['id'],
+    #                           types=[_type],
+    #                           values=[value])
+    #     for obj in res:
+    #         if obj['type'] == 'observed-data':
+    #             test_value = obj['x_eiq_object_refs_objects'][0]['value']
+    #             self.assertTrue(test_value == value)
+    #         else:
+    #             self.assertTrue(False)
 
-        # Values and grouping with context - ip address from event
-        res = g4i.get_content(user_id=user_id1['id'],
-                              types=['grouping'],
-                              group_contexts=[group_type],
-                              values=[value])
-        for obj in res:
-            if obj['type'] == 'grouping':
-                self.assertTrue(obj['context'] == 'event')
-                test_value = obj['x_eiq_object_refs_objects'][0]['value']
-                self.assertTrue(test_value == value)
-            else:
-                self.assertTrue(False)
+    #     # Values and grouping with context - ip address from event
+    #     res = g4i.get_content(user_id=user_id1['id'],
+    #                           types=['grouping'],
+    #                           group_contexts=[group_type],
+    #                           values=[value])
+    #     for obj in res:
+    #         if obj['type'] == 'grouping':
+    #             self.assertTrue(obj['context'] == 'event')
+    #             test_value = obj['x_eiq_object_refs_objects'][0]['value']
+    #             self.assertTrue(test_value == value)
+    #         else:
+    #             self.assertTrue(False)
 
-        # Additional types and grouping with context - grouping and identity
-        res = g4i.get_content(user_id=user_id1['id'],
-                              types=['grouping', 'identity'],
-                              group_contexts=[group_type])
-        for obj in res:
-            if obj['type'] == 'grouping':
-                self.assertTrue(obj['context'] == 'event')
-                self.assertTrue(len(obj['x_eiq_object_refs_objects']) == 3)
-                for obs in obj['x_eiq_object_refs_objects']:
-                    self.assertTrue(type(obs) is dict)
-            elif obj['type'] == 'identity':
-                self.assertTrue(True)
-            else:
-                self.assertTrue(False)
-        self.assertTrue(len(res) == 2)
+    #     # Additional types and grouping with context - grouping and identity
+    #     res = g4i.get_content(user_id=user_id1['id'],
+    #                           types=['grouping', 'identity'],
+    #                           group_contexts=[group_type])
+    #     for obj in res:
+    #         if obj['type'] == 'grouping':
+    #             self.assertTrue(obj['context'] == 'event')
+    #             self.assertTrue(len(obj['x_eiq_object_refs_objects']) == 3)
+    #             for obs in obj['x_eiq_object_refs_objects']:
+    #                 self.assertTrue(type(obs) is dict)
+    #         elif obj['type'] == 'identity':
+    #             self.assertTrue(True)
+    #         else:
+    #             self.assertTrue(False)
+    #     self.assertTrue(len(res) == 2)
 
-        # Values, types and grouping with context - grouping, identity and sco
-        #   value
-        res = g4i.get_content(user_id=user_id1['id'],
-                              types=['grouping', 'report'],
-                              group_contexts=[group_type],
-                              values=[value])
-        for obj in res:
-            if obj['type'] == 'grouping':
-                self.assertTrue(obj['context'] == 'event')
-                test_value = obj['x_eiq_object_refs_objects'][0]['value']
-                self.assertTrue(test_value == value)
-            elif obj['type'] == 'report':
-                self.assertTrue(value in str(obj))
-            else:
-                self.assertTrue(False)
-        self.assertTrue(len(res) == 2)
+    #     # Values, types and grouping with context - grouping, identity and sco
+    #     #   value
+    #     res = g4i.get_content(user_id=user_id1['id'],
+    #                           types=['grouping', 'report'],
+    #                           group_contexts=[group_type],
+    #                           values=[value])
+    #     for obj in res:
+    #         if obj['type'] == 'grouping':
+    #             self.assertTrue(obj['context'] == 'event')
+    #             test_value = obj['x_eiq_object_refs_objects'][0]['value']
+    #             self.assertTrue(test_value == value)
+    #         elif obj['type'] == 'report':
+    #             self.assertTrue(value in str(obj))
+    #         else:
+    #             self.assertTrue(False)
+    #     self.assertTrue(len(res) == 2)
 
-        # Eventually add my_org_only == False when md filtering applied
+    #     # Eventually add my_org_only == False when md filtering applied
 
 
 if __name__ == '__main__':
