@@ -63,6 +63,13 @@ class Client(Elasticsearch):
         self.org = get_system_org(system_id=self.identity['id'], org_only=True)
         Elasticsearch.__init__(self, uri)
 
+    # OVERLOADS
+    def search(self, **kwargs):
+        kwargs['index'] = 'intel'
+        kwargs['size'] = 10000
+        # Insert query mangling here to enable filtering on mds
+        return super().search(**kwargs)
+
     # SETS:
     def store_core_data(self):
         self.__setup_es(self.stix_ver)
@@ -196,8 +203,9 @@ class Client(Elasticsearch):
 
     def get_rels(self, stixid, schema=None, rels=False):
         obj_id = stixid.split('--')[1]
-        q = {"query": {"bool": {"should": [{"match": {"source_ref": obj_id}},
-                                           {"match": {"target_ref": obj_id}}]}}}
+        q = {"query": {"bool": {"should": [
+                                   {"match": {"source_ref": obj_id}},
+                                   {"match": {"target_ref": obj_id}}]}}}
         res = self.search(index='relationship',
                           body=q,
                           size=10000)
