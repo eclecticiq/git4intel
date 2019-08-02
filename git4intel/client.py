@@ -65,8 +65,10 @@ class Client(Elasticsearch):
 
     # OVERLOADS
     def search(self, **kwargs):
-        kwargs['index'] = 'intel'
-        kwargs['size'] = 10000
+        if 'index' not in kwargs:
+            kwargs['index'] = 'intel'
+        if 'size' not in kwargs:
+            kwargs['size'] = 10000
         # Insert query mangling here to enable filtering on mds
         return super().search(**kwargs)
 
