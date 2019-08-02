@@ -94,38 +94,16 @@ def validate(objects, schema_name):
     try:
         schema = json.loads(pkg_resources.read_text(schemas, schema_name))
     except FileNotFoundError:
-        if schema_name == 'register_user.json':
-            user = json.loads(pkg_resources.read_text(schemas, 'user.json'))
-            user_loc_ref = json.loads(pkg_resources.read_text(
-                                                          schemas,
-                                                          'user_loc_ref.json'))
-            schema = {"type": "array",
-                      "title": "user",
-                      "maxItems": 2,
-                      "items": [user, user_loc_ref]}
-        if schema_name == 'register_org.json':
-            org = json.loads(pkg_resources.read_text(schemas, 'org.json'))
-            org_loc_ref = json.loads(pkg_resources.read_text(
-                                                         schemas,
-                                                         'org_loc_ref.json'))
-            schema = {"type": "array",
-                      "title": "org",
-                      "description": "Single organization.",
-                      "maxItems": 2,
-                      "items": [org, org_loc_ref]}
+        print('No schema by that name')
+        return False
 
-    # Future: add an ability to check if missing objects can be got from kb
-    if schema['type'] == 'array' and not isinstance(objects, list):
-        objects = [objects]
     try:
-        # pprint(objects)
-        # pprint(schema)
         _validate = fastjsonschema.compile(schema)
         _validate(objects)
+        return True
     except fastjsonschema.JsonSchemaException as e:
-        print(e)
+        # print(e)
         return False
-    return True
 
 
 # SYSTEM INFO:

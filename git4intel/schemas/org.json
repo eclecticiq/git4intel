@@ -2,7 +2,7 @@
     "title": "molecule--organization",
     "description": "Organization and membership information for when getting my-org data.",
     "type": "array",
-    "items": {
+    "contains": {
         "anyOf": [
             {
                 "title": "identity--organization",
