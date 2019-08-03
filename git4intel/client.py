@@ -307,6 +307,13 @@ class Client(Elasticsearch):
                         seeds.append(obj)
                 except KeyError:
                     pass
+        else:
+            # Assume global
+            q = {"query": {"exists": {"field": 'x_eiq_assigned_to'}}}
+            res = self.search(index='attack-pattern', body=q)
+            if res['hits']:
+                for hit in res['hits']['hits']:
+                    seeds.append(hit['_source'])
 
         if not seeds:
             return False
