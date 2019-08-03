@@ -8,6 +8,10 @@
                 "title": "identity--organization",
                 "description": "Identity object that must indicate an organization.",
                 "type": "object",
+                "required": [
+                    "type",
+                    "identity_class"
+                ],
                 "properties": {
                     "type": {
                         "type": "string",
@@ -26,6 +30,12 @@
                 "title": "relationship--membership",
                 "description": "Relationship that indicates an an identity's membership of an organization.",
                 "type": "object",
+                "required": [
+                    "type",
+                    "source_ref",
+                    "target_ref",
+                    "relationship_type"
+                ],
                 "properties": {
                     "type": {
                         "type": "string",
@@ -53,6 +63,12 @@
                 "title": "relationship--operatinglocationref",
                 "description": "Relationship that indicates the organization incorporation location.",
                 "type": "object",
+                "required": [
+                    "type",
+                    "source_ref",
+                    "target_ref",
+                    "relationship_type"
+                ],
                 "properties": {
                     "type": {
                         "type": "string",

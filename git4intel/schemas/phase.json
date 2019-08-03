@@ -8,12 +8,24 @@
             "description": "Indicator that points to the observed data of the event",
             "type": "object",
             "required": [
-                "type"
+                "type",
+                "indicator_types"
             ],
             "properties": {
                 "type": {
                     "type": "string",
                     "const": "indicator"
+                },
+                "indicator_types": {
+                    "type": "array",
+                    "contains": {
+                        "type": "string",
+                        "enum": [
+                            "anomalous-activity",
+                            "benign",
+                            "malicious-activity"
+                        ]
+                    }
                 }
             }
         }, {
@@ -42,11 +54,17 @@
             "description": "Relationship linking micro attack pattern and macro library attack pattern (Mitre Att&ck).",
             "type": "object",
             "required": [
+                "type",
                 "relationship_type",
                 "source_ref",
                 "target_ref"
             ],
             "properties": {
+                "type": {
+                    "type": "string",
+                    "description": "The type of this object, which MUST be the literal `relationship`.",
+                    "const": "relationship"
+                },
                 "relationship_type": {
                     "type": "string",
                     "description": "Derived From.",
@@ -66,11 +84,17 @@
             "description": "Relationship linking indicator to micro attack pattern.",
             "type": "object",
             "required": [
+                "type",
                 "relationship_type",
                 "source_ref",
                 "target_ref"
             ],
             "properties": {
+                "type": {
+                    "type": "string",
+                    "description": "The type of this object, which MUST be the literal `relationship`.",
+                    "const": "relationship"
+                },
                 "relationship_type": {
                     "type": "string",
                     "description": "Derived From.",
@@ -90,11 +114,17 @@
             "description": "Relationship the micro attack pattern to the master incident attack pattern.",
             "type": "object",
             "required": [
+                "type",
                 "relationship_type",
                 "source_ref",
                 "target_ref"
             ],
             "properties": {
+                "type": {
+                    "type": "string",
+                    "description": "The type of this object, which MUST be the literal `relationship`.",
+                    "const": "relationship"
+                },
                 "relationship_type": {
                     "type": "string",
                     "description": "Using the related-to field here.",
@@ -114,11 +144,17 @@
             "description": "Relationship to show the sourcing of the indicator from observed data in an event.",
             "type": "object",
             "required": [
+                "type",
                 "relationship_type",
                 "source_ref",
                 "target_ref"
             ],
             "properties": {
+                "type": {
+                    "type": "string",
+                    "description": "The type of this object, which MUST be the literal `relationship`.",
+                    "const": "relationship"
+                },
                 "relationship_type": {
                     "type": "string",
                     "description": "Using the related-to field here.",

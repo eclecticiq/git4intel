@@ -8,14 +8,16 @@
                 "title": "attack-pattern--incident",
                 "description": "Uses the STIX 2.1 attack pattern object for the master incident object",
                 "type": "object",
+                "required": [
+                    "type",
+                    "x_eiq_priority",
+                    "x_eiq_assigned_to",
+                    "aliases"
+                ],
                 "properties": {
                     "type": {
                         "type": "string",
                         "const": "attack-pattern"
-                    },
-                    "created_by_ref": {
-                        "type": "string",
-                        "pattern": "^identity--"
                     },
                     "x_eiq_priority": {
                         "type": "string"
@@ -33,10 +35,45 @@
                     }
                 }
             }, {
+                "title": "identity--organization",
+                "description": "Targeted identity.",
+                "type": "object",
+                "required": [
+                    "type",
+                    "identity_class"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "description": "The type of this object, which MUST be the literal `identity`.",
+                        "const": "identity"
+                    },
+                    "identity_class": {
+                        "type": "string",
+                        "description": "The type of entity that this Identity describes, e.g., an individual or organization. Open Vocab - identity-class-ov",
+                        "enum": [
+                            "organization",
+                            "individual",
+                            "system"
+                        ]
+                    }
+                }
+            }, {
                 "title": "relationship--targets",
                 "description": "Relationship linking attack pattern and target organization.",
                 "type": "object",
+                "required": [
+                    "type",
+                    "source_ref",
+                    "target_ref",
+                    "relationship_type"
+                ],
                 "properties": {
+                    "type": {
+                        "type": "string",
+                        "description": "The type of this object, which MUST be the literal `relationship`.",
+                        "const": "relationship"
+                    },
                     "relationship_type": {
                         "type": "string",
                         "description": "Must be targets.",
@@ -55,7 +92,18 @@
                 "title": "relationship--phase-to-incident",
                 "description": "Relationship linking phase attack pattern to incident attack pattern.",
                 "type": "object",
+                "required": [
+                    "type",
+                    "source_ref",
+                    "target_ref",
+                    "relationship_type"
+                ],
                 "properties": {
+                    "type": {
+                        "type": "string",
+                        "description": "The type of this object, which MUST be the literal `relationship`.",
+                        "const": "relationship"
+                    },
                     "relationship_type": {
                         "type": "string",
                         "const": "phase-of"

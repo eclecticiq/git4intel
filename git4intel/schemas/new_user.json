@@ -8,6 +8,10 @@
                 "title": "identity--user",
                 "description": "Identity object that must indicate an individual user.",
                 "type": "object",
+                "required": [
+                    "type",
+                    "identity_class"
+                ],
                 "properties": {
                     "type": {
                         "type": "string",
@@ -27,6 +31,12 @@
                 "title": "relationship--operatinglocationref",
                 "description": "Relationship that indicates the user operating location.",
                 "type": "object",
+                "required": [
+                    "type",
+                    "source_ref",
+                    "target_ref",
+                    "relationship_type"
+                ],
                 "properties": {
                     "type": {
                         "type": "string",

@@ -7,7 +7,54 @@
             {
                 "title": "observed-data--event",
                 "description": "Observed data conveys information that was observed on systems and networks, such as log data or network traffic, using the Cyber Observable specification.",
-                "type": "object"
+                "type": "object",
+                "required": [
+                    "type",
+                    "object_refs"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "description": "The type of this object, which MUST be the literal `observed-data`.",
+                        "const": "observed-data"
+                    },
+                    "object_refs": {
+                        "type": "array"
+                    }
+                }
+            }, {
+                "title": "relationship--based-on",
+                "description": "Relationship that shows an indicator is based on observed-data (ie: is an event).",
+                "type": "object",
+                "required": [
+                    "type",
+                    "source_ref",
+                    "target_ref",
+                    "relationship_type"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "description": "The type of this object, which MUST be the literal `relationship`.",
+                        "const": "relationship"
+                    },
+                    "source_ref": {
+                        "description": "The ID of the source (from) object.",
+                        "type": "string",
+                        "pattern": "^indicator--.+$"
+                    },
+                    "target_ref": {
+                        "description": "The ID of the target (to) object.",
+                        "type": "string",
+                        "pattern": "^observed-data--.+$"
+                    },
+                    "relationship_type": {
+                        "title": "relationship_type",
+                        "type": "string",
+                        "description": "The name used to identify the type of relationship.",
+                        "const": "based-on"
+                    }
+                }
             }
 
         ]
