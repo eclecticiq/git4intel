@@ -88,22 +88,37 @@ def get_external_refs(bundle):
     return diff
 
 
-def validate(objects, schema_name):
-    schema_name = schema_name + '.json'
-    # Get the called schemas and compound them if needed
-    try:
-        schema = json.loads(pkg_resources.read_text(schemas, schema_name))
-    except FileNotFoundError:
-        print('No schema by that name')
+def validate(objects, schema_name=None, try_all=False):
+    if not schema_name and not try_all:
         return False
 
-    try:
-        _validate = fastjsonschema.compile(schema)
-        _validate(objects)
-        return True
-    except fastjsonschema.JsonSchemaException as e:
-        # print(e)
-        return False
+    if try_all:
+        schema_names = []
+        for item in pkg_resources.contents(schemas):
+            if not item[-5:] == '.json':
+                continue
+            schema_names.append(item)
+    elif isinstance(schema_name, list):
+        schema_names = schema_name
+    else:
+        schema_names = [schema_name + '.json']
+
+    output = {}
+    for _schema_name in schema_names:
+        try:
+            schema = json.loads(pkg_resources.read_text(schemas, _schema_name))
+        except FileNotFoundError:
+            print('No schema by that name')
+            output[_schema_name[:-5]] = False
+
+        try:
+            _validate = fastjsonschema.compile(schema)
+            _validate(objects)
+            output[_schema_name[:-5]] = True
+        except fastjsonschema.JsonSchemaException as e:
+            # print(e)
+            output[_schema_name[:-5]] = False
+    return output
 
 
 # SYSTEM INFO:

@@ -105,7 +105,7 @@ class Client(Elasticsearch):
 
     def store_objects(self, objects, molecule_types=None):
         if molecule_types:
-            if not validate(objects, molecule_types):
+            if not validate(objects, molecule_types)[molecule_types]:
                 return False
 
         if isinstance(objects, list):
@@ -146,6 +146,28 @@ class Client(Elasticsearch):
         return md_id
 
     # GETS:
+    def get_free_text(self, user_id, phrase, include_molecules=False):
+        q = {"query": {"multi_match": {"query": phrase}}}
+        res = self.search(body=q)
+        if not res['hits']['hits']:
+            return False
+        output = []
+        for hit in res['hits']['hits']:
+            if not include_molecules:
+                output.append(hit['_source'])
+                continue
+            molecules = []
+            validations = validate(objects=[hit['_source']], try_all=True)
+            for schema in validations:
+                if validations[schema]:
+                    molecule = self.get_molecule(user_id=user_id,
+                                                 stix_id=hit['_source']['id'],
+                                                 schema=schema)
+                    molecules.append(molecule)
+            molecules.append(hit['_source'])
+            output.append(molecules)
+        return output
+
     def get_object(self, user_id, obj_id, values=None):
         if not isinstance(obj_id, str):
             return False
@@ -156,7 +178,7 @@ class Client(Elasticsearch):
             return False
         return docs[0]
 
-    def get_objects(self, user_id, obj_ids, values=None, expand_refs=True):
+    def get_objects(self, user_id, obj_ids, values=None):
         if not obj_ids:
             return False
         if user_id.split('--')[0] != 'identity':
@@ -213,7 +235,7 @@ class Client(Elasticsearch):
         rels = {}
         for hit in res['hits']['hits']:
             if schema:
-                if not validate([hit["_source"]], schema):
+                if not validate([hit["_source"]], schema)[schema]:
                     continue
             if hit['_source']['target_ref'] == stixid:
                 rels[hit['_source']['source_ref']] = hit['_source']
@@ -224,7 +246,7 @@ class Client(Elasticsearch):
 
     def get_molecule(self, user_id, stix_id, schema, _record=None, _objs=None):
         obj = self.get_objects(user_id=user_id, obj_ids=[stix_id])
-        validation = validate(objects=obj, schema_name=schema)
+        validation = validate(objects=obj, schema_name=schema)[schema]
         if not validation:
             return False
         if not _record:

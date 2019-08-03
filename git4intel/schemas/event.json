@@ -55,8 +55,21 @@
                         "const": "based-on"
                     }
                 }
+            }, {
+                "title": "sco--event-observables",
+                "description": "Catch all for any objects that are SCO types.",
+                "type": "object",
+                "required": [
+                    "type"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "pattern": "^artifact|directory|file|mutex|process|software|user-account|windows-registry-key|x509-certificate|autonomous-system|domain-name|email-addr|email-message|ipv4-addr|ipv6-addr|mac-addr|network-traffic|url$",
+                        "description": "Indicates that this object is a custom Observable Object."
+                    }
+                }
             }
-
         ]
     }
 }
