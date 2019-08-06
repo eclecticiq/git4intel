@@ -88,6 +88,15 @@ def get_external_refs(bundle):
     return diff
 
 
+def get_schema(schema_name):
+    schema_name = schema_name + '.json'
+    try:
+        return json.loads(pkg_resources.read_text(schemas, schema_name))
+    except FileNotFoundError:
+        print('No schema by that name')
+        return False
+
+
 def validate(objects, schema_name=None, try_all=False):
     if not schema_name and not try_all:
         return False

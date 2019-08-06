@@ -12,6 +12,7 @@ from pprint import pprint
 from .utils import (
     compare_mappings,
     get_deterministic_uuid,
+    get_schema,
     get_stix_ver_name,
     get_system_id,
     get_system_org,
@@ -276,6 +277,49 @@ class Client(Elasticsearch):
                                       _record=_record,
                                       _objs=_objs)
         return _objs
+
+    def get_molecule_2(self, user_id, stix_ids, schema, objs=None):
+        if isinstance(schema, str):
+            schema = get_schema(schema)
+        ids = stix_ids[:]
+        while True:
+            old_len = len(ids)
+            q_ids = []
+            q_str = ''
+            for _id in ids:
+                q_ids.append({"match": {"id": _id.split('--')[1]}})
+                q_str += _id.split('--')[1] + " OR "
+            q_str = q_str[:-4]
+
+            q_ids.append({"query_string": {
+                            "fields": ["*_ref", "*_refs"],
+                            "query": q_str}})
+            q = {"query": {"bool": {"must": {"bool": {"should": q_ids}},
+                                    "filter": schema}}}
+            res = self.search(body=q,
+                              _source_excludes=["created_by_ref"],
+                              filter_path=['hits.hits._source.id',
+                                           'hits.hits._source.*_ref',
+                                           'hits.hits._source.*_refs'])
+            for hit in res['hits']['hits']:
+                for value in list(hit['_source'].values()):
+                    if isinstance(value, list):
+                        ids += value
+                        continue
+                    ids.append(value)
+            ids = list(set(ids))
+            new_len = len(ids)
+            if new_len == old_len:
+                if not objs:
+                    return ids
+                q_objs = []
+                for _id in ids:
+                    q_objs.append({"match": {"id": _id.split('--')[1]}})
+                q = {"query": {"bool": {"must": {"bool": {"should": q_objs}},
+                                        "filter": schema}}}
+                res = self.search(body=q,
+                                  filter_path=['hits.hits._source'])
+                return res
 
     def get_incidents(self, user_id, focus=None):
         userid = user_id.split('--')[1]

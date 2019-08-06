@@ -1,0 +1,20 @@
+{
+    "bool": {
+        "should": [
+            {"bool": {"must": [
+                {"match": {"type": "identity"}},
+                {"bool": {"should": [
+                    {"match": {"identity_class": "individual"}},
+                    {"match": {"identity_class": "system"}},
+                    {"match": {"identity_class": "organization"}}
+                ]}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"match": {"relationship_type": "member-of"}},
+                {"match": {"source_ref": "identity--"}},
+                {"match": {"target_ref": "identity--"}}
+            ]}}
+        ]
+    }
+}

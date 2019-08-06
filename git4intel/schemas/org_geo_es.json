@@ -1,0 +1,32 @@
+{
+    "bool": {
+        "should": [
+            {"bool": {"must": [
+                {"match": {"type": "identity"}},
+                {"bool": {"should": [
+                    {"match": {"identity_class": "individual"}},
+                    {"match": {"identity_class": "system"}},
+                    {"match": {"identity_class": "organization"}}
+                ]}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "location"}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"match": {"relationship_type": "member-of"}},
+                {"match": {"source_ref": "identity--"}},
+                {"match": {"target_ref": "identity--"}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"bool": {"should": [
+                    {"match": {"relationship_type": "incorporated-at"}},
+                    {"match": {"relationship_type": "operates-at"}}
+                ]}},
+                {"match": {"source_ref": "identity--"}},
+                {"match": {"target_ref": "location--"}}
+            ]}}
+        ]
+    }
+}
