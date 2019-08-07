@@ -88,7 +88,7 @@ def get_external_refs(bundle):
     return diff
 
 
-def get_schema(schema_name):
+def get_schema(schema_name, all=False):
     schema_name = schema_name + '.json'
     try:
         return json.loads(pkg_resources.read_text(schemas, schema_name))
@@ -97,37 +97,14 @@ def get_schema(schema_name):
         return False
 
 
-def validate(objects, schema_name=None, try_all=False):
-    if not schema_name and not try_all:
-        return False
-
-    if try_all:
-        schema_names = []
-        for item in pkg_resources.contents(schemas):
-            if not item[-5:] == '.json':
-                continue
-            schema_names.append(item)
-    elif isinstance(schema_name, list):
-        schema_names = schema_name
-    else:
-        schema_names = [schema_name + '.json']
-
-    output = {}
-    for _schema_name in schema_names:
-        try:
-            schema = json.loads(pkg_resources.read_text(schemas, _schema_name))
-        except FileNotFoundError:
-            print('No schema by that name')
-            output[_schema_name[:-5]] = False
-
-        try:
-            _validate = fastjsonschema.compile(schema)
-            _validate(objects)
-            output[_schema_name[:-5]] = True
-        except fastjsonschema.JsonSchemaException as e:
-            # print(e)
-            output[_schema_name[:-5]] = False
-    return output
+def get_all_schemas():
+    schema_list = []
+    for schema_name in pkg_resources.contents(schemas):
+        if not schema_name[-5:] == '.json':
+            continue
+        schema = json.loads(pkg_resources.read_text(schemas, schema_name))
+        schema_list.append(schema)
+    return schema_list
 
 
 # SYSTEM INFO:
@@ -385,13 +362,24 @@ def get_marking_definitions(created_by_ref):
     os_licence = OS_LICENSE
     pii_dm = PII_DM
 
+    os_group = stix2.v21.Grouping(created_by_ref=created_by_ref,
+                                  name="Open Source Data Markings",
+                                  description="Data Marking objects that are "
+                                  "considered to be available for all users "
+                                  "to view.",
+                                  context='os-markings',
+                                  object_refs=[tlp_white_dm.id,
+                                               tlp_green_dm.id,
+                                               os_licence.id])
+
     objs = [
         tlp_red_dm,
         tlp_amber_dm,
         tlp_green_dm,
         tlp_white_dm,
         pii_dm,
-        os_licence
+        os_licence,
+        os_group
     ]
     bundle = json.loads(stix2.v21.Bundle(objs).serialize())
     return bundle['objects']
@@ -1124,10 +1112,10 @@ def get_locations(created_by_ref):
                                                     prefix="relationship--",
                                                     seed=str(located_at_id +
                                                              down_loc_id +
-                                                             'located_at')),
+                                                             'located-at')),
                                             source_ref=down_loc_id,
                                             target_ref=located_at_id,
-                                            relationship_type='located_at')
+                                            relationship_type='located-at')
                             all_objs.append(rel1)
                         if located_at_id not in region_ids:
                             region_ids.append(located_at_id)

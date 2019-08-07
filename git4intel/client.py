@@ -11,6 +11,7 @@ from pprint import pprint
 
 from .utils import (
     compare_mappings,
+    get_all_schemas,
     get_deterministic_uuid,
     get_schema,
     get_stix_ver_name,
@@ -19,8 +20,7 @@ from .utils import (
     get_system_to_org,
     refresh_static_data,
     stix_to_elk,
-    todays_index,
-    validate,
+    todays_index
 )
 
 
@@ -58,33 +58,53 @@ class TLPPlusMarking(object):
 
 class Client(Elasticsearch):
 
-    def __init__(self, uri, molecule_file=None):
+    def __init__(self, uri):
         self.stix_ver = '21'
         self.identity = get_system_id(id_only=True)
         self.org = get_system_org(system_id=self.identity['id'], org_only=True)
         Elasticsearch.__init__(self, uri)
 
     # OVERLOADS
-    def search(self, **kwargs):
+    def search(self, user_id, schema=None, **kwargs):
         if 'index' not in kwargs:
             kwargs['index'] = 'intel'
         if 'size' not in kwargs:
             kwargs['size'] = 10000
-        # Insert query mangling here to enable filtering on mds
+
+        _filter = None
+        if schema:
+            if schema == 'all':
+                schemas = get_all_schemas()
+            else:
+                if isinstance(schema, str):
+                    schema = [schema]
+                schemas = []
+                for _schema in schema:
+                    schemas.append(get_schema(_schema))
+            _filter_should = []
+            for _schema in schemas:
+                _filter_should += _schema['bool']['should']
+            _filter = {"bool": {"should": _filter_should}}
+
+        # Add to _filter for marking definitions (remove the _filter check)
+
+        if _filter:
+            kwargs['body'] = {"query": {"bool": {"must": kwargs['body']['query'],
+                                                 "filter": _filter}}}
         return super().search(**kwargs)
 
     # SETS:
     def store_core_data(self):
         self.__setup_es(self.stix_ver)
-        system_id_bundle = get_system_id()
-        org_id_bundle = get_system_org(self.identity['id'])
-        if not self.store_objects(system_id_bundle, 'new_user'):
+        system_id = get_system_id()
+        org_id = get_system_org(self.identity['id'])
+        if not self.store_objects(system_id):
             return False
-        if not self.store_objects(org_id_bundle, 'new_org'):
+        if not self.store_objects(org_id):
             return False
 
         org_rel = get_system_to_org(self.identity['id'], self.org['id'])
-        if not self.store_objects(org_rel, 'new_org'):
+        if not self.store_objects(org_rel):
             return False
 
         static_data = refresh_static_data(self.identity['id'])
@@ -104,11 +124,7 @@ class Client(Elasticsearch):
             return True
         return False
 
-    def store_objects(self, objects, molecule_types=None):
-        if molecule_types:
-            if not validate(objects, molecule_types)[molecule_types]:
-                return False
-
+    def store_objects(self, objects):
         if isinstance(objects, list):
             for obj in objects:
                 if not self.__store_object(obj):
@@ -147,26 +163,26 @@ class Client(Elasticsearch):
         return md_id
 
     # GETS:
-    def get_free_text(self, user_id, phrase, include_molecules=False):
+    def get_free_text(self, user_id, phrase, schema=None):
+        output = []
         q = {"query": {"multi_match": {"query": phrase}}}
-        res = self.search(body=q)
+        res = self.search(user_id=user_id, body=q)
         if not res['hits']['hits']:
             return False
-        output = []
-        for hit in res['hits']['hits']:
-            if not include_molecules:
+        if not schema:
+            for hit in res['hits']['hits']:
                 output.append(hit['_source'])
-                continue
-            molecules = []
-            validations = validate(objects=[hit['_source']], try_all=True)
-            for schema in validations:
-                if validations[schema]:
-                    molecule = self.get_molecule(user_id=user_id,
-                                                 stix_id=hit['_source']['id'],
-                                                 schema=schema)
-                    molecules.append(molecule)
-            molecules.append(hit['_source'])
-            output.append(molecules)
+            return output
+
+        for hit in res['hits']['hits']:
+            hit_row = [hit['_source']]
+            molecule = self.get_molecule(user_id=user_id,
+                                         stix_ids=[hit['_source']['id']],
+                                         schema=schema,
+                                         objs=True)
+            if molecule:
+                hit_row.append(molecule)
+            output.append(hit_row)
         return output
 
     def get_object(self, user_id, obj_id, values=None):
@@ -202,9 +218,8 @@ class Client(Elasticsearch):
 
             q["query"]["bool"]["must"].append(value_q)
             q["query"]["bool"]["must"].append(id_q)
-            res = self.search(index='intel',
-                              body=q,
-                              size=10000)
+            res = self.search(user_id=user_id,
+                              body=q)
             try:
                 for hit in res['hits']['hits']:
                     docs.append(hit['_source'])
@@ -225,62 +240,9 @@ class Client(Elasticsearch):
             return False
         return docs
 
-    def get_rels(self, stixid, schema=None):
-        obj_id = stixid.split('--')[1]
-        q = {"query": {"bool": {"should": [
-                                   {"match": {"source_ref": obj_id}},
-                                   {"match": {"target_ref": obj_id}}]}}}
-        res = self.search(index='relationship',
-                          body=q,
-                          size=10000)
-        rels = {}
-        for hit in res['hits']['hits']:
-            if schema:
-                if not validate([hit["_source"]], schema)[schema]:
-                    continue
-            if hit['_source']['target_ref'] == stixid:
-                rels[hit['_source']['source_ref']] = hit['_source']
-            else:
-                rels[hit['_source']['target_ref']] = hit['_source']
-
-        return rels
-
-    def get_molecule(self, user_id, stix_id, schema, _record=None, _objs=None):
-        obj = self.get_objects(user_id=user_id, obj_ids=[stix_id])
-        validation = validate(objects=obj, schema_name=schema)[schema]
-        if not validation:
+    def get_molecule(self, user_id, stix_ids, schema, objs=None, query=None):
+        if not isinstance(schema, str):
             return False
-        if not _record:
-            _record = [stix_id]
-            _objs = []
-            if obj:
-                _objs.append(obj[0])
-
-        rels = self.get_rels(stixid=stix_id, schema=schema)
-        if rels:
-            id_lst = []
-            for rel in rels:
-                if rel not in _record:
-                    _record.append(rel)
-                    id_lst.append(rel)
-                    if rels[rel]['id'] not in _record:
-                        _record.append(rels[rel]['id'])
-                        _objs.append(rels[rel])
-                    obj = self.get_objects(user_id=user_id, obj_ids=[rel])
-                    if obj:
-                        _objs.append(obj[0])
-            if id_lst:
-                for found in id_lst:
-                    self.get_molecule(user_id=user_id,
-                                      stix_id=found,
-                                      schema=schema,
-                                      _record=_record,
-                                      _objs=_objs)
-        return _objs
-
-    def get_molecule_2(self, user_id, stix_ids, schema, objs=None):
-        if isinstance(schema, str):
-            schema = get_schema(schema)
         ids = stix_ids[:]
         while True:
             old_len = len(ids)
@@ -294,13 +256,16 @@ class Client(Elasticsearch):
             q_ids.append({"query_string": {
                             "fields": ["*_ref", "*_refs"],
                             "query": q_str}})
-            q = {"query": {"bool": {"must": {"bool": {"should": q_ids}},
-                                    "filter": schema}}}
-            res = self.search(body=q,
+            q = {"query": {"bool": {"must": {"bool": {"should": q_ids}}}}}
+            res = self.search(user_id=user_id,
+                              body=q,
+                              schema=schema,
                               _source_excludes=["created_by_ref"],
                               filter_path=['hits.hits._source.id',
                                            'hits.hits._source.*_ref',
                                            'hits.hits._source.*_refs'])
+            if not res:
+                return False
             for hit in res['hits']['hits']:
                 for value in list(hit['_source'].values()):
                     if isinstance(value, list):
@@ -315,114 +280,134 @@ class Client(Elasticsearch):
                 q_objs = []
                 for _id in ids:
                     q_objs.append({"match": {"id": _id.split('--')[1]}})
-                q = {"query": {"bool": {"must": {"bool": {"should": q_objs}},
-                                        "filter": schema}}}
-                res = self.search(body=q,
+                if query:
+                    q = {"query": {"bool": {"must": [
+                                                query['query'],
+                                                {"bool": {"should": q_objs}}
+                                                ]}}}
+                else:
+                    q = {"query": {"bool": {"must": {"bool": {
+                                                        "should": q_objs}}}}}
+                res = self.search(user_id=user_id,
+                                  body=q,
+                                  schema=schema,
                                   filter_path=['hits.hits._source'])
-                return res
+                output = []
+                for hit in res['hits']['hits']:
+                    output.append(hit['_source'])
+                return output
 
     def get_incidents(self, user_id, focus=None):
         userid = user_id.split('--')[1]
         seeds = []
         if focus == 'assigned':
             q = {"query": {"bool": {"must":
-                                    {"match": {"x_eiq_assigned_to": userid}}}}}
-            res = self.search(index='attack-pattern', body=q)
-            if res['hits']:
-                for hit in res['hits']['hits']:
-                    seeds.append(hit['_source'])
+                                    {"match": {"x_eiq_assigned_to_ref": userid}}}}}
+            res = self.search(user_id=user_id, index='attack-pattern', body=q,
+                              schema='incident',
+                              filter_path=['hits.hits._source.id'])
+            if not res:
+                print('No assigned incidents')
+                return False
+            for hit in res['hits']['hits']:
+                seeds.append(hit['_source']['id'])
         elif focus == 'my_org':
-            org_data = self.get_molecule(user_id=user_id,
-                                         stix_id=user_id,
-                                         schema='org')
-            for obj in org_data:
-                try:
-                    if obj['identity_class'] == 'organization':
-                        seeds.append(obj)
-                except KeyError:
-                    pass
+            q = {"query": {"bool": {"must": {"match": {"identity_class": 'organization'}}}}}
+
+            org_objs = self.get_molecule(user_id=user_id,
+                                         stix_ids=[user_id],
+                                         schema='org',
+                                         query=q,
+                                         objs=True)
+            if not org_objs:
+                print('No organizations in org chart.')
+                return False
+            for obj in org_objs:
+                seeds.append(obj['id'])
         elif focus == 'my_sectors':
-            org_data = self.get_molecule(user_id=user_id,
-                                         stix_id=user_id,
-                                         schema='org')
+            q = {"query": {"bool": {"must": [{"match": {"identity_class": 'organization'}},
+                                             {"exists": {"field": "sectors"}}]}}}
+            org_objs = self.get_molecule(user_id=user_id,
+                                         stix_ids=[user_id],
+                                         schema='org',
+                                         query=q,
+                                         objs=True)
+            if not org_objs:
+                print('No organizations in org chart.')
+                return False
+            sectors = []
+            for obj in org_objs:
+                sectors += obj['sectors']
+            if not sectors:
+                print('No sectors defined on organizations.')
+            sectors = list(set(sectors))
             q_sectors = []
-            sector_lst = []
-            for obj in org_data:
-                try:
-                    for sector in obj['sectors']:
-                        if sector not in sector_lst:
-                            q_sectors.append({"match": {"sectors": sector}})
-                            sector_lst.append(sector)
-                except KeyError:
-                    pass
-            if q_sectors:
-                q = {"query": {"bool": {"must": [
-                                {"match": {"identity_class": 'organization'}},
-                                {"bool": {"should": q_sectors}}]}}}
-                res = self.search(index='identity', body=q)
-                if res['hits']:
-                    for hit in res['hits']['hits']:
-                        seeds.append(hit['_source'])
+            for sector in sectors:
+                q_sectors.append({"match": {"sectors": sector}})
+            q = {"query": {"bool": {"must": [
+                            {"match": {"identity_class": 'organization'}},
+                            {"bool": {"should": q_sectors}}]}}}
+            res = self.search(user_id=user_id, index='identity', body=q,
+                              filter_path=['hits.hits._source.id'])
+            if not res:
+                print('No incidents in defined sectors.')
+                return False
+            for hit in res['hits']['hits']:
+                seeds.append(hit['_source']['id'])
         elif focus == 'my_ao':
-            org_data = self.get_molecule(user_id=user_id,
-                                         stix_id=user_id,
-                                         schema='org_geo')
-            for obj in org_data:
-                try:
-                    if obj['identity_class'] == 'organization':
-                        seeds.append(obj)
-                except KeyError:
-                    pass
+            q = {"query": {"match": {"identity_class": 'organization'}}}
+            org_objs = self.get_molecule(user_id=user_id,
+                                         stix_ids=[user_id],
+                                         schema='org_geo',
+                                         query=q,
+                                         objs=True)
+            if not org_objs:
+                print('No organizations in geo region.')
+                return False
+            for obj in org_objs:
+                seeds.append(obj['id'])
         else:
             # Assume global
-            q = {"query": {"exists": {"field": 'x_eiq_assigned_to'}}}
-            res = self.search(index='attack-pattern', body=q)
-            if res['hits']:
-                for hit in res['hits']['hits']:
-                    seeds.append(hit['_source'])
+            q = {"query": {"exists": {"field": 'x_eiq_assigned_to_ref'}}}
+            res = self.search(user_id=user_id, index='attack-pattern', body=q,
+                              filter_path=['hits.hits._source.id'])
+            if not res:
+                print('No incidents assigned.')
+                return False
+            for hit in res['hits']['hits']:
+                seeds.append(hit['_source']['id'])
 
-        if not seeds:
-            return False
         output = []
-        for hit in seeds:
-            molecule = self.get_molecule(user_id=user_id,
-                                         stix_id=hit['id'],
-                                         schema='incident')
-            if not molecule:
+        for seed in seeds:
+            inc_objs = self.get_molecule(user_id=user_id,
+                                         stix_ids=[seed],
+                                         schema='incident',
+                                         objs=True)
+            if not inc_objs or len(inc_objs) < 2:
                 continue
-            incident = []
-            for obj in molecule:
-                phase = []
-                phase_data = []
+            inc = inc_objs[:]
+            for inc_obj in inc_objs:
                 try:
-                    if obj['relationship_type'] == 'phase-of':
-                        phase_data = self.get_molecule(
-                                                   user_id=user_id,
-                                                   stix_id=obj['source_ref'],
-                                                   schema='phase')
-                    else:
-                        incident.append(obj)
+                    if inc_obj['relationship_type'] != 'phase-of':
+                        continue
+                    phase_objs = self.get_molecule(user_id=user_id,
+                                                   stix_ids=[inc_obj['source_ref']],
+                                                   schema='phase',
+                                                   objs=True)
+                    inc.append(phase_objs)
                 except KeyError:
-                    try:
-                        if any('EIQ-PHASE' not in s for s in obj['aliases']):
-                            incident.append(obj)
-                    except KeyError:
-                        incident.append(obj)
-
-                if phase_data:
-                    for phase_obj in phase_data:
-                        if 'x_eiq_assigned_to' not in phase_obj:
-                            phase.append(phase_obj)
-                    incident.append(phase)
-            output.append(incident)
+                    pass
+            output.append(inc)
         return output
 
     def get_countries(self):
         q = {"query": {"bool": {"must": [
                 {"match": {"created_by_ref": self.identity['id']}}],
                 "filter": [{"exists": {"field": "country"}}]}}}
-        res = self.search(index='location', body=q, _source=[
-                          'name', 'id'], size=10000)
+        res = self.search(user_id=self.identity['id'],
+                          index='location',
+                          body=q,
+                          _source=['name', 'id'])
         countries = {}
         for hit in res['hits']['hits']:
             countries[hit['_source']['id']] = hit['_source']['name']

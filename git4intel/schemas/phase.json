@@ -1,174 +1,36 @@
 {
-    "title": "phase",
-    "description": "Mission Control specific structure for security incidents, consisting of multiple phases.",
-    "type": "array",
-    "items": {
-        "anyOf": [{
-            "title": "indicator--phase",
-            "description": "Indicator that points to the observed data of the event",
-            "type": "object",
-            "required": [
-                "type",
-                "indicator_types"
-            ],
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "const": "indicator"
-                },
-                "indicator_types": {
-                    "type": "array",
-                    "contains": {
-                        "type": "string",
-                        "enum": [
-                            "anomalous-activity",
-                            "benign",
-                            "malicious-activity"
-                        ]
-                    }
-                }
-            }
-        }, {
-            "title": "attack-pattern--micro",
-            "description": "Micro Attack Pattern that ties indicator to its ",
-            "type": "object",
-            "required": [
-                "type",
-                "aliases"
-            ],
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "const": "attack-pattern"
-                },
-                "aliases": {
-                    "type": "array",
-                    "contains": {
-                        "type": "string",
-                        "pattern": "^EIQ-PHASE"
-                    }
-                }
-            }
-        }, {
-            "title": "relationship--micro-to-macro",
-            "description": "Relationship linking micro attack pattern and macro library attack pattern (Mitre Att&ck).",
-            "type": "object",
-            "required": [
-                "type",
-                "relationship_type",
-                "source_ref",
-                "target_ref"
-            ],
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "description": "The type of this object, which MUST be the literal `relationship`.",
-                    "const": "relationship"
-                },
-                "relationship_type": {
-                    "type": "string",
-                    "description": "Derived From.",
-                    "const": "instance-of"
-                },
-                "source_ref": {
-                    "type": "string",
-                    "pattern": "^attack-pattern--"
-                },
-                "target_ref": {
-                    "type": "string",
-                    "pattern": "^attack-pattern--"
-                }
-            }
-        }, {
-            "title": "relationship--indicator-to-micro",
-            "description": "Relationship linking indicator to micro attack pattern.",
-            "type": "object",
-            "required": [
-                "type",
-                "relationship_type",
-                "source_ref",
-                "target_ref"
-            ],
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "description": "The type of this object, which MUST be the literal `relationship`.",
-                    "const": "relationship"
-                },
-                "relationship_type": {
-                    "type": "string",
-                    "description": "Derived From.",
-                    "const": "indicates"
-                },
-                "source_ref": {
-                    "type": "string",
-                    "pattern": "^indicator--"
-                },
-                "target_ref": {
-                    "type": "string",
-                    "pattern": "^attack-pattern--"
-                }
-            }
-        }, {
-            "title": "relationship--ap-to-incident-ap",
-            "description": "Relationship the micro attack pattern to the master incident attack pattern.",
-            "type": "object",
-            "required": [
-                "type",
-                "relationship_type",
-                "source_ref",
-                "target_ref"
-            ],
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "description": "The type of this object, which MUST be the literal `relationship`.",
-                    "const": "relationship"
-                },
-                "relationship_type": {
-                    "type": "string",
-                    "description": "Using the related-to field here.",
-                    "const": "phase-of"
-                },
-                "source_ref": {
-                    "type": "string",
-                    "pattern": "^attack-pattern--"
-                },
-                "target_ref": {
-                    "type": "string",
-                    "pattern": "^attack-pattern--"
-                }
-            }
-        }, {
-            "title": "relationship--indicator-to-observed-data",
-            "description": "Relationship to show the sourcing of the indicator from observed data in an event.",
-            "type": "object",
-            "required": [
-                "type",
-                "relationship_type",
-                "source_ref",
-                "target_ref"
-            ],
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "description": "The type of this object, which MUST be the literal `relationship`.",
-                    "const": "relationship"
-                },
-                "relationship_type": {
-                    "type": "string",
-                    "description": "Using the related-to field here.",
-                    "const": "based-on"
-                },
-                "source_ref": {
-                    "type": "string",
-                    "pattern": "^indicator--"
-                },
-                "target_ref": {
-                    "type": "string",
-                    "pattern": "^observed-data--"
-                }
-            }
-        }]
+    "bool": {
+        "should": [
+            {"bool": {"must": [
+                {"match": {"type": "indicator"}},
+                {"bool": {"should": [
+                    {"match": {"indicator_types": "anomalous-activity"}},
+                    {"match": {"indicator_types": "benign"}},
+                    {"match": {"indicator_types": "malicious-activity"}}
+                ]}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "attack-pattern"}},
+                {"prefix": {"aliases": {"value": "EIQ-PHASE"}}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"match": {"relationship_type": "indicates"}},
+                {"match": {"source_ref": "indicator--"}},
+                {"match": {"target_ref": "attack-pattern--"}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"match": {"relationship_type": "phase-of"}},
+                {"match": {"source_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "attack-pattern--"}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"match": {"relationship_type": "based-on"}},
+                {"match": {"source_ref": "indicator--"}},
+                {"match": {"target_ref": "observed-data--"}}
+            ]}}
+        ]
     }
 }

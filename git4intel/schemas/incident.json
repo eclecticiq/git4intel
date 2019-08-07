@@ -1,123 +1,31 @@
 {
-    "title": "incident",
-    "description": "Mission Control specific structure for security incidents, consisting of multiple phases.",
-    "type": "array",
-    "items": {
-        "anyOf": [
-            {
-                "title": "attack-pattern--incident",
-                "description": "Uses the STIX 2.1 attack pattern object for the master incident object",
-                "type": "object",
-                "required": [
-                    "type",
-                    "x_eiq_priority",
-                    "x_eiq_assigned_to",
-                    "aliases"
-                ],
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "const": "attack-pattern"
-                    },
-                    "x_eiq_priority": {
-                        "type": "string"
-                    },
-                    "x_eiq_assigned_to": {
-                        "type": "string",
-                        "pattern": "^identity--"
-                    }, 
-                    "aliases": {
-                        "type": "array",
-                        "contains": {
-                            "type": "string",
-                            "pattern": "^EIQ-INCIDENT"
-                        }
-                    }
-                }
-            }, {
-                "title": "identity--organization",
-                "description": "Targeted identity.",
-                "type": "object",
-                "required": [
-                    "type",
-                    "identity_class"
-                ],
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "description": "The type of this object, which MUST be the literal `identity`.",
-                        "const": "identity"
-                    },
-                    "identity_class": {
-                        "type": "string",
-                        "description": "The type of entity that this Identity describes, e.g., an individual or organization. Open Vocab - identity-class-ov",
-                        "enum": [
-                            "organization",
-                            "individual",
-                            "system"
-                        ]
-                    }
-                }
-            }, {
-                "title": "relationship--targets",
-                "description": "Relationship linking attack pattern and target organization.",
-                "type": "object",
-                "required": [
-                    "type",
-                    "source_ref",
-                    "target_ref",
-                    "relationship_type"
-                ],
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "description": "The type of this object, which MUST be the literal `relationship`.",
-                        "const": "relationship"
-                    },
-                    "relationship_type": {
-                        "type": "string",
-                        "description": "Must be targets.",
-                        "const": "targets"
-                    },
-                    "source_ref": {
-                        "type": "string",
-                        "pattern": "^attack-pattern--"
-                    },
-                    "target_ref": {
-                        "type": "string",
-                        "pattern": "^identity--"
-                    }
-                }
-            }, {
-                "title": "relationship--phase-to-incident",
-                "description": "Relationship linking phase attack pattern to incident attack pattern.",
-                "type": "object",
-                "required": [
-                    "type",
-                    "source_ref",
-                    "target_ref",
-                    "relationship_type"
-                ],
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "description": "The type of this object, which MUST be the literal `relationship`.",
-                        "const": "relationship"
-                    },
-                    "relationship_type": {
-                        "type": "string",
-                        "const": "phase-of"
-                    },
-                    "source_ref": {
-                        "type": "string",
-                        "pattern": "^attack-pattern--"
-                    },
-                    "target_ref": {
-                        "type": "string",
-                        "pattern": "^attack-pattern--"
-                    }
-                }
-            }
+    "bool": {
+        "should": [
+            {"bool": {"must": [
+                {"match": {"type": "attack-pattern"}},
+                {"match": {"x_eiq_assigned_to_ref": "identity--"}},
+                {"exists": {"field": "x_eiq_priority"}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "identity"}},
+                {"bool": {"should": [
+                    {"match": {"identity_class": "individual"}},
+                    {"match": {"identity_class": "system"}},
+                    {"match": {"identity_class": "organization"}}
+                ]}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"match": {"relationship_type": "targets"}},
+                {"match": {"source_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "identity--"}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"match": {"relationship_type": "phase-of"}},
+                {"match": {"source_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "attack-pattern--"}}
+            ]}}
         ]
     }
 }

@@ -1,122 +1,32 @@
 {
-    "title": "molecule--organization",
-    "description": "Organization and membership information for when getting my-org data.",
-    "type": "array",
-    "contains": {
-        "anyOf": [
-            {
-                "title": "identity--organization",
-                "description": "Identity object that must indicate an organization.",
-                "type": "object",
-                "required": [
-                    "type",
-                    "identity_class"
-                ],
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "description": "The type of this object, which MUST be the literal `identity`.",
-                        "const": "identity"
-                    },
-                    "identity_class": {
-                        "type": "string",
-                        "description": "The type of entity that this Identity describes, e.g., an individual or organization. Open Vocab - identity-class-ov",
-                        "enum": [
-                            "organization",
-                            "individual",
-                            "system"
-                        ]
-                    }
-                }
-            }, {
-                "title": "location--org-geo",
-                "description": "Location of an identity.",
-                "type": "object",
-                "required": [
-                    "type",
-                    "country"
-                ],
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "description": "The type of this object, which MUST be the literal `location`.",
-                        "const": "location"
-                    },
-                    "country": {
-                        "type": "string",
-                        "description": "The operating/incorporating country."
-                    }
-                }
-            }, {
-                "title": "relationship--membership",
-                "description": "Relationship that indicates an an identity's membership of an organization.",
-                "type": "object",
-                "required": [
-                    "type",
-                    "source_ref",
-                    "target_ref",
-                    "relationship_type"
-                ],
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "description": "The type of this object, which MUST be the literal `relationship`.",
-                        "const": "relationship"
-                    },
-                    "source_ref": {
-                        "description": "The ID of the source (from) object.",
-                        "type": "string",
-                        "pattern": "^identity--.+$"
-                    },
-                    "target_ref": {
-                        "description": "The ID of the target (to) object.",
-                        "type": "string",
-                        "pattern": "^identity--.+$"
-                    },
-                    "relationship_type": {
-                        "title": "relationship_type",
-                        "type": "string",
-                        "description": "The name used to identify the type of relationship.",
-                        "const": "member-of"
-                    }
-                }
-            }, {
-                "title": "relationship--location",
-                "description": "Relationship that indicates the operating or incorporation location of an identity.",
-                "type": "object",
-                "required": [
-                    "type",
-                    "source_ref",
-                    "target_ref",
-                    "relationship_type"
-                ],
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "description": "The type of this object, which MUST be the literal `relationship`.",
-                        "const": "relationship"
-                    },
-                    "source_ref": {
-                        "description": "The ID of the source (from) object.",
-                        "type": "string",
-                        "pattern": "^identity--.+$"
-                    },
-                    "target_ref": {
-                        "description": "The ID of the target (to) object.",
-                        "type": "string",
-                        "pattern": "^location--.+$"
-                    },
-                    "relationship_type": {
-                        "title": "relationship_type",
-                        "type": "string",
-                        "description": "The name used to identify the type of relationship.",
-                        "enum": [
-                            "incorporated-at",
-                            "operates-at"
-                        ]
-                    }
-                }
-            }
+    "bool": {
+        "should": [
+            {"bool": {"must": [
+                {"match": {"type": "identity"}},
+                {"bool": {"should": [
+                    {"match": {"identity_class": "individual"}},
+                    {"match": {"identity_class": "system"}},
+                    {"match": {"identity_class": "organization"}}
+                ]}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "location"}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"match": {"relationship_type": "member-of"}},
+                {"match": {"source_ref": "identity--"}},
+                {"match": {"target_ref": "identity--"}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"bool": {"should": [
+                    {"match": {"relationship_type": "incorporated-at"}},
+                    {"match": {"relationship_type": "operates-at"}}
+                ]}},
+                {"match": {"source_ref": "identity--"}},
+                {"match": {"target_ref": "location--"}}
+            ]}}
         ]
     }
 }
