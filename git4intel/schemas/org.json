@@ -5,9 +5,12 @@
                 {"match": {"type": "identity"}},
                 {"bool": {"should": [
                     {"match": {"identity_class": "individual"}},
-                    {"match": {"identity_class": "system"}},
-                    {"match": {"identity_class": "organization"}}
+                    {"match": {"identity_class": "system"}}
                 ]}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "identity"}},
+                {"match": {"identity_class": "organization"}}
             ]}},
             {"bool": {"must": [
                 {"match": {"type": "relationship"}},

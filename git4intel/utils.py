@@ -58,34 +58,14 @@ def ordered(obj):
         return obj
 
 
+def md_time_index(user_id, old_alias):
+    time_slice = datetime.now().strftime("%y%m%d%H")
+    _id = user_id.split('--')[1]
+    return old_alias + '--' + _id, time_slice
+
+
 def todays_index(index_alias):
     return (index_alias + '--' + datetime.now().strftime("%y%m%d"))
-
-
-def get_external_refs(bundle):
-    # Returns True if bundle has external refs that are resolvable in
-    #   g4i backend
-    # Returns False if bundle contains extrefs that are unresolvable
-    # Returns None if no extrefs
-    rel_lst = []
-    id_lst = []
-    for obj in bundle['objects']:
-        for field in obj:
-            if field[-4:] == '_ref':
-                rel_lst.append(obj[field])
-            elif field[-5:] == '_refs':
-                for rel in obj[field]:
-                    rel_lst.append(rel)
-        if obj['type'] == 'relationship':
-            if obj['source_ref'] not in rel_lst:
-                rel_lst.append(obj['source_ref'])
-            if obj['target_ref'] not in rel_lst:
-                rel_lst.append(obj['target_ref'])
-        else:
-            if obj['id'] not in id_lst:
-                id_lst.append(obj['id'])
-    diff = list(set(rel_lst) - set(id_lst))
-    return diff
 
 
 def get_schema(schema_name, all=False):
@@ -301,20 +281,7 @@ def refresh_static_data(created_by_ref):
     return locations + markings
 
 
-def get_marking_definitions(created_by_ref):
-    # Install basis marking definitions:
-    # - TLP from stix API (except AMBER and RED which need to be extended
-    # for named recipient identity ids)
-    # - PII for all idents and their relationships (including to locations)
-    # required for user creation
-    # - Default open source licence for any TLP WHITE/GREEN data
-
-    # Markings with nested objects don't serialise very well...need to fix this
-    tlp_white_dm = stix2.v21.common.TLP_WHITE
-    tlp_green_dm = stix2.v21.common.TLP_GREEN
-    tlp_amber_dm = stix2.v21.common.TLP_AMBER
-    tlp_red_dm = stix2.v21.common.TLP_RED
-
+def get_pii_marking(created_by_ref):
     PII_NIST_EXTREF = stix2.v21.ExternalReference(
         source_name="nist",
         url="https://csrc.nist.gov/glossary/term/"
@@ -328,11 +295,6 @@ def get_marking_definitions(created_by_ref):
             "key-definitions/what-is-personal-data/"
     )
 
-    OS_EXTREF = stix2.v21.ExternalReference(
-        source_name="apache-2.0",
-        url="https://www.apache.org/licenses/LICENSE-2.0"
-    )
-
     PII_DM = stix2.v21.MarkingDefinition(
         id='marking-definition--d7c85080-576f-4b99-aae3-69d05b2d3bf2',
         created='2019-07-20T00:00:00.000Z',
@@ -343,6 +305,15 @@ def get_marking_definitions(created_by_ref):
             statement="Personally identifiable data is stored in this system"
                         " on the legal basis of 'Legtimate Interest'."),
         external_references=[PII_ICO_EXTREF, PII_NIST_EXTREF]
+    )
+    bundle = json.loads(stix2.v21.Bundle([PII_DM]).serialize())
+    return bundle['objects']
+
+
+def get_os_licence(created_by_ref):
+    OS_EXTREF = stix2.v21.ExternalReference(
+        source_name="apache-2.0",
+        url="https://www.apache.org/licenses/LICENSE-2.0"
     )
 
     OS_LICENSE = stix2.v21.MarkingDefinition(
@@ -359,30 +330,33 @@ def get_marking_definitions(created_by_ref):
             "TLP AMBER or RED."),
         external_references=[OS_EXTREF]
     )
-    os_licence = OS_LICENSE
-    pii_dm = PII_DM
+    bundle = json.loads(stix2.v21.Bundle([OS_LICENSE]).serialize())
+    return bundle['objects']
 
-    os_group = stix2.v21.Grouping(created_by_ref=created_by_ref,
-                                  name="Open Source Data Markings",
-                                  description="Data Marking objects that are "
-                                  "considered to be available for all users "
-                                  "to view.",
-                                  context='os-markings',
-                                  object_refs=[tlp_white_dm.id,
-                                               tlp_green_dm.id,
-                                               os_licence.id])
 
-    objs = [
+def get_marking_definitions(created_by_ref):
+    # Install basis marking definitions:
+    # - TLP from stix API (except AMBER and RED which need to be extended
+    # for named recipient identity ids)
+    # - PII for all idents and their relationships (including to locations)
+    # required for user creation
+    # - Default open source licence for any TLP WHITE/GREEN data
+
+    # Markings with nested objects don't serialise very well...need to fix this
+    tlp_white_dm = stix2.v21.common.TLP_WHITE
+    tlp_green_dm = stix2.v21.common.TLP_GREEN
+    tlp_amber_dm = stix2.v21.common.TLP_AMBER
+    tlp_red_dm = stix2.v21.common.TLP_RED
+
+    tlp_objs = [
         tlp_red_dm,
         tlp_amber_dm,
         tlp_green_dm,
-        tlp_white_dm,
-        pii_dm,
-        os_licence,
-        os_group
+        tlp_white_dm
     ]
-    bundle = json.loads(stix2.v21.Bundle(objs).serialize())
-    return bundle['objects']
+    tlp_bundle = json.loads(stix2.v21.Bundle(tlp_objs).serialize())
+    tlps = tlp_bundle['objects']
+    return tlps + get_pii_marking(created_by_ref) + get_os_licence(created_by_ref)
 
 
 def get_2from3(code3_in):

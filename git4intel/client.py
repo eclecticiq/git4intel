@@ -13,12 +13,16 @@ from .utils import (
     compare_mappings,
     get_all_schemas,
     get_deterministic_uuid,
+    get_locations,
+    get_marking_definitions,
+    get_os_licence,
+    get_pii_marking,
     get_schema,
     get_stix_ver_name,
     get_system_id,
     get_system_org,
     get_system_to_org,
-    refresh_static_data,
+    md_time_index,
     stix_to_elk,
     todays_index
 )
@@ -45,6 +49,14 @@ sdo_indices = [
     'vulnerability',
 ]
 
+os_refs = [
+    {"bool": {"must_not": {"exists": {"field": "object_marking_refs"}}}},
+    {"match": {"object_marking_refs":
+               stix2.v21.common.TLP_WHITE.id.split('--')[1]}},
+    {"match": {"object_marking_refs":
+               stix2.v21.common.TLP_GREEN.id.split('--')[1]}}
+]
+
 
 @CustomMarking('x-tlpplus-marking', [
     ('tlp_marking_def_ref', ReferenceProperty(
@@ -62,33 +74,42 @@ class Client(Elasticsearch):
         self.stix_ver = '21'
         self.identity = get_system_id(id_only=True)
         self.org = get_system_org(system_id=self.identity['id'], org_only=True)
+        self.pii_marking = get_pii_marking(self.identity['id'])[0]
+        self.os_licence = get_os_licence(self.identity['id'])[0]
         Elasticsearch.__init__(self, uri)
 
     # OVERLOADS
-    def search(self, user_id, schema=None, **kwargs):
+    def search(self, user_id, schema=None, _md=None, **kwargs):
+        if _md is None:
+            _md = True
         if 'index' not in kwargs:
             kwargs['index'] = 'intel'
         if 'size' not in kwargs:
             kwargs['size'] = 10000
 
-        _filter = None
+        if not schema and not _md:
+            return super().search(**kwargs)
+        if _md:
+            md_alias = self.get_id_markings(user_id=user_id, index_alias=kwargs['index'])
+            kwargs['index'] = md_alias
+
         if schema:
-            if schema == 'all':
-                schemas = get_all_schemas()
+            _schema_should = []
+            if isinstance(schema, dict):
+                _schema_should = [schema]
             else:
-                if isinstance(schema, str):
-                    schema = [schema]
-                schemas = []
-                for _schema in schema:
-                    schemas.append(get_schema(_schema))
-            _filter_should = []
-            for _schema in schemas:
-                _filter_should += _schema['bool']['should']
-            _filter = {"bool": {"should": _filter_should}}
+                if schema == 'all':
+                    schemas = get_all_schemas()
+                else:
+                    if isinstance(schema, str):
+                        schema = [schema]
+                    schemas = []
+                    for _schema in schema:
+                        schemas.append(get_schema(_schema))
+                for _schema in schemas:
+                    _schema_should += _schema['bool']['should']
 
-        # Add to _filter for marking definitions (remove the _filter check)
-
-        if _filter:
+            _filter = {"bool": {"should": _schema_should}}
             kwargs['body'] = {"query": {"bool": {"must": kwargs['body']['query'],
                                                  "filter": _filter}}}
         return super().search(**kwargs)
@@ -99,18 +120,26 @@ class Client(Elasticsearch):
         system_id = get_system_id()
         org_id = get_system_org(self.identity['id'])
         if not self.store_objects(system_id):
+            print('Could not store system id.')
             return False
         if not self.store_objects(org_id):
+            print('Could not store system org id.')
             return False
 
         org_rel = get_system_to_org(self.identity['id'], self.org['id'])
         if not self.store_objects(org_rel):
+            print('Could not store system-org relationship.')
             return False
 
-        static_data = refresh_static_data(self.identity['id'])
-        for obj in static_data:
-            if not self.__store_object(obj):
-                return False
+        markings = get_marking_definitions(self.identity['id'])
+        if not self.store_objects(markings):
+            print('Could not store marking definitions.')
+            return False
+
+        locations = get_locations(self.identity['id'])
+        if not self.store_objects(locations):
+            print('Could not store locations.')
+            return False
         return True
 
     def __store_object(self, obj):
@@ -163,6 +192,73 @@ class Client(Elasticsearch):
         return md_id
 
     # GETS:
+    def get_id_markings(self, user_id, index_alias):
+        # Get all marking definition refs that the identity is allowed
+        #   to view. Assume that identities are allowed to view:
+        # - objects with no marking references
+        # - objects with _only_ os references (eg: TLP WHITE/GREEN)
+        # - objects with a marking reference that explicitely includes their
+        #   id in a distribution list (eg: tlp+)
+        # - PII marked objects that are within their org chart
+        md_alias_root, md_alias_date = md_time_index(user_id=user_id,
+                                                     old_alias=index_alias)
+        md_alias_name = md_alias_root + '--' + md_alias_date
+        if self.indices.exists_alias(name=md_alias_name):
+            return md_alias_name
+
+        self.indices.delete_alias(index='_all',
+                                  name=[md_alias_root + '*'],
+                                  ignore=[400, 404])
+
+        valid_refs = os_refs[:]
+        valid_refs.append({"match": {"object_marking_refs":
+                                     self.os_licence['id'].split('--')[1]}})
+        user_id_split = user_id.split('--')[1]
+
+        # Get orgs that are in the user network from which they may inherit
+        #   a distribution list ref (eg: marked TLP AMBER/RED for a whole org)
+        q = {"query": {"bool": {"should": [
+                                {"match": {"identity_class": 'organization'}},
+                                {"match": {"type": "relationship"}}]}}}
+        org_objs = self.get_molecule(user_id=user_id,
+                                     stix_ids=[user_id],
+                                     schema_name='org',
+                                     query=q,
+                                     objs=True,
+                                     _md=False)
+        if not org_objs:
+            return False
+        org_should = [{"match": {"definition.distribution_refs": user_id_split}}]
+        for org in org_objs:
+            org_id = org['id']
+            if org['type'] == 'organization':
+                org_should.append({"match": {"definition.distribution_refs":
+                                   org_id.split('--')[1]}})
+            valid_refs.append(
+                {"bool": {"must": [
+                    {"match": {"id": org_id.split('--')[1]}},
+                    {"match": {"object_marking_refs": self.pii_marking['id'].split('--')[1]}}
+                ]}})
+        q = {"query": {"bool": {"should": org_should}}}
+        res = self.search(user_id=user_id,
+                          index='marking-definition',
+                          body=q,
+                          filter_path=['hits.hits._source.id'],
+                          _md=False)
+        if res:
+            for hit in res['hits']['hits']:
+                valid_refs.append({"match": {"object_marking_refs":
+                                  hit['_source']['id'].split('--')[1]}})
+        body = {"filter": {"bool": {"should": valid_refs}}}
+        alias_info = self.cat.aliases(name=index_alias, format='json')
+        alias_mapping = []
+        for info in alias_info:
+            alias_mapping.append(info['index'])
+        self.indices.put_alias(index=alias_mapping,
+                               name=md_alias_name,
+                               body=body)
+        return md_alias_name
+
     def get_free_text(self, user_id, phrase, schema=None):
         output = []
         q = {"query": {"multi_match": {"query": phrase}}}
@@ -178,7 +274,7 @@ class Client(Elasticsearch):
             hit_row = [hit['_source']]
             molecule = self.get_molecule(user_id=user_id,
                                          stix_ids=[hit['_source']['id']],
-                                         schema=schema,
+                                         schema_name=schema,
                                          objs=True)
             if molecule:
                 hit_row.append(molecule)
@@ -240,10 +336,19 @@ class Client(Elasticsearch):
             return False
         return docs
 
-    def get_molecule(self, user_id, stix_ids, schema, objs=None, query=None):
-        if not isinstance(schema, str):
+    def get_molecule(self, user_id, stix_ids, schema_name, objs=None,
+                     query=None, pivot=None, _md=None):
+        if _md is None:
+            _md = True
+        if pivot is None:
+            pivot = True
+        if not isinstance(schema_name, str):
             return False
+
+        failed = 0
         ids = stix_ids[:]
+
+        check_lst = []
         while True:
             old_len = len(ids)
             q_ids = []
@@ -257,21 +362,43 @@ class Client(Elasticsearch):
                             "fields": ["*_ref", "*_refs"],
                             "query": q_str}})
             q = {"query": {"bool": {"must": {"bool": {"should": q_ids}}}}}
-            res = self.search(user_id=user_id,
-                              body=q,
-                              schema=schema,
-                              _source_excludes=["created_by_ref"],
-                              filter_path=['hits.hits._source.id',
-                                           'hits.hits._source.*_ref',
-                                           'hits.hits._source.*_refs'])
-            if not res:
-                return False
-            for hit in res['hits']['hits']:
-                for value in list(hit['_source'].values()):
-                    if isinstance(value, list):
-                        ids += value
+            if pivot:
+                schemas = [schema_name]
+            else:
+                schema_data = get_schema(schema_name)
+                schemas = schema_data['bool']['should']
+            count = 0
+            for schema in schemas:
+                try:
+                    if check_lst[count] is True:
                         continue
-                    ids.append(value)
+                except IndexError:
+                    pass
+                res = self.search(user_id=user_id,
+                                  body=q,
+                                  schema=schema,
+                                  _source_excludes=["created_by_ref", "object_marking_refs"],
+                                  filter_path=['hits.hits._source.id',
+                                               'hits.hits._source.*_ref',
+                                               'hits.hits._source.*_refs'],
+                                  _md=_md)
+                try:
+                    check_lst[count] = bool(res)
+                except IndexError:
+                    check_lst.append(bool(res))
+                count += 1
+                # if not res:
+                #     return False
+                if res:
+                    for hit in res['hits']['hits']:
+                        for value in list(hit['_source'].values()):
+                            if isinstance(value, list):
+                                for sub_value in value:
+                                    if not sub_value:
+                                        continue
+                                    ids.append(sub_value)
+                                continue
+                            ids.append(value)
             ids = list(set(ids))
             new_len = len(ids)
             if new_len == old_len:
@@ -290,12 +417,18 @@ class Client(Elasticsearch):
                                                         "should": q_objs}}}}}
                 res = self.search(user_id=user_id,
                                   body=q,
-                                  schema=schema,
-                                  filter_path=['hits.hits._source'])
+                                  schema=schema_name,
+                                  filter_path=['hits.hits._source'],
+                                  _md=_md)
                 output = []
-                for hit in res['hits']['hits']:
-                    output.append(hit['_source'])
+                if res:
+                    for hit in res['hits']['hits']:
+                        output.append(hit['_source'])
                 return output
+            else:
+                failed += 1
+            if failed > 3:
+                return False
 
     def get_incidents(self, user_id, focus=None):
         userid = user_id.split('--')[1]
@@ -313,23 +446,35 @@ class Client(Elasticsearch):
                 seeds.append(hit['_source']['id'])
         elif focus == 'my_org':
             q = {"query": {"bool": {"must": {"match": {"identity_class": 'organization'}}}}}
-
             org_objs = self.get_molecule(user_id=user_id,
                                          stix_ids=[user_id],
-                                         schema='org',
+                                         schema_name='org',
                                          query=q,
                                          objs=True)
             if not org_objs:
                 print('No organizations in org chart.')
                 return False
-            for obj in org_objs:
-                seeds.append(obj['id'])
+            org_ids = []
+            for org in org_objs:
+                org_ids.append({"match": {"target_ref": org['id']}})
+
+            q = {"query": {"bool": {"must": [
+                                {"match": {"relationship_type": "targets"}},
+                                {"bool": {"should": org_ids}}]}}}
+            res = self.search(user_id=user_id, index='relationship', body=q,
+                              filter_path=['hits.hits._source.source_ref'])
+            if not res:
+                print('No incidents targeting your organisation. High five your neighbour.')
+                return False
+
+            for obj in res['hits']['hits']:
+                seeds.append(obj['_source']['source_ref'])
         elif focus == 'my_sectors':
             q = {"query": {"bool": {"must": [{"match": {"identity_class": 'organization'}},
                                              {"exists": {"field": "sectors"}}]}}}
             org_objs = self.get_molecule(user_id=user_id,
                                          stix_ids=[user_id],
-                                         schema='org',
+                                         schema_name='org',
                                          query=q,
                                          objs=True)
             if not org_objs:
@@ -358,7 +503,7 @@ class Client(Elasticsearch):
             q = {"query": {"match": {"identity_class": 'organization'}}}
             org_objs = self.get_molecule(user_id=user_id,
                                          stix_ids=[user_id],
-                                         schema='org_geo',
+                                         schema_name='org_geo',
                                          query=q,
                                          objs=True)
             if not org_objs:
@@ -381,8 +526,9 @@ class Client(Elasticsearch):
         for seed in seeds:
             inc_objs = self.get_molecule(user_id=user_id,
                                          stix_ids=[seed],
-                                         schema='incident',
-                                         objs=True)
+                                         schema_name='incident',
+                                         objs=True,
+                                         pivot=False)
             if not inc_objs or len(inc_objs) < 2:
                 continue
             inc = inc_objs[:]
@@ -392,8 +538,9 @@ class Client(Elasticsearch):
                         continue
                     phase_objs = self.get_molecule(user_id=user_id,
                                                    stix_ids=[inc_obj['source_ref']],
-                                                   schema='phase',
-                                                   objs=True)
+                                                   schema_name='phase',
+                                                   objs=True,
+                                                   pivot=False)
                     inc.append(phase_objs)
                 except KeyError:
                     pass
