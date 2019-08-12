@@ -30,6 +30,12 @@
                 {"match": {"relationship_type": "based-on"}},
                 {"match": {"source_ref": "indicator--"}},
                 {"match": {"target_ref": "observed-data--"}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"match": {"relationship_type": "instance-of"}},
+                {"match": {"source_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "attack-pattern--"}}
             ]}}
         ]
     }

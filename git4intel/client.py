@@ -8,6 +8,7 @@ import json
 from stix2.v21 import CustomMarking
 from stix2.properties import ListProperty, ReferenceProperty
 from pprint import pprint
+import time
 
 from .utils import (
     compare_mappings,
@@ -49,14 +50,6 @@ sdo_indices = [
     'vulnerability',
 ]
 
-os_refs = [
-    {"bool": {"must_not": {"exists": {"field": "object_marking_refs"}}}},
-    {"match": {"object_marking_refs":
-               stix2.v21.common.TLP_WHITE.id.split('--')[1]}},
-    {"match": {"object_marking_refs":
-               stix2.v21.common.TLP_GREEN.id.split('--')[1]}}
-]
-
 
 @CustomMarking('x-tlpplus-marking', [
     ('tlp_marking_def_ref', ReferenceProperty(
@@ -75,7 +68,11 @@ class Client(Elasticsearch):
         self.identity = get_system_id(id_only=True)
         self.org = get_system_org(system_id=self.identity['id'], org_only=True)
         self.pii_marking = get_pii_marking(self.identity['id'])[0]
-        self.os_licence = get_os_licence(self.identity['id'])[0]
+        os_group_name = 'Open Source Data Markings'
+        os_group_context = 'os-data-markings'
+        self.os_group_id = get_deterministic_uuid(
+                                      prefix='grouping--',
+                                      seed=os_group_name + os_group_context)
         Elasticsearch.__init__(self, uri)
 
     # OVERLOADS
@@ -131,7 +128,8 @@ class Client(Elasticsearch):
             print('Could not store system-org relationship.')
             return False
 
-        markings = get_marking_definitions(self.identity['id'])
+        markings, os_group_id = get_marking_definitions(self.identity['id'])
+        self.os_group_id = os_group_id
         if not self.store_objects(markings):
             print('Could not store marking definitions.')
             return False
@@ -186,10 +184,20 @@ class Client(Elasticsearch):
                                              definition=tlp_plus,
                                              id=md_id,
                                              created_by_ref=user_id)
-        if not self.store_objects(json.loads(new_md.serialize())):
+        md_json = json.loads(new_md.serialize())
+        if not self.store_objects(md_json):
             return False
 
-        return md_id
+        return md_id, md_json
+
+    def set_new_osdm(self, user_id, stix_id):
+        os_group = self.get_object(user_id=user_id, obj_id=self.os_group_id)
+        if stix_id in os_group['object_refs']:
+            return True
+        os_group['object_refs'].append(stix_id)
+
+        res = self.__store_object(obj=os_group)
+        return res
 
     # GETS:
     def get_id_markings(self, user_id, index_alias):
@@ -210,15 +218,20 @@ class Client(Elasticsearch):
                                   name=[md_alias_root + '*'],
                                   ignore=[400, 404])
 
-        valid_refs = os_refs[:]
-        valid_refs.append({"match": {"object_marking_refs":
-                                     self.os_licence['id'].split('--')[1]}})
+        os_list = self.get_object(user_id=self.identity['id'],
+                                  obj_id=self.os_group_id)['object_refs']
+        valid_refs = [{"bool": {"must_not": {"exists": {
+                                            "field": "object_marking_refs"}}}}]
+        for os_id in os_list:
+            valid_refs.append({"match": {
+                                "object_marking_refs": os_id.split('--')[1]}})
+
         user_id_split = user_id.split('--')[1]
 
         # Get orgs that are in the user network from which they may inherit
         #   a distribution list ref (eg: marked TLP AMBER/RED for a whole org)
         q = {"query": {"bool": {"should": [
-                                {"match": {"identity_class": 'organization'}},
+                                {"match": {"type": 'identity'}},
                                 {"match": {"type": "relationship"}}]}}}
         org_objs = self.get_molecule(user_id=user_id,
                                      stix_ids=[user_id],
@@ -228,7 +241,8 @@ class Client(Elasticsearch):
                                      _md=False)
         if not org_objs:
             return False
-        org_should = [{"match": {"definition.distribution_refs": user_id_split}}]
+        org_should = [{"match": {
+                        "definition.distribution_refs": user_id_split}}]
         for org in org_objs:
             org_id = org['id']
             if org['type'] == 'organization':
@@ -237,7 +251,8 @@ class Client(Elasticsearch):
             valid_refs.append(
                 {"bool": {"must": [
                     {"match": {"id": org_id.split('--')[1]}},
-                    {"match": {"object_marking_refs": self.pii_marking['id'].split('--')[1]}}
+                    {"match": {"object_marking_refs":
+                               self.pii_marking['id'].split('--')[1]}}
                 ]}})
         q = {"query": {"bool": {"should": org_should}}}
         res = self.search(user_id=user_id,
@@ -287,7 +302,11 @@ class Client(Elasticsearch):
         docs = self.get_objects(user_id=user_id,
                                 obj_ids=[obj_id],
                                 values=values)
+        if not docs:
+            print('No docs found.')
+            return False
         if len(docs) > 1:
+            print('Multiple docs found (not handled atm).')
             return False
         return docs[0]
 
@@ -369,11 +388,12 @@ class Client(Elasticsearch):
                 schemas = schema_data['bool']['should']
             count = 0
             for schema in schemas:
-                try:
-                    if check_lst[count] is True:
-                        continue
-                except IndexError:
-                    pass
+                if not pivot:
+                    try:
+                        if check_lst[count] is True:
+                            continue
+                    except IndexError:
+                        pass
                 res = self.search(user_id=user_id,
                                   body=q,
                                   schema=schema,
@@ -382,13 +402,12 @@ class Client(Elasticsearch):
                                                'hits.hits._source.*_ref',
                                                'hits.hits._source.*_refs'],
                                   _md=_md)
-                try:
-                    check_lst[count] = bool(res)
-                except IndexError:
-                    check_lst.append(bool(res))
-                count += 1
-                # if not res:
-                #     return False
+                if not pivot:
+                    try:
+                        check_lst[count] = bool(res)
+                    except IndexError:
+                        check_lst.append(bool(res))
+                    count += 1
                 if res:
                     for hit in res['hits']['hits']:
                         for value in list(hit['_source'].values()):
@@ -433,9 +452,12 @@ class Client(Elasticsearch):
     def get_incidents(self, user_id, focus=None):
         userid = user_id.split('--')[1]
         seeds = []
+        print('Getting seed data...')
+        start = time.time()
         if focus == 'assigned':
-            q = {"query": {"bool": {"must":
-                                    {"match": {"x_eiq_assigned_to_ref": userid}}}}}
+            q = {"query": {"bool":
+                           {"must":
+                            {"match": {"x_eiq_assigned_to_ref": userid}}}}}
             res = self.search(user_id=user_id, index='attack-pattern', body=q,
                               schema='incident',
                               filter_path=['hits.hits._source.id'])
@@ -445,18 +467,21 @@ class Client(Elasticsearch):
             for hit in res['hits']['hits']:
                 seeds.append(hit['_source']['id'])
         elif focus == 'my_org':
-            q = {"query": {"bool": {"must": {"match": {"identity_class": 'organization'}}}}}
+            q = {"query": {"bool":
+                           {"must":
+                            {"match": {"identity_class": 'organization'}}}}}
             org_objs = self.get_molecule(user_id=user_id,
                                          stix_ids=[user_id],
                                          schema_name='org',
                                          query=q,
-                                         objs=True)
+                                         objs=True,
+                                         pivot=True)
             if not org_objs:
                 print('No organizations in org chart.')
                 return False
             org_ids = []
             for org in org_objs:
-                org_ids.append({"match": {"target_ref": org['id']}})
+                org_ids.append({"match": {"target_ref": org['id'].split('--')[1]}})
 
             q = {"query": {"bool": {"must": [
                                 {"match": {"relationship_type": "targets"}},
@@ -464,7 +489,8 @@ class Client(Elasticsearch):
             res = self.search(user_id=user_id, index='relationship', body=q,
                               filter_path=['hits.hits._source.source_ref'])
             if not res:
-                print('No incidents targeting your organisation. High five your neighbour.')
+                print('No incidents targeting your organisation. '
+                      'High five your neighbour.')
                 return False
 
             for obj in res['hits']['hits']:
@@ -476,7 +502,8 @@ class Client(Elasticsearch):
                                          stix_ids=[user_id],
                                          schema_name='org',
                                          query=q,
-                                         objs=True)
+                                         objs=True,
+                                         pivot=True)
             if not org_objs:
                 print('No organizations in org chart.')
                 return False
@@ -486,19 +513,40 @@ class Client(Elasticsearch):
             if not sectors:
                 print('No sectors defined on organizations.')
             sectors = list(set(sectors))
+            print(sectors)
             q_sectors = []
             for sector in sectors:
                 q_sectors.append({"match": {"sectors": sector}})
             q = {"query": {"bool": {"must": [
                             {"match": {"identity_class": 'organization'}},
                             {"bool": {"should": q_sectors}}]}}}
+            # Use an _md False search just to get other org ids only.
+            # Technically the org ids are PII, but this is a proportionate
+            #   search that only returns ids of orgs with that sector.
             res = self.search(user_id=user_id, index='identity', body=q,
-                              filter_path=['hits.hits._source.id'])
+                              filter_path=['hits.hits._source.id'], _md=False)
             if not res:
                 print('No incidents in defined sectors.')
                 return False
+            org_ids = []
             for hit in res['hits']['hits']:
-                seeds.append(hit['_source']['id'])
+                org_ids.append({"match": {"target_ref": hit['_source']['id'].split('--')[1]}})
+
+            q = {"query": {"bool": {"must": [
+                                {"match": {"relationship_type": "targets"}},
+                                {"bool": {"should": org_ids}}]}}}
+            # MDs reapplied here to ensure PII and other markings are respected
+            res = self.search(user_id=user_id, index='relationship', body=q,
+                              filter_path=['hits.hits._source.source_ref'])
+            if not res:
+                print('No incidents targeting your sector. '
+                      'High five your neighbour.')
+                return False
+
+            for obj in res['hits']['hits']:
+                seeds.append(obj['_source']['source_ref'])
+
+            pprint(seeds)
         elif focus == 'my_ao':
             q = {"query": {"match": {"identity_class": 'organization'}}}
             org_objs = self.get_molecule(user_id=user_id,
@@ -509,8 +557,22 @@ class Client(Elasticsearch):
             if not org_objs:
                 print('No organizations in geo region.')
                 return False
-            for obj in org_objs:
-                seeds.append(obj['id'])
+            org_ids = []
+            for org in org_objs:
+                org_ids.append({"match": {"target_ref": org['id'].split('--')[1]}})
+
+            q = {"query": {"bool": {"must": [
+                                {"match": {"relationship_type": "targets"}},
+                                {"bool": {"should": org_ids}}]}}}
+            res = self.search(user_id=user_id, index='relationship', body=q,
+                              filter_path=['hits.hits._source.source_ref'])
+            if not res:
+                print('No incidents targeting your organisation. '
+                      'High five your neighbour.')
+                return False
+
+            for obj in res['hits']['hits']:
+                seeds.append(obj['_source']['source_ref'])
         else:
             # Assume global
             q = {"query": {"exists": {"field": 'x_eiq_assigned_to_ref'}}}
@@ -521,14 +583,20 @@ class Client(Elasticsearch):
                 return False
             for hit in res['hits']['hits']:
                 seeds.append(hit['_source']['id'])
+        end = time.time()
+        print(end-start)
 
         output = []
         for seed in seeds:
+            print('  ...inc get_molecule ' + seed)
+            start = time.time()
             inc_objs = self.get_molecule(user_id=user_id,
                                          stix_ids=[seed],
                                          schema_name='incident',
                                          objs=True,
                                          pivot=False)
+            end = time.time()
+            print('  done: ' + str(end-start))
             if not inc_objs or len(inc_objs) < 2:
                 continue
             inc = inc_objs[:]
@@ -536,11 +604,15 @@ class Client(Elasticsearch):
                 try:
                     if inc_obj['relationship_type'] != 'phase-of':
                         continue
+                    print('    ...phase get_molecule')
+                    start = time.time()
                     phase_objs = self.get_molecule(user_id=user_id,
                                                    stix_ids=[inc_obj['source_ref']],
                                                    schema_name='phase',
                                                    objs=True,
                                                    pivot=False)
+                    end = time.time()
+                    print('    done: ' + str(end-start))
                     inc.append(phase_objs)
                 except KeyError:
                     pass

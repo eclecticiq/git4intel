@@ -275,12 +275,6 @@ def stix_to_elk(obj, stix_ver):
 
 
 # STATIC DATA
-def refresh_static_data(created_by_ref):
-    locations = get_locations(created_by_ref)
-    markings = get_marking_definitions(created_by_ref)
-    return locations + markings
-
-
 def get_pii_marking(created_by_ref):
     PII_NIST_EXTREF = stix2.v21.ExternalReference(
         source_name="nist",
@@ -348,15 +342,38 @@ def get_marking_definitions(created_by_ref):
     tlp_amber_dm = stix2.v21.common.TLP_AMBER
     tlp_red_dm = stix2.v21.common.TLP_RED
 
-    tlp_objs = [
+    os_licence = get_os_licence(created_by_ref)
+    pii_marking = get_pii_marking(created_by_ref)
+
+    os_objs = [
+        tlp_white_dm.id,
+        tlp_green_dm.id
+    ]
+
+    for obj in os_licence:
+        os_objs.append(obj['id'])
+
+    os_group_name = 'Open Source Data Markings'
+    os_group_context = 'os-data-markings'
+    os_group_id = get_deterministic_uuid(prefix='grouping--',
+                                         seed=os_group_name + os_group_context)
+    os_group = stix2.v21.Grouping(id=os_group_id,
+                                  name=os_group_name,
+                                  context=os_group_context,
+                                  object_refs=os_objs)
+
+    dm_objs = [
         tlp_red_dm,
         tlp_amber_dm,
         tlp_green_dm,
-        tlp_white_dm
+        tlp_white_dm,
+        os_group
     ]
-    tlp_bundle = json.loads(stix2.v21.Bundle(tlp_objs).serialize())
-    tlps = tlp_bundle['objects']
-    return tlps + get_pii_marking(created_by_ref) + get_os_licence(created_by_ref)
+    dm_objs += os_licence
+    dm_objs += pii_marking
+    dm_bundle = json.loads(stix2.v21.Bundle(objects=dm_objs).serialize())
+    dms = dm_bundle['objects']
+    return dms, os_group.id
 
 
 def get_2from3(code3_in):
