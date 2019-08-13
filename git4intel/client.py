@@ -1,3 +1,8 @@
+"""Summary
+
+Attributes:
+    sdo_indices (TYPE): Description
+"""
 from elasticsearch import Elasticsearch
 import stix2
 from taxii2client import Collection
@@ -58,12 +63,31 @@ sdo_indices = [
         ReferenceProperty(type='identity'), required=True))
 ])
 class TLPPlusMarking(object):
+
+    """Summary
+    """
+    
     pass
 
 
 class Client(Elasticsearch):
 
+    """Summary
+    
+    Attributes:
+        identity (TYPE): Description
+        org (TYPE): Description
+        os_group_id (TYPE): Description
+        pii_marking (TYPE): Description
+        stix_ver (str): Description
+    """
+    
     def __init__(self, uri):
+        """Summary
+        
+        Args:
+            uri (TYPE): Description
+        """
         self.stix_ver = '21'
         self.identity = get_system_id(id_only=True)
         self.org = get_system_org(system_id=self.identity['id'], org_only=True)
@@ -77,6 +101,17 @@ class Client(Elasticsearch):
 
     # OVERLOADS
     def search(self, user_id, schema=None, _md=None, **kwargs):
+        """Summary
+        
+        Args:
+            user_id (TYPE): Description
+            schema (None, optional): Description
+            _md (None, optional): Description
+            **kwargs: Description
+        
+        Returns:
+            TYPE: Description
+        """
         if _md is None:
             _md = True
         if 'index' not in kwargs:
@@ -113,6 +148,11 @@ class Client(Elasticsearch):
 
     # SETS:
     def store_core_data(self):
+        """Summary
+        
+        Returns:
+            TYPE: Description
+        """
         self.__setup_es(self.stix_ver)
         system_id = get_system_id()
         org_id = get_system_org(self.identity['id'])
@@ -141,6 +181,14 @@ class Client(Elasticsearch):
         return True
 
     def __store_object(self, obj):
+        """Summary
+        
+        Args:
+            obj (TYPE): Description
+        
+        Returns:
+            TYPE: Description
+        """
         id_parts = obj['id'].split('--')
         index_name = id_parts[0]
         doc_id = id_parts[1]
@@ -152,6 +200,14 @@ class Client(Elasticsearch):
         return False
 
     def store_objects(self, objects):
+        """Summary
+        
+        Args:
+            objects (TYPE): Description
+        
+        Returns:
+            TYPE: Description
+        """
         if isinstance(objects, list):
             for obj in objects:
                 if not self.__store_object(obj):
@@ -161,6 +217,16 @@ class Client(Elasticsearch):
         return self.__store_object(objects)
 
     def set_tlpplus(self, user_id, tlp_marking_def_ref, distribution_refs):
+        """Summary
+        
+        Args:
+            user_id (TYPE): Description
+            tlp_marking_def_ref (TYPE): Description
+            distribution_refs (TYPE): Description
+        
+        Returns:
+            TYPE: Description
+        """
         if user_id.split('--')[0] != 'identity':
             return False
         if not isinstance(distribution_refs, list):
@@ -191,6 +257,15 @@ class Client(Elasticsearch):
         return md_id, md_json
 
     def set_new_osdm(self, user_id, stix_id):
+        """Summary
+        
+        Args:
+            user_id (TYPE): Description
+            stix_id (TYPE): Description
+        
+        Returns:
+            TYPE: Description
+        """
         os_group = self.get_object(user_id=user_id, obj_id=self.os_group_id)
         if stix_id in os_group['object_refs']:
             return True
@@ -201,6 +276,15 @@ class Client(Elasticsearch):
 
     # GETS:
     def get_id_markings(self, user_id, index_alias):
+        """Summary
+        
+        Args:
+            user_id (TYPE): Description
+            index_alias (TYPE): Description
+        
+        Returns:
+            TYPE: Description
+        """
         # Get all marking definition refs that the identity is allowed
         #   to view. Assume that identities are allowed to view:
         # - objects with no marking references
@@ -275,6 +359,16 @@ class Client(Elasticsearch):
         return md_alias_name
 
     def get_free_text(self, user_id, phrase, schema=None):
+        """Summary
+        
+        Args:
+            user_id (TYPE): Description
+            phrase (TYPE): Description
+            schema (None, optional): Description
+        
+        Returns:
+            TYPE: Description
+        """
         output = []
         q = {"query": {"multi_match": {"query": phrase}}}
         res = self.search(user_id=user_id, body=q)
@@ -297,6 +391,16 @@ class Client(Elasticsearch):
         return output
 
     def get_object(self, user_id, obj_id, values=None):
+        """Summary
+        
+        Args:
+            user_id (TYPE): Description
+            obj_id (TYPE): Description
+            values (None, optional): Description
+        
+        Returns:
+            TYPE: Description
+        """
         if not isinstance(obj_id, str):
             return False
         docs = self.get_objects(user_id=user_id,
@@ -311,6 +415,16 @@ class Client(Elasticsearch):
         return docs[0]
 
     def get_objects(self, user_id, obj_ids, values=None):
+        """Summary
+        
+        Args:
+            user_id (TYPE): Description
+            obj_ids (TYPE): Description
+            values (None, optional): Description
+        
+        Returns:
+            TYPE: Description
+        """
         if not obj_ids:
             return False
         if user_id.split('--')[0] != 'identity':
@@ -357,6 +471,20 @@ class Client(Elasticsearch):
 
     def get_molecule(self, user_id, stix_ids, schema_name, objs=None,
                      query=None, pivot=None, _md=None):
+        """Summary
+        
+        Args:
+            user_id (TYPE): Description
+            stix_ids (TYPE): Description
+            schema_name (TYPE): Description
+            objs (None, optional): Description
+            query (None, optional): Description
+            pivot (None, optional): Description
+            _md (None, optional): Description
+        
+        Returns:
+            TYPE: Description
+        """
         if _md is None:
             _md = True
         if pivot is None:
@@ -450,10 +578,17 @@ class Client(Elasticsearch):
                 return False
 
     def get_incidents(self, user_id, focus=None):
+        """Summary
+        
+        Args:
+            user_id (TYPE): Description
+            focus (None, optional): Description
+        
+        Returns:
+            TYPE: Description
+        """
         userid = user_id.split('--')[1]
         seeds = []
-        print('Getting seed data...')
-        start = time.time()
         if focus == 'assigned':
             q = {"query": {"bool":
                            {"must":
@@ -583,20 +718,14 @@ class Client(Elasticsearch):
                 return False
             for hit in res['hits']['hits']:
                 seeds.append(hit['_source']['id'])
-        end = time.time()
-        print(end-start)
 
         output = []
         for seed in seeds:
-            print('  ...inc get_molecule ' + seed)
-            start = time.time()
             inc_objs = self.get_molecule(user_id=user_id,
                                          stix_ids=[seed],
                                          schema_name='incident',
                                          objs=True,
                                          pivot=False)
-            end = time.time()
-            print('  done: ' + str(end-start))
             if not inc_objs or len(inc_objs) < 2:
                 continue
             inc = inc_objs[:]
@@ -604,15 +733,11 @@ class Client(Elasticsearch):
                 try:
                     if inc_obj['relationship_type'] != 'phase-of':
                         continue
-                    print('    ...phase get_molecule')
-                    start = time.time()
                     phase_objs = self.get_molecule(user_id=user_id,
                                                    stix_ids=[inc_obj['source_ref']],
                                                    schema_name='phase',
                                                    objs=True,
                                                    pivot=False)
-                    end = time.time()
-                    print('    done: ' + str(end-start))
                     inc.append(phase_objs)
                 except KeyError:
                     pass
@@ -620,6 +745,11 @@ class Client(Elasticsearch):
         return output
 
     def get_countries(self):
+        """Summary
+        
+        Returns:
+            TYPE: Description
+        """
         q = {"query": {"bool": {"must": [
                 {"match": {"created_by_ref": self.identity['id']}}],
                 "filter": [{"exists": {"field": "country"}}]}}}
@@ -634,6 +764,14 @@ class Client(Elasticsearch):
 
     # SETUP:
     def __get_index_from_alias(self, index_alias):
+        """Summary
+        
+        Args:
+            index_alias (TYPE): Description
+        
+        Returns:
+            TYPE: Description
+        """
         aliases = self.cat.aliases(name=[index_alias]).split(' ')
         for alias in aliases:
             if re.match(r'.+-[0-9]+', alias):
@@ -641,6 +779,15 @@ class Client(Elasticsearch):
         return False
 
     def __update_es_indexmapping(self, index_alias, new_mapping):
+        """Summary
+        
+        Args:
+            index_alias (TYPE): Description
+            new_mapping (TYPE): Description
+        
+        Returns:
+            TYPE: Description
+        """
         new_index_name = todays_index(index_alias)
 
         if self.indices.exists(index=[new_index_name]):
@@ -672,6 +819,15 @@ class Client(Elasticsearch):
             return True
 
     def __new_index(self, index_alias, mapping=None):
+        """Summary
+        
+        Args:
+            index_alias (TYPE): Description
+            mapping (None, optional): Description
+        
+        Returns:
+            TYPE: Description
+        """
         index_name = todays_index(index_alias)
         self.indices.create(index=index_name, body=mapping)
         self.indices.put_alias(index=[index_name], name='intel')
@@ -680,6 +836,11 @@ class Client(Elasticsearch):
         return self.indices.put_alias(index=[index_name], name=index_alias)
 
     def __setup_es(self, stix_ver):
+        """Summary
+        
+        Args:
+            stix_ver (TYPE): Description
+        """
         unsupported_types = [
             'archive-ext',
             'bundle',
@@ -735,6 +896,11 @@ class Client(Elasticsearch):
                     print('Failed to create new index for ' + index_name)
 
     def data_primer(self):
+        """Summary
+        
+        Returns:
+            TYPE: Description
+        """
         # Get Mitre Att&ck as a basis
         # Note: We don't apply commit control on ingest - it runs in the
         #   background so as not to slow down ingestion

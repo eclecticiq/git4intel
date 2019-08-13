@@ -6,7 +6,6 @@ from datetime import datetime
 import random
 import uuid
 from slugify import slugify
-import fastjsonschema
 from pprint import pprint
 
 try:
