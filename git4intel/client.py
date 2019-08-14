@@ -1,7 +1,8 @@
-"""Summary
+"""A python class to turn elasticsearch into a CTI repository.
 
 Attributes:
-    sdo_indices (TYPE): Description
+    sdo_indices (:obj:`list` of :obj:`str`): Global list of actively supported
+        STIX Domain Objects (SDOs) that each have it's own elasticsearch index.
 """
 from elasticsearch import Elasticsearch
 import stix2
@@ -13,7 +14,6 @@ import json
 from stix2.v21 import CustomMarking
 from stix2.properties import ListProperty, ReferenceProperty
 from pprint import pprint
-import time
 
 from .utils import (
     compare_mappings,
@@ -21,7 +21,6 @@ from .utils import (
     get_deterministic_uuid,
     get_locations,
     get_marking_definitions,
-    get_os_licence,
     get_pii_marking,
     get_schema,
     get_stix_ver_name,
@@ -63,31 +62,33 @@ sdo_indices = [
         ReferenceProperty(type='identity'), required=True))
 ])
 class TLPPlusMarking(object):
-
-    """Summary
-    """
-    
     pass
 
 
 class Client(Elasticsearch):
+    """Wrapper for the elasticsearch python client.
 
-    """Summary
-    
-    Attributes:
-        identity (TYPE): Description
-        org (TYPE): Description
-        os_group_id (TYPE): Description
-        pii_marking (TYPE): Description
-        stix_ver (str): Description
+    Sets up some core attributes for setitng up the CTI repository:
+
+    - identity (:obj:`dict`): Identity stix2 object for the system identity
+      in order to setup core data.
+    - org (:obj:`dict`): Identity stix2 object for the system's organisation
+      identity in order to setup core data.
+    - os_group_id (:obj:`str`): STIX2 grouping object reference id for marking
+      definitions that allow all users of the repository to see that
+      referenced object (eg: TLP WHITE).
+    - pii_marking (:obj:`dict`): Marking-definition stix2 object that is to
+      be applied to all objects considered Personally Identifiable
+      Information.
+    - stix_ver (:obj:`str`): Currently hard-coded (but provided for
+      anticipation of future requirement) stix version number for the
+      repository.
+
+    Args:
+        uri (str): Endpoint for elasticsearch.
     """
-    
+
     def __init__(self, uri):
-        """Summary
-        
-        Args:
-            uri (TYPE): Description
-        """
         self.stix_ver = '21'
         self.identity = get_system_id(id_only=True)
         self.org = get_system_org(system_id=self.identity['id'], org_only=True)
@@ -99,18 +100,28 @@ class Client(Elasticsearch):
                                       seed=os_group_name + os_group_context)
         Elasticsearch.__init__(self, uri)
 
-    # OVERLOADS
     def search(self, user_id, schema=None, _md=None, **kwargs):
-        """Summary
-        
+        """Wrapper for the elasticsearch ``search()`` method.
+
         Args:
-            user_id (TYPE): Description
-            schema (None, optional): Description
-            _md (None, optional): Description
-            **kwargs: Description
-        
+            user_id (str): STIX2 identity object reference id for the user
+                running the function.
+            schema (:obj:`str` name or :obj:`dict` object, optional):
+                Elasticsearch query to represent the 'molecule' of stix2
+                objects as a filter to include objects that represent an
+                intelligence category (eg: incident data as a cluster of stix
+                objects).
+            _md (bool, optional): Defaults to ``True`` to ensure that users are
+                only able to see data in the results that they are allowed to
+                as per stix2 marking definitions (md). Should only be set to
+                ``False`` for zero-knowledge searches with appropriate
+                anonymisation (eg: user searching for organisation members
+                requires a join on the organisations they are a member of first
+                before they can find out if they are allowed to see the data).
+            **kwargs: As per elasticsearch ``search()`` arguments.
+
         Returns:
-            TYPE: Description
+            dict: JSON serializable dictionary per ``elasticsearch.search()``.
         """
         if _md is None:
             _md = True
@@ -146,7 +157,6 @@ class Client(Elasticsearch):
                                                  "filter": _filter}}}
         return super().search(**kwargs)
 
-    # SETS:
     def store_core_data(self):
         """Summary
         
