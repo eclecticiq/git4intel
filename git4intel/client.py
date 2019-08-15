@@ -104,24 +104,26 @@ class Client(Elasticsearch):
         """Wrapper for the elasticsearch ``search()`` method.
 
         Args:
-            user_id (str): STIX2 identity object reference id for the user
-                running the function.
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
             schema (:obj:`str` name or :obj:`dict` object, optional):
                 Elasticsearch query to represent the 'molecule' of stix2
                 objects as a filter to include objects that represent an
                 intelligence category (eg: incident data as a cluster of stix
                 objects).
-            _md (bool, optional): Defaults to ``True`` to ensure that users are
-                only able to see data in the results that they are allowed to
-                as per stix2 marking definitions (md). Should only be set to
-                ``False`` for zero-knowledge searches with appropriate
-                anonymisation (eg: user searching for organisation members
-                requires a join on the organisations they are a member of first
-                before they can find out if they are allowed to see the data).
+            _md (:obj:`bool`, optional): Defaults to ``True`` to ensure that
+                users are only able to see data in the results that they are
+                allowed to as per stix2 marking definitions (md). Should only
+                be set to ``False`` for zero-knowledge searches with
+                appropriate anonymisation (eg: user searching for organisation
+                members requires a join on the organisations they are a member
+                of first before they can find out if they are allowed to see
+                the data).
             **kwargs: As per elasticsearch ``search()`` arguments.
 
         Returns:
-            dict: JSON serializable dictionary per ``elasticsearch.search()``.
+            :obj:`dict`: JSON serializable dictionary per
+            ``elasticsearch.search()``.
         """
         if _md is None:
             _md = True
@@ -158,10 +160,18 @@ class Client(Elasticsearch):
         return super().search(**kwargs)
 
     def store_core_data(self):
-        """Summary
-        
-        Returns:
-            TYPE: Description
+        """Should be run once for setup of the necessary CTI core data to turn
+        elasticsearch in to a CTI repository.
+
+        Does the following:
+
+        - runs ``__setup_es()`` to setup an index for each supported stix2 type
+          (taken from the stix2 python API) with appropriate field mappings
+        - stores full 'system' identity objects in elasticsearch that are
+          required to resolve references for objects created by the system (eg:
+          core marking definitions)
+        - marking definitions, including base TLP, PII and licences
+        - location objects as per the UN M49 standard.
         """
         self.__setup_es(self.stix_ver)
         system_id = get_system_id()
@@ -191,13 +201,15 @@ class Client(Elasticsearch):
         return True
 
     def __store_object(self, obj):
-        """Summary
-        
+        """Make use of the ``elasticsearch.index()`` to store stix2 objects to
+        the relevant index.
+
         Args:
-            obj (TYPE): Description
-        
+            obj (:obj:`dict`): JSON serializable python dictionary that
+                represents a stix2 object.
+
         Returns:
-            TYPE: Description
+            :obj:`bool`: ``True`` for created/updated; ``False`` for failed.
         """
         id_parts = obj['id'].split('--')
         index_name = id_parts[0]
@@ -210,13 +222,11 @@ class Client(Elasticsearch):
         return False
 
     def store_objects(self, objects):
-        """Summary
-        
+        """Wrapper for the ``__store_object()`` method to handle a list of objects.
+
         Args:
-            objects (TYPE): Description
-        
-        Returns:
-            TYPE: Description
+            objects (:obj:`list` of :obj:`dict`): List of JSON serializable
+                stix2 object dictionaries.
         """
         if isinstance(objects, list):
             for obj in objects:
@@ -227,15 +237,22 @@ class Client(Elasticsearch):
         return self.__store_object(objects)
 
     def set_tlpplus(self, user_id, tlp_marking_def_ref, distribution_refs):
-        """Summary
-        
+        """Creates and stores a tlp+ marking definition object for a named
+        distribution list.
+
         Args:
-            user_id (TYPE): Description
-            tlp_marking_def_ref (TYPE): Description
-            distribution_refs (TYPE): Description
-        
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
+            tlp_marking_def_ref (:obj:`str`): STIX2 identity object reference
+                id for the TLP marking definition (RED or AMBER) to which the
+                tlp+ marking definition refers.
+            distribution_refs (:obj:`list` of :obj:`str`): List of STIX2
+                identity object reference ids for the named user/organisation
+                distribution list for the markin definition.
+
         Returns:
-            TYPE: Description
+            :obj:`str`: STIX2 identity object reference id for the tlp+ marking
+            definition.
         """
         if user_id.split('--')[0] != 'identity':
             return False
@@ -267,14 +284,16 @@ class Client(Elasticsearch):
         return md_id, md_json
 
     def set_new_osdm(self, user_id, stix_id):
-        """Summary
-        
+        """Add a stix2 marking definition id reference to the master grouping
+        object reference list to be considered viewable by all platform
+        users (eg: a copyright statement marking definition which shouldn't
+        restrict viewing of the object, just ensure that users are aware of
+        it's usage limitations).
+
         Args:
-            user_id (TYPE): Description
-            stix_id (TYPE): Description
-        
-        Returns:
-            TYPE: Description
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
+            stix_id (:obj:`str`): marking definition id reference to be added.
         """
         os_group = self.get_object(user_id=user_id, obj_id=self.os_group_id)
         if stix_id in os_group['object_refs']:
@@ -286,22 +305,27 @@ class Client(Elasticsearch):
 
     # GETS:
     def get_id_markings(self, user_id, index_alias):
-        """Summary
-        
+        """Creates a new alias for a user that includes a filter of what they
+        are allowed to see based on the marking definitions of the data.
+
+        Including:
+
+        - objects with no marking references
+        - objects with _only_ os references (eg: TLP WHITE/GREEN)
+        - objects with a marking reference that explicitely includes their
+          id in a distribution list (eg: tlp+)
+        - PII marked objects that are within their org chart
+
         Args:
-            user_id (TYPE): Description
-            index_alias (TYPE): Description
-        
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
+            index_alias (:obj:`str`): The index string being used in the query
+                (that will have the alias filter).
+
         Returns:
-            TYPE: Description
+            :obj:`str`: User and time specific alias to be used as the new
+            index for the query.
         """
-        # Get all marking definition refs that the identity is allowed
-        #   to view. Assume that identities are allowed to view:
-        # - objects with no marking references
-        # - objects with _only_ os references (eg: TLP WHITE/GREEN)
-        # - objects with a marking reference that explicitely includes their
-        #   id in a distribution list (eg: tlp+)
-        # - PII marked objects that are within their org chart
         md_alias_root, md_alias_date = md_time_index(user_id=user_id,
                                                      old_alias=index_alias)
         md_alias_name = md_alias_root + '--' + md_alias_date
@@ -369,15 +393,22 @@ class Client(Elasticsearch):
         return md_alias_name
 
     def get_free_text(self, user_id, phrase, schema=None):
-        """Summary
-        
+        """EXAMPLE IMPLEMENTATION OF g4i. Takes a string query and conducts a
+        full text search of the repository (or a molecule filter).
+
         Args:
-            user_id (TYPE): Description
-            phrase (TYPE): Description
-            schema (None, optional): Description
-        
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
+            phrase (:obj:`str`): String to be searched for.
+            schema (:obj:`str` name or :obj:`dict` object, optional):
+                Elasticsearch query to represent the 'molecule' of stix2
+                objects as a filter to include objects that represent an
+                intelligence category (eg: incident data as a cluster of stix
+                objects).
+
         Returns:
-            TYPE: Description
+            :obj:`list` of :obj:`dict`: List of JSON serializable stix2 objects
+            that meet the query criteria.
         """
         output = []
         q = {"query": {"multi_match": {"query": phrase}}}
@@ -401,15 +432,20 @@ class Client(Elasticsearch):
         return output
 
     def get_object(self, user_id, obj_id, values=None):
-        """Summary
-        
+        """Wrapper for the ``get_objects()`` function to get an object from
+        it's stix id.
+
         Args:
-            user_id (TYPE): Description
-            obj_id (TYPE): Description
-            values (None, optional): Description
-        
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
+            obj_id (:obj:`str`): STIX2 object reference id for the object to
+                get.
+            values (:obj:`list` of :obj:`str`, optional): List of phrases to
+                perform in-situ free text search.
+
         Returns:
-            TYPE: Description
+            :obj:`dict`: JSON serializable python dictionary of the stix2
+            object.
         """
         if not isinstance(obj_id, str):
             return False
@@ -425,15 +461,19 @@ class Client(Elasticsearch):
         return docs[0]
 
     def get_objects(self, user_id, obj_ids, values=None):
-        """Summary
-        
+        """Gets objects from the repository from a list of stix2 reference ids.
+
         Args:
-            user_id (TYPE): Description
-            obj_ids (TYPE): Description
-            values (None, optional): Description
-        
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
+            obj_ids (:obj:`list` of :obj:`str`): STIX2 object reference ids for
+                the objects to get.
+            values (:obj:`list` of :obj:`str`, optional): List of phrases to
+                perform in-situ free text search.
+
         Returns:
-            TYPE: Description
+            :obj:`list` of :obj:`dict`: List of JSON serializable python
+            dictionaries of the stix2 objects.
         """
         if not obj_ids:
             return False
@@ -481,19 +521,39 @@ class Client(Elasticsearch):
 
     def get_molecule(self, user_id, stix_ids, schema_name, objs=None,
                      query=None, pivot=None, _md=None):
-        """Summary
-        
+        """From a seed id and using a molecule schema, return all objects that
+        comply with that schema.
+
         Args:
-            user_id (TYPE): Description
-            stix_ids (TYPE): Description
-            schema_name (TYPE): Description
-            objs (None, optional): Description
-            query (None, optional): Description
-            pivot (None, optional): Description
-            _md (None, optional): Description
-        
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
+            stix_ids (:obj:`list` of :obj:`str`): STIX2 object reference ids
+                as seed object references for the molecule.
+            schema (:obj:`str` name or :obj:`dict` object, optional):
+                Elasticsearch query to represent the 'molecule' of stix2
+                objects as a filter to include objects that represent an
+                intelligence category (eg: incident data as a cluster of stix
+                objects).
+            objs (:obj:`bool`, optional): ``True`` to return full objects;
+                ``False`` to return id references only (faster).
+            query (:obj:`dict`, optional): Elasticsearch compliant query that
+                will be applied as an *and* for the moleule search.
+            pivot (:obj:`bool`, optional): ``True`` to allow pivoting to other
+                molecules of the same schema (eg: where another incident
+                molecule shares an assigned user); ``False`` breaks down the
+                query schema to ensure only the targeted molecule is returned.
+            _md (:obj:`bool`, optional): Defaults to ``True`` to ensure that
+                users are only able to see data in the results that they are
+                allowed to as per stix2 marking definitions (md). Should only
+                be set to ``False`` for zero-knowledge searches with
+                appropriate anonymisation (eg: user searching for organisation
+                members requires a join on the organisations they are a member
+                of first before they can find out if they are allowed to see
+                the data).
+
         Returns:
-            TYPE: Description
+            :obj:`list` of :obj:`dict`: List of JSON serializable python
+            dictionaries of the stix2 objects.
         """
         if _md is None:
             _md = True
@@ -588,14 +648,39 @@ class Client(Elasticsearch):
                 return False
 
     def get_incidents(self, user_id, focus=None):
-        """Summary
-        
+        """EXAMPLE IMPLEMENTATION OF g4i. Use the molecule schema method to
+        obtain incidents and component phases for a given user and focus.
+
         Args:
-            user_id (TYPE): Description
-            focus (None, optional): Description
-        
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
+            focus (:obj:`str`, optional): Focus area, specific to Mission
+                Control, for the incident molecules.
+
+        A core concept in understanding "focus" is the organisation structure.
+        In this case, where we refer to "the user's organisation" below we
+        mean any identity (individual, system or organisation) that the
+        user making the request is a member of or that one of those
+        identities is also a member of. By this way we understand that a
+        user's organisation can also be the parent organisations that their
+        company is associated with (eg: ISACs, etc). Importantly, the fact
+        that certain identities are affiliated with other identities can
+        also be data-marked (using stix marking definitions) to ensure they
+        are not included.
+
+        Options for ``focus`` include:
+
+        - *assigned*: that are assigned to the ``user_id``
+        - *my_org*: that target the user's organisation
+        - *my_sectors*: that target any organisation that shares a sector with
+          the user's organisation
+        - *my_ao*: that target any identity that shares a geographic region
+          with the user's organisation
+        - *None*: global search.
+
         Returns:
-            TYPE: Description
+            :obj:`list` of :obj:`list` of :obj:`dict`: Nested lists of the
+            indicents and their associated phases.
         """
         userid = user_id.split('--')[1]
         seeds = []
@@ -755,10 +840,12 @@ class Client(Elasticsearch):
         return output
 
     def get_countries(self):
-        """Summary
-        
+        """Provided for ease of use - provides the full UN M49 country/region
+        list as stix2 object id references and their region names.
+
         Returns:
-            TYPE: Description
+            :obj:`dict`: Dictionary in the form:
+            {"country_stix_ref": "country_name"}
         """
         q = {"query": {"bool": {"must": [
                 {"match": {"created_by_ref": self.identity['id']}}],
@@ -774,13 +861,14 @@ class Client(Elasticsearch):
 
     # SETUP:
     def __get_index_from_alias(self, index_alias):
-        """Summary
-        
+        """Supporting function to get the real index name from the date-stamped
+        alias (for rotating stix2 versions when needed).
+
         Args:
-            index_alias (TYPE): Description
-        
+            index_alias (:obj:`str`): Alias to be queried.
+
         Returns:
-            TYPE: Description
+            :obj:`str`: Index name.
         """
         aliases = self.cat.aliases(name=[index_alias]).split(' ')
         for alias in aliases:
@@ -789,14 +877,18 @@ class Client(Elasticsearch):
         return False
 
     def __update_es_indexmapping(self, index_alias, new_mapping):
-        """Summary
-        
+        """Updates an index mapping with a new one and swaps over relevant aliases.
+
         Args:
-            index_alias (TYPE): Description
-            new_mapping (TYPE): Description
-        
+            index_alias (:obj:`str`): Index alias to be changed.
+            new_mapping (:obj:`dict`): JSON serializable python dictionary
+                representing the new elasticsearch mapping to be applied to the
+                index.
+
         Returns:
-            TYPE: Description
+            :obj:`bool`: ``True`` for success; ``False`` if the mapping has
+            already been updated in this time window (currently set to the same
+            day).
         """
         new_index_name = todays_index(index_alias)
 
@@ -828,15 +920,17 @@ class Client(Elasticsearch):
 
             return True
 
-    def __new_index(self, index_alias, mapping=None):
-        """Summary
-        
+    def __new_index(self, index_alias, mapping):
+        """Create a new index for the stix object type.
+
         Args:
-            index_alias (TYPE): Description
-            mapping (None, optional): Description
-        
+            index_alias (:obj:`str`): Index alias to be created.
+            mapping (:obj:`dict`): JSON serializable python dictionary
+                representing the elasticsearch mapping to be applied to the
+                index.
+
         Returns:
-            TYPE: Description
+            :obj:`dict`: Elasticsearch response for index creation.
         """
         index_name = todays_index(index_alias)
         self.indices.create(index=index_name, body=mapping)
@@ -846,10 +940,17 @@ class Client(Elasticsearch):
         return self.indices.put_alias(index=[index_name], name=index_alias)
 
     def __setup_es(self, stix_ver):
-        """Summary
-        
+        """Main harness for setting up elasticsearch indices in accordance with
+        the local environment's installed ``stix2`` python API. This can be
+        updated in the environment and this harness will ensure that changes in
+        the spec (that are in the python API) will get reflected in to the
+        index mapping. Specifically this is looking to ensure that property
+        types are accurately mapped to improve elasticsearch query performance.
+
         Args:
-            stix_ver (TYPE): Description
+            stix_ver (:obj:`str`): Stix version to be applied to the stix2
+            python API to determine object composition. Should be either '21'
+            or '20'.
         """
         unsupported_types = [
             'archive-ext',
@@ -906,15 +1007,16 @@ class Client(Elasticsearch):
                     print('Failed to create new index for ' + index_name)
 
     def data_primer(self):
-        """Summary
-        
+        """Simple get for the Mitre Att&ck library in stix2.
+
+        Note: We don't apply commit control on ingest - it runs in the
+        background so as not to slow down ingestion. If it's stix2.x - let it
+        in.
+
         Returns:
-            TYPE: Description
+            :obj:`bool`: ``True`` for success; ``False`` if any store action
+            failed. (Brutal, I know.)
         """
-        # Get Mitre Att&ck as a basis
-        # Note: We don't apply commit control on ingest - it runs in the
-        #   background so as not to slow down ingestion
-        # If it's stix2.x - let it in.
         attack = {}
         collection = Collection(
             "https://cti-taxii.mitre.org/stix/collections/"
