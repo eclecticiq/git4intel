@@ -4,7 +4,7 @@ Attributes:
     sdo_indices (:obj:`list` of :obj:`str`): Global list of actively supported
         STIX Domain Objects (SDOs) that each have it's own elasticsearch index.
 """
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, exceptions
 import stix2
 from taxii2client import Collection
 import sys
@@ -94,14 +94,34 @@ class Client(Elasticsearch):
         self.identity = get_system_id(id_only=True)
         self.org = get_system_org(system_id=self.identity['id'], org_only=True)
         self.pii_marking = get_pii_marking(self.identity['id'])[0]
-        os_group_name = 'Open Source Data Markings'
-        os_group_context = 'os-data-markings'
-        self.os_group_id = get_deterministic_uuid(
-                                      prefix='grouping--',
-                                      seed=os_group_name + os_group_context)
         Elasticsearch.__init__(self, uri)
+        try:
+            res = self.search(user_id=self.identity['id'],
+                              index='grouping',
+                              body={"query": {"match": {"context":
+                                                        "os-data-markings"}}},
+                              _md=False)
+        except exceptions.NotFoundError:
+            os_group_name = 'Open Source Data Markings'
+            os_group_context = 'os-data-markings'
+            seed = os_group_name + os_group_context
+            self.os_group_id = get_deterministic_uuid(prefix='grouping--',
+                                                      seed=seed)
+            return
 
-    def search(self, user_id, schema=None, _md=None, **kwargs):
+        if len(res['hits']['hits']) < 1:
+            os_group_name = 'Open Source Data Markings'
+            os_group_context = 'os-data-markings'
+            seed = os_group_name + os_group_context
+            self.os_group_id = get_deterministic_uuid(prefix='grouping--',
+                                                      seed=seed)
+        elif len(res['hits']['hits']) == 1:
+            self.os_group_id = res['hits']['hits'][0]['_source']['id']
+        else:
+            pprint(res)
+            raise ValueError("Multiple active OS marking groups detected.")
+
+    def search(self, user_id, schema=None, _md=None, revoked=None, **kwargs):
         """Wrapper for the elasticsearch ``search()`` method.
 
         Args:
@@ -126,18 +146,29 @@ class Client(Elasticsearch):
             :obj:`dict`: JSON serializable dictionary per
             ``elasticsearch.search()``.
         """
+        _filter = {}
         if _md is None:
             _md = True
+        if revoked is None:
+            revoked = False
         if 'index' not in kwargs:
             kwargs['index'] = 'intel'
         if 'size' not in kwargs:
             kwargs['size'] = 10000
 
-        if not schema and not _md:
-            return super().search(**kwargs)
+        # if not schema and not _md:
+        #     return super().search(**kwargs)
         if _md:
-            md_alias = self.get_id_markings(user_id=user_id, index_alias=kwargs['index'])
+            md_alias = self.get_id_markings(user_id=user_id,
+                                            index_alias=kwargs['index'])
             kwargs['index'] = md_alias
+
+        if not revoked:
+            _filter = {"bool": {"should": [
+                                    {"bool": {"must_not": {"exists": {
+                                        "field": "revoked"}}}},
+                                    {"bool": {"must_not": {"match": {
+                                        "revoked": True}}}}]}}
 
         if schema:
             _schema_should = []
@@ -155,9 +186,10 @@ class Client(Elasticsearch):
                 for _schema in schemas:
                     _schema_should += _schema['bool']['should']
 
-            _filter = {"bool": {"should": _schema_should}}
-            kwargs['body'] = {"query": {"bool": {"must": kwargs['body']['query'],
-                                                 "filter": _filter}}}
+            _filter = {"bool": {"must": [{"bool": {"should": _schema_should}},
+                                         _filter]}}
+        kwargs['body'] = {"query": {"bool": {"must": kwargs['body']['query'],
+                                             "filter": _filter}}}
         return super().search(**kwargs)
 
     def index(self, user_id, up_version=None, **kwargs):
@@ -166,14 +198,15 @@ class Client(Elasticsearch):
         doc_id = obj_id_parts[1]
         if 'index' not in kwargs:
             kwargs['index'] = index_name
+        if 'id' not in kwargs:
+            kwargs['id'] = doc_id
         if not self.exists(index=index_name,
                            id=doc_id,
                            _source=False,
                            ignore=[400, 404]):
             res = super().index(**kwargs)
             if res['result'] == 'created':
-                print(kwargs['body'])
-                return True
+                return kwargs['body']['id']
             return False
 
         if up_version is None:
@@ -187,17 +220,12 @@ class Client(Elasticsearch):
                 not self.index(user_id=user_id, body=new_objs[1])):
             print('Error indexing up version')
             return False
-        return True
-
-    def mindex(self, user_id, **kwargs):
-        if not isinstance(kwargs['body'], list):
-            print("`Multi-Index must have `body` as a list of objects.")
+        insert = {"doc": {"revoked": True}}
+        res = self.update(index=index_name, id=doc_id, body=insert)
+        if res['result'] != 'updated' and res['result'] != 'noop':
+            print('Failed to revoke updated object.')
             return False
-        successes = 0
-        for obj in kwargs['body']:
-            if self.index(user_id=user_id, body=obj):
-                successes += 1
-        return successes
+        return new_objs[1]['id']
 
     def store_core_data(self):
         """Should be run once for setup of the necessary CTI core data to turn
@@ -216,31 +244,35 @@ class Client(Elasticsearch):
         self.__setup_es(self.stix_ver)
         system_id = get_system_id()
         org_id = get_system_org(self.identity['id'])
-        if not self.store_objects(system_id):
+        if not self.index_objects(user_id=self.identity['id'],
+                                  objects=system_id):
             print('Could not store system id.')
             return False
-        if not self.store_objects(org_id):
+        if not self.index_objects(user_id=self.identity['id'], objects=org_id):
             print('Could not store system org id.')
             return False
 
-        org_rel = get_system_to_org(self.identity['id'], self.org['id'])
-        if not self.store_objects(org_rel):
+        org_rel = get_system_to_org(system_id=self.identity['id'],
+                                    org_id=self.org['id'])
+        if not self.index(user_id=self.identity['id'], body=org_rel):
             print('Could not store system-org relationship.')
             return False
 
         markings, os_group_id = get_marking_definitions(self.identity['id'])
-        self.os_group_id = os_group_id
-        if not self.store_objects(markings):
-            print('Could not store marking definitions.')
-            return False
+        if self.os_group_id == os_group_id:
+            if not self.index_objects(user_id=self.identity['id'],
+                                      objects=markings):
+                print('Could not store marking definitions.')
+                return False
 
         locations = get_locations(self.identity['id'])
-        if not self.store_objects(locations):
+        if not self.index_objects(user_id=self.identity['id'],
+                                  objects=locations):
             print('Could not store locations.')
             return False
         return True
 
-    def store_objects(self, user_id, objects):
+    def index_objects(self, user_id, objects):
         """Wrapper for the ``index()`` method to handle a list of objects.
 
         Args:
@@ -250,11 +282,11 @@ class Client(Elasticsearch):
                 stix2 object dictionaries.
         """
         if isinstance(objects, list):
+            successes = 0
             for obj in objects:
-                if not self.index(user_id=user_id, body=obj):
-                    return False
-            return True
-
+                if self.index(user_id=user_id, body=obj):
+                    successes += 1
+            return successes
         return self.index(user_id=user_id, body=objects)
 
     def set_tlpplus(self, user_id, tlp_marking_def_ref, distribution_refs):
@@ -299,7 +331,7 @@ class Client(Elasticsearch):
                                              id=md_id,
                                              created_by_ref=user_id)
         md_json = json.loads(new_md.serialize())
-        if not self.store_objects(user_id=user_id, objects=md_json):
+        if not self.index_objects(user_id=user_id, objects=md_json):
             return False
 
         return md_id, md_json
@@ -321,7 +353,9 @@ class Client(Elasticsearch):
             return True
         os_group['object_refs'].append(stix_id)
 
-        res = self.index(body=os_group)
+        res = self.index(user_id=user_id, body=os_group)
+        print(res)
+        self.os_group_id = res
         return res
 
     # GETS:
@@ -377,7 +411,8 @@ class Client(Elasticsearch):
                                      schema_name='org',
                                      query=q,
                                      objs=True,
-                                     _md=False)
+                                     _md=False,
+                                     pivot=True)
         if not org_objs:
             return False
         org_should = [{"match": {
@@ -446,7 +481,8 @@ class Client(Elasticsearch):
             molecule = self.get_molecule(user_id=user_id,
                                          stix_ids=[hit['_source']['id']],
                                          schema_name=schema,
-                                         objs=True)
+                                         objs=True,
+                                         pivot=False)
             if molecule:
                 hit_row.append(molecule)
             output.append(hit_row)
@@ -616,7 +652,8 @@ class Client(Elasticsearch):
                 res = self.search(user_id=user_id,
                                   body=q,
                                   schema=schema,
-                                  _source_excludes=["created_by_ref", "object_marking_refs"],
+                                  _source_excludes=["created_by_ref",
+                                                    "object_marking_refs"],
                                   filter_path=['hits.hits._source.id',
                                                'hits.hits._source.*_ref',
                                                'hits.hits._source.*_refs'],
@@ -665,7 +702,7 @@ class Client(Elasticsearch):
                 return output
             else:
                 failed += 1
-            if failed > 3:
+            if failed > 2:
                 return False
 
     def get_incidents(self, user_id, focus=None):
@@ -804,7 +841,8 @@ class Client(Elasticsearch):
                                          stix_ids=[user_id],
                                          schema_name='org_geo',
                                          query=q,
-                                         objs=True)
+                                         objs=True,
+                                         pivot=True)
             if not org_objs:
                 print('No organizations in geo region.')
                 return False
@@ -882,8 +920,9 @@ class Client(Elasticsearch):
 
     # SETUP:
     def __get_index_from_alias(self, index_alias):
-        """Supporting function to get the real index name from the date-stamped
-        alias (for rotating stix2 versions when needed).
+        """Supporting function to get the real index names (timestamped,
+        specfic stix object typed indices) that are referred to by a given
+        alias.
 
         Args:
             index_alias (:obj:`str`): Alias to be queried.
@@ -891,10 +930,10 @@ class Client(Elasticsearch):
         Returns:
             :obj:`str`: Index name.
         """
-        aliases = self.cat.aliases(name=[index_alias]).split(' ')
+        aliases = self.cat.aliases(name=[index_alias], format='json')
         for alias in aliases:
-            if re.match(r'.+-[0-9]+', alias):
-                return alias
+            if re.match(r'.+-[0-9]+', alias['index']):
+                return alias['index']
         return False
 
     def __update_es_indexmapping(self, index_alias, new_mapping):
@@ -1050,6 +1089,9 @@ class Client(Elasticsearch):
                 doc = json.loads(obj.serialize())
             except AttributeError:
                 doc = obj
-            if not self.store_objects(doc):
+            if obj['type'] == 'marking-definition':
+                self.set_new_osdm(user_id=self.identity['id'],
+                                  stix_id=obj['id'])
+            if not self.index(user_id=self.identity['id'], body=doc):
                 return False
         return True

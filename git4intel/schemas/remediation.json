@@ -1,0 +1,18 @@
+{
+    "bool": {
+        "should": [
+            {"bool": {"must": [
+                {"match": {"type": "attack-pattern"}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "course-of-action"}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"match": {"relationship_type": "mitigates"}},
+                {"match": {"source_ref": "course-of-action--"}},
+                {"match": {"target_ref": "attack-pattern--"}}
+            ]}}
+        ]
+    }
+}
