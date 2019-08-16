@@ -28,6 +28,7 @@ from .utils import (
     get_system_org,
     get_system_to_org,
     md_time_index,
+    new_obj_version,
     stix_to_elk,
     todays_index
 )
@@ -159,6 +160,45 @@ class Client(Elasticsearch):
                                                  "filter": _filter}}}
         return super().search(**kwargs)
 
+    def index(self, user_id, up_version=None, **kwargs):
+        obj_id_parts = kwargs['body']['id'].split('--')
+        index_name = obj_id_parts[0]
+        doc_id = obj_id_parts[1]
+        if 'index' not in kwargs:
+            kwargs['index'] = index_name
+        if not self.exists(index=index_name,
+                           id=doc_id,
+                           _source=False,
+                           ignore=[400, 404]):
+            res = super().index(**kwargs)
+            if res['result'] == 'created':
+                print(kwargs['body'])
+                return True
+            return False
+
+        if up_version is None:
+            up_version = True
+
+        if not up_version:
+            return False
+
+        new_objs = new_obj_version(user_id=user_id, stix_object=kwargs['body'])
+        if (not self.index(user_id=user_id, body=new_objs[0]) or
+                not self.index(user_id=user_id, body=new_objs[1])):
+            print('Error indexing up version')
+            return False
+        return True
+
+    def mindex(self, user_id, **kwargs):
+        if not isinstance(kwargs['body'], list):
+            print("`Multi-Index must have `body` as a list of objects.")
+            return False
+        successes = 0
+        for obj in kwargs['body']:
+            if self.index(user_id=user_id, body=obj):
+                successes += 1
+        return successes
+
     def store_core_data(self):
         """Should be run once for setup of the necessary CTI core data to turn
         elasticsearch in to a CTI repository.
@@ -200,41 +240,22 @@ class Client(Elasticsearch):
             return False
         return True
 
-    def __store_object(self, obj):
-        """Make use of the ``elasticsearch.index()`` to store stix2 objects to
-        the relevant index.
+    def store_objects(self, user_id, objects):
+        """Wrapper for the ``index()`` method to handle a list of objects.
 
         Args:
-            obj (:obj:`dict`): JSON serializable python dictionary that
-                represents a stix2 object.
-
-        Returns:
-            :obj:`bool`: ``True`` for created/updated; ``False`` for failed.
-        """
-        id_parts = obj['id'].split('--')
-        index_name = id_parts[0]
-        doc_id = id_parts[1]
-        res = self.index(index=index_name,
-                         body=obj,
-                         id=doc_id)
-        if res['result'] == 'created' or res['result'] == 'updated':
-            return True
-        return False
-
-    def store_objects(self, objects):
-        """Wrapper for the ``__store_object()`` method to handle a list of objects.
-
-        Args:
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
             objects (:obj:`list` of :obj:`dict`): List of JSON serializable
                 stix2 object dictionaries.
         """
         if isinstance(objects, list):
             for obj in objects:
-                if not self.__store_object(obj):
+                if not self.index(user_id=user_id, body=obj):
                     return False
             return True
 
-        return self.__store_object(objects)
+        return self.index(user_id=user_id, body=objects)
 
     def set_tlpplus(self, user_id, tlp_marking_def_ref, distribution_refs):
         """Creates and stores a tlp+ marking definition object for a named
@@ -278,7 +299,7 @@ class Client(Elasticsearch):
                                              id=md_id,
                                              created_by_ref=user_id)
         md_json = json.loads(new_md.serialize())
-        if not self.store_objects(md_json):
+        if not self.store_objects(user_id=user_id, objects=md_json):
             return False
 
         return md_id, md_json
@@ -300,7 +321,7 @@ class Client(Elasticsearch):
             return True
         os_group['object_refs'].append(stix_id)
 
-        res = self.__store_object(obj=os_group)
+        res = self.index(body=os_group)
         return res
 
     # GETS:

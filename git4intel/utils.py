@@ -86,6 +86,18 @@ def get_all_schemas():
     return schema_list
 
 
+def new_obj_version(user_id, stix_object):
+    old_id = stix_object['id']
+    new_id = get_deterministic_uuid(prefix=old_id.split('--')[0] + '--')
+    ver_rel = stix2.v21.Relationship(created_by_ref=user_id,
+                                     source_ref=new_id,
+                                     target_ref=old_id,
+                                     relationship_type="derived-from")
+    ver_rel = json.loads(ver_rel.serialize())
+    stix_object['id'] = new_id
+    return [ver_rel, stix_object]
+
+
 # SYSTEM INFO:
 def get_system_id(id_only=False):
     system_id = stix2.v21.Identity(
