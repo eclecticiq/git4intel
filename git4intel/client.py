@@ -899,6 +899,20 @@ class Client(Elasticsearch):
             output.append(inc)
         return output
 
+    def get_events(self, user_id):
+        seeds = []
+        org_ids = self.get_molecule(user_id=user_id,
+                                    stix_ids=[user_id],
+                                    schema_name='org',
+                                    pivot=True)
+        for org_id in org_ids:
+            if org_id.split('--')[0] == 'identity':
+                seeds.append({"match": {"created_by_ref":
+                                        org_id.split('--')[1]}})
+        q = {"query": {"bool": {"should": seeds}}}
+        res = self.search(user_id=user_id, index='observed-data', body=q)
+        return res
+
     def get_countries(self):
         """Provided for ease of use - provides the full UN M49 country/region
         list as stix2 object id references and their region names.
