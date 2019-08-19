@@ -14,6 +14,7 @@ import json
 from stix2.v21 import CustomMarking
 from stix2.properties import ListProperty, ReferenceProperty
 from pprint import pprint
+import time
 
 from .utils import (
     compare_mappings,
@@ -118,7 +119,6 @@ class Client(Elasticsearch):
         elif len(res['hits']['hits']) == 1:
             self.os_group_id = res['hits']['hits'][0]['_source']['id']
         else:
-            pprint(res)
             raise ValueError("Multiple active OS marking groups detected.")
 
     def search(self, user_id, schema=None, _md=None, revoked=None, **kwargs):
@@ -196,6 +196,7 @@ class Client(Elasticsearch):
         obj_id_parts = kwargs['body']['id'].split('--')
         index_name = obj_id_parts[0]
         doc_id = obj_id_parts[1]
+
         if 'index' not in kwargs:
             kwargs['index'] = index_name
         if 'id' not in kwargs:
@@ -290,6 +291,47 @@ class Client(Elasticsearch):
             return id_list
         return self.index(user_id=user_id, body=objects)
 
+    def update_md(self, md_obj):
+        # Check to see if there are named distros. Only set for tlp+ atm
+        if not md_obj['definition_type'] == 'tlp-plus':
+            return False
+        if not self.wait_until_indexed(md_obj['id']):
+            print('Could not update marking definition aliases.')
+            return False
+
+        aliases_info = self.cat.aliases(format='json')
+
+        done_aliases = []
+        md_add = {"match": {"object_marking_refs": md_obj['id']}}
+        for user_id in md_obj['definition']['distribution_refs']:
+            for alias_info in aliases_info:
+                if not re.match(r'.+--' + re.escape(user_id.split('--')[1]) + r'--+',
+                                alias_info['alias']):
+                    continue
+                if alias_info['alias'] not in done_aliases:
+
+                    res = self.indices.get_alias(name=alias_info['alias'])
+                    for key in res:
+                        _filter = res[key]['aliases'][alias_info['alias']]
+                        new_filter = _filter['filter']['bool']['should'].append(md_add)
+                        self.indices.put_alias(index=key,
+                                               name=alias_info['alias'],
+                                               body=new_filter)
+                done_aliases.append(alias_info['alias'])
+        return True
+
+    def wait_until_indexed(self, stix_id):
+        fails = 0
+        if not self.exists(index='marking-definition',
+                           id=stix_id.split('--')[1],
+                           _source=False,
+                           ignore=[400, 404]):
+            if fails > 3:
+                return False
+            fails += 1
+            time.sleep(2)
+        return True
+
     def set_tlpplus(self, user_id, tlp_marking_def_ref, distribution_refs):
         """Creates and stores a tlp+ marking definition object for a named
         distribution list.
@@ -335,6 +377,8 @@ class Client(Elasticsearch):
         if not self.index_objects(user_id=user_id, objects=md_json):
             return False
 
+        if not self.update_md(md_json):
+            return False
         return md_id, md_json
 
     def set_new_osdm(self, user_id, stix_id):
@@ -355,12 +399,11 @@ class Client(Elasticsearch):
         os_group['object_refs'].append(stix_id)
 
         res = self.index(user_id=user_id, body=os_group)
-        print(res)
         self.os_group_id = res
         return res
 
     # GETS:
-    def get_id_markings(self, user_id, index_alias):
+    def get_id_markings(self, user_id, index_alias, force_refresh=False):
         """Creates a new alias for a user that includes a filter of what they
         are allowed to see based on the marking definitions of the data.
 
@@ -385,8 +428,9 @@ class Client(Elasticsearch):
         md_alias_root, md_alias_date = md_time_index(user_id=user_id,
                                                      old_alias=index_alias)
         md_alias_name = md_alias_root + '--' + md_alias_date
-        if self.indices.exists_alias(name=md_alias_name):
-            return md_alias_name
+        if not force_refresh:
+            if self.indices.exists_alias(name=md_alias_name):
+                return md_alias_name
 
         self.indices.delete_alias(index='_all',
                                   name=[md_alias_root + '*'],
@@ -802,7 +846,6 @@ class Client(Elasticsearch):
             if not sectors:
                 print('No sectors defined on organizations.')
             sectors = list(set(sectors))
-            print(sectors)
             q_sectors = []
             for sector in sectors:
                 q_sectors.append({"match": {"sectors": sector}})
@@ -834,8 +877,6 @@ class Client(Elasticsearch):
 
             for obj in res['hits']['hits']:
                 seeds.append(obj['_source']['source_ref'])
-
-            pprint(seeds)
         elif focus == 'my_ao':
             q = {"query": {"match": {"identity_class": 'organization'}}}
             org_objs = self.get_molecule(user_id=user_id,
@@ -959,7 +1000,7 @@ class Client(Elasticsearch):
         """
         aliases = self.cat.aliases(name=[index_alias], format='json')
         for alias in aliases:
-            if re.match(r'.+-[0-9]+', alias['index']):
+            if re.match(r'.+--[0-9]+', alias['index']):
                 return alias['index']
         return False
 
