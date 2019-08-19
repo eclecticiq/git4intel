@@ -282,11 +282,12 @@ class Client(Elasticsearch):
                 stix2 object dictionaries.
         """
         if isinstance(objects, list):
-            successes = 0
+            id_list = []
             for obj in objects:
-                if self.index(user_id=user_id, body=obj):
-                    successes += 1
-            return successes
+                res = self.index(user_id=user_id, body=obj)
+                if res:
+                    id_list.append(res)
+            return id_list
         return self.index(user_id=user_id, body=objects)
 
     def set_tlpplus(self, user_id, tlp_marking_def_ref, distribution_refs):
