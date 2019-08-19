@@ -900,18 +900,30 @@ class Client(Elasticsearch):
         return output
 
     def get_events(self, user_id):
-        seeds = []
+        id_list = []
         org_ids = self.get_molecule(user_id=user_id,
                                     stix_ids=[user_id],
                                     schema_name='org',
                                     pivot=True)
         for org_id in org_ids:
             if org_id.split('--')[0] == 'identity':
-                seeds.append({"match": {"created_by_ref":
-                                        org_id.split('--')[1]}})
-        q = {"query": {"bool": {"should": seeds}}}
-        res = self.search(user_id=user_id, index='observed-data', body=q)
-        return res
+                id_list.append({"match": {"created_by_ref":
+                                          org_id.split('--')[1]}})
+        q = {"query": {"bool": {"should": id_list}}}
+        res = self.search(user_id=user_id, index='observed-data', body=q,
+                          filter_path=['hits.hits._source.id'])
+        seeds = []
+        if not res:
+            return False
+        for hit in res['hits']['hits']:
+            seeds.append(hit['_source']['id'])
+
+        output = []
+        for seed in seeds:
+            res = self.get_molecule(user_id=user_id, stix_ids=[seed],
+                                    schema_name='event', pivot=False, objs=True)
+            output.append(res)
+        return output
 
     def get_countries(self):
         """Provided for ease of use - provides the full UN M49 country/region
