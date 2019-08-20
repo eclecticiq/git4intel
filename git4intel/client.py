@@ -458,8 +458,6 @@ class Client(Elasticsearch):
                                      objs=True,
                                      _md=False,
                                      pivot=True)
-        if not org_objs:
-            return False
         org_should = [{"match": {
                         "definition.distribution_refs": user_id_split}}]
         for org in org_objs:
