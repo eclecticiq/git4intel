@@ -270,8 +270,8 @@ def main():
     # g4i.index_objects(user_id="identity--084bcd40-a2ed-4420-84db-04444bd0e763",
     #                   objects=bundle['objects'])
 
-    # print(g4i.store_core_data())
-    # print(g4i.data_primer())
+    print(g4i.store_core_data())
+    print(g4i.data_primer())
 
     # Make org 1:
     org1, users1 = make_org(username1="User1",
@@ -311,57 +311,57 @@ def main():
     end = time.time()
     print(end-start)
 
-    # print('Get org1 info...')
-    # start = time.time()
-    # res = g4i.get_molecule(user_id=users1[1],
-    #                        stix_ids=[users1[0]],
-    #                        schema_name='org',
-    #                        objs=True,
-    #                        pivot=True)
-    # end = time.time()
-    # pprint(res)
-    # print(end-start)
+    print('Get org1 info...')
+    start = time.time()
+    res = g4i.get_molecule(user_id=users1[1],
+                           stix_ids=[users1[0]],
+                           schema_name='org',
+                           objs=True,
+                           pivot=True)
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
-    # print('Get inc1...')
-    # start = time.time()
-    # res = g4i.get_molecule(user_id=users1[1],
-    #                        stix_ids=[inc_ids1[1]],
-    #                        schema_name='incident',
-    #                        objs=True,
-    #                        pivot=False)
-    # end = time.time()
-    # pprint(res)
-    # print(end-start)
+    print('Get inc1...')
+    start = time.time()
+    res = g4i.get_molecule(user_id=users1[1],
+                           stix_ids=[inc_ids1[1]],
+                           schema_name='incident',
+                           objs=True,
+                           pivot=False)
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
-    # print('Try to get red inc when not on distro...')
-    # start = time.time()
-    # res = g4i.get_molecule(user_id=users1[2],
-    #                        stix_ids=[inc_ids3[1]],
-    #                        schema_name='incident',
-    #                        objs=True,
-    #                        pivot=False)
-    # end = time.time()
-    # pprint(res)
-    # print(end-start)
+    print('Try to get red inc when not on distro...')
+    start = time.time()
+    res = g4i.get_molecule(user_id=users1[2],
+                           stix_ids=[inc_ids3[1]],
+                           schema_name='incident',
+                           objs=True,
+                           pivot=False)
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
-    # print('Get remediations for an attack pattern...')
-    # start = time.time()
-    # res = g4i.get_molecule(user_id=users1[2],
-    #                        stix_ids=["attack-pattern--4b74a1d4-b0e9-4ef1-93f1-14ecc6e2f5b5"],
-    #                        schema_name='remediation',
-    #                        objs=True,
-    #                        pivot=False)
-    # end = time.time()
-    # pprint(res)
-    # print(end-start)
+    print('Get remediations for an attack pattern...')
+    start = time.time()
+    res = g4i.get_molecule(user_id=users1[2],
+                           stix_ids=["attack-pattern--4b74a1d4-b0e9-4ef1-93f1-14ecc6e2f5b5"],
+                           schema_name='remediation',
+                           objs=True,
+                           pivot=False)
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
-    # print('Get MC-specific incident format...')
-    # start = time.time()
-    # res = g4i.get_incidents(user_id=users1[1],
-    #                         focus='assigned')
-    # end = time.time()
-    # pprint(res)
-    # print(end-start)
+    print('Get MC-specific incident format...')
+    start = time.time()
+    res = g4i.get_incidents(user_id=users1[1],
+                            focus='assigned')
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
 
 if __name__ == '__main__':

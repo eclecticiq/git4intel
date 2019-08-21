@@ -444,7 +444,8 @@ class Client(Elasticsearch):
                                   ignore=[400, 404])
 
         os_list = self.get_object(user_id=self.identity['id'],
-                                  obj_id=self.os_group_id)['object_refs']
+                                  obj_id=self.os_group_id,
+                                  _md=False)['object_refs']
         valid_refs = [{"bool": {"must_not": {"exists": {
                                             "field": "object_marking_refs"}}}}]
         for os_id in os_list:
@@ -538,7 +539,7 @@ class Client(Elasticsearch):
             output.append(hit_row)
         return output
 
-    def get_object(self, user_id, obj_id, values=None):
+    def get_object(self, user_id, obj_id, _md=True, values=None):
         """Wrapper for the ``get_objects()`` function to get an object from
         it's stix id.
 
@@ -558,7 +559,8 @@ class Client(Elasticsearch):
             return False
         docs = self.get_objects(user_id=user_id,
                                 obj_ids=[obj_id],
-                                values=values)
+                                values=values,
+                                _md=_md)
         if not docs:
             print('No docs found.')
             return False
@@ -567,7 +569,7 @@ class Client(Elasticsearch):
             return False
         return docs[0]
 
-    def get_objects(self, user_id, obj_ids, values=None):
+    def get_objects(self, user_id, obj_ids, _md=True, values=None):
         """Gets objects from the repository from a list of stix2 reference ids.
 
         Args:
@@ -615,8 +617,14 @@ class Client(Elasticsearch):
 
         g = {"docs": []}
         for obj_id in obj_ids:
-            g['docs'].append({"_index": obj_id.split('--')[0],
-                              "_id": obj_id.split('--')[1]})
+            id_parts = obj_id.split('--')
+            _index = id_parts[0]
+            _id = id_parts[1]
+            if _md:
+                md_alias = self.get_id_markings(user_id=user_id,
+                                                index_alias=_index)
+                _index = md_alias
+            g['docs'].append({"_index": _index, "_id": _id})
 
         res = self.mget(body=g)
         try:
