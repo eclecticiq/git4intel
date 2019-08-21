@@ -17,7 +17,6 @@ from pprint import pprint
 import time
 
 from .utils import (
-    bulk_data,
     compare_mappings,
     get_all_schemas,
     get_deterministic_uuid,
@@ -88,7 +87,7 @@ class Client(Elasticsearch):
       repository.
 
     Args:
-        uri (str): Endpoint for elasticsearch.
+        uri (:obj:`str`): Endpoint for elasticsearch.
     """
 
     def __init__(self, uri):
@@ -141,6 +140,10 @@ class Client(Elasticsearch):
                 members requires a join on the organisations they are a member
                 of first before they can find out if they are allowed to see
                 the data).
+            revoked (:obj:`bool`, optional): Defaults to ``False`` to limit
+                responses to only objects that are currently valid (ie: not
+                revoked); Set to ``True`` to include revoked objects in the
+                search.
             **kwargs: As per elasticsearch ``search()`` arguments.
 
         Returns:
@@ -194,6 +197,23 @@ class Client(Elasticsearch):
         return super().search(**kwargs)
 
     def index(self, user_id, up_version=True, **kwargs):
+        """Wrapper for the elasticsearch ``search()`` method. Overloads the
+        existing elasticsearch index() method with stix2 version control.
+
+        Args:
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
+            objects (:obj:`list` of :obj:`dict`): List of JSON serializable
+                stix2 object dictionaries.
+            up_version (:obj:`bool`, optional): Pass through to index() to
+                determine if stix up-versioning should be applied.
+            **kwargs: As per elasticsearch ``index()`` arguments.
+
+        Returns:
+            :obj:`list` of :obj:`str`: List of indexed objects (either the
+            objects originally submitted or the newly created objects if
+            up-versioning occurs).
+        """
         obj_id_parts = kwargs['body']['id'].split('--')
         index_name = obj_id_parts[0]
         doc_id = obj_id_parts[1]
@@ -226,7 +246,7 @@ class Client(Elasticsearch):
         if res['result'] != 'updated' and res['result'] != 'noop':
             print('Failed to revoke updated object.')
             return False
-        return new_objs[1]['id']
+        return [new_objs[1]['id']]
 
     def index_objects(self, user_id, objects, up_version=True, refresh=False):
         """Wrapper for the ``index()`` method to handle a list of objects.
@@ -269,8 +289,8 @@ class Client(Elasticsearch):
         - stores full 'system' identity objects in elasticsearch that are
           required to resolve references for objects created by the system (eg:
           core marking definitions)
-        - marking definitions, including base TLP, PII and licences
-        - location objects as per the UN M49 standard.
+        - stores marking definitions, including base TLP, PII and licences
+        - stores location objects as per the UN M49 standard.
         """
         self.__setup_es(self.stix_ver)
         system_id = get_system_id()
@@ -304,6 +324,29 @@ class Client(Elasticsearch):
         return True
 
     def update_md(self, md_obj):
+        """Call this when a new marking definition is created to resolve user
+        index alias filters for all ids named in the distribution (at the
+        moment, very much tlp+ specific as others do not have distribution
+        lists). This is the opposite functionality to get_id_markings which is
+        called in the user context (and so updates for the specific user only).
+
+        .. note::
+
+            If the user that is named in the distribution list has an index
+            alias already created for them (ie: has run a query already and
+            triggered ``get_id_markings()``) then this function will update the
+            existing index alias in situ and not change the name of the alias
+            (ie: does not update the timeslice component). If no index aliases
+            exist for those users this function does nothing as the index alias
+            filters will be created by get_id_markings() when the user runs
+            their first query.
+
+        Args:
+            md_obj (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
         # Check to see if there are named distros. Only set for tlp+ atm
         if not md_obj['definition_type'] == 'tlp-plus':
             return False
@@ -332,7 +375,16 @@ class Client(Elasticsearch):
     def set_tlpplus(self, user_id, md_name, tlp_marking_def_ref,
                     distribution_refs):
         """Creates and stores a tlp+ marking definition object for a named
-        distribution list.
+        distribution list. Also calls ``update_md()`` to proactively update the
+        user index aliases of all users named in ``distribution_refs``.
+
+        .. note::
+
+            This function should be called whenver a tlp+ marking definition is
+            created to ensure that the database and distribution lists are
+            updated. TLP+ objects can be made asynchronously but the effects of
+            the distribution list may not be availabe to users straight away if
+            not implemented through this method.
 
         Args:
             user_id (:obj:`str`): STIX2 identity object reference id for the
@@ -417,6 +469,21 @@ class Client(Elasticsearch):
         - objects with a marking reference that explicitely includes their
           id in a distribution list (eg: tlp+)
         - PII marked objects that are within their org chart
+
+        .. note::
+
+            This method should continue to be used when accessing data in the
+            database despite the proactive nature of ``update_md()`` to account
+            for the fact that other global users might add a marking definition
+            that includes the user in a specific distribution list and may have
+            done so without running ``update_md()`` (eg: if someone created a
+            tlp+ marking definition offline/manually and just pushed it in as
+            an object). Keeping this function on an hourly time slice is 'belt
+            and bracers' to catch any updates. It still only updates hourly but
+            in scenarios such as the one described the change is asynchronous,
+            so unlikely to cause too many usability issues. If search speed is
+            willing to be sacrificed over accuracy in these cases, enable
+            ``force_refresh``.
 
         Args:
             user_id (:obj:`str`): STIX2 identity object reference id for the
@@ -548,6 +615,14 @@ class Client(Elasticsearch):
                 user running the function.
             obj_id (:obj:`str`): STIX2 object reference id for the object to
                 get.
+            _md (:obj:`bool`, optional): Defaults to ``True`` to ensure that
+                users are only able to see data in the results that they are
+                allowed to as per stix2 marking definitions (md). Should only
+                be set to ``False`` for zero-knowledge searches with
+                appropriate anonymisation (eg: user searching for organisation
+                members requires a join on the organisations they are a member
+                of first before they can find out if they are allowed to see
+                the data).
             values (:obj:`list` of :obj:`str`, optional): List of phrases to
                 perform in-situ free text search.
 
@@ -577,6 +652,14 @@ class Client(Elasticsearch):
                 user running the function.
             obj_ids (:obj:`list` of :obj:`str`): STIX2 object reference ids for
                 the objects to get.
+            _md (:obj:`bool`, optional): Defaults to ``True`` to ensure that
+                users are only able to see data in the results that they are
+                allowed to as per stix2 marking definitions (md). Should only
+                be set to ``False`` for zero-knowledge searches with
+                appropriate anonymisation (eg: user searching for organisation
+                members requires a join on the organisations they are a member
+                of first before they can find out if they are allowed to see
+                the data).
             values (:obj:`list` of :obj:`str`, optional): List of phrases to
                 perform in-situ free text search.
 
@@ -997,7 +1080,7 @@ class Client(Elasticsearch):
 
         Returns:
             :obj:`dict`: Dictionary in the form:
-            {"country_stix_ref": "country_name"}
+            ``{"country_stix_ref": "country_name"}``
         """
         q = {"query": {"bool": {"must": [
                 {"match": {"created_by_ref": self.identity['id']}}],
