@@ -179,14 +179,36 @@ def get_rels(stix_id):
 
 def main():
 
-    mol = g4i.get_molecule(
-           user_id="identity--7471b90d-87c1-4bbd-9e5e-cea7ad3b4cf5",
-           stix_ids=["attack-pattern--fff235c8-6c22-415c-ab72-5abb7b6de0ce"],
-           schema_name='phase',
-           objs=True,
-           pivot=False)
+    author = "identity--6d9f5924-fe28-4579-853b-0e3d77536ad9"
+    recipient = "identity--ed059e4f-1810-4f16-9cb5-4a8ba7dc9333"
 
-    pprint(mol)
+    print(g4i.set_tlpplus(user_id=author,
+                          md_name="Super Secret Distro List!!!",
+                          tlp_marking_def_ref=stix2.v21.common.TLP_RED.id,
+                          distribution_refs=[author, recipient]))
+
+    time.sleep(2)
+
+    print(g4i.set_tlpplus(user_id=author,
+                          md_name="Super Secret Distro List!!!",
+                          tlp_marking_def_ref=stix2.v21.common.TLP_RED.id,
+                          distribution_refs=[author, recipient]))
+
+    time.sleep(2)
+
+    print(g4i.set_tlpplus(user_id=author,
+                          md_name="Banter network...",
+                          tlp_marking_def_ref=stix2.v21.common.TLP_RED.id,
+                          distribution_refs=[author, recipient]))
+
+    # mol = g4i.get_molecule(
+    #        user_id=g4i.identity['id'],
+    #        stix_ids=["attack-pattern--fff235c8-6c22-415c-ab72-5abb7b6de0ce"],
+    #        schema_name='phase',
+    #        objs=True,
+    #        pivot=False)
+
+    # pprint(mol)
 
     # q = {"query": {"match_all": {}}}
     # res = g4i.search(user_id=g4i.identity['id'], index='marking-definition',
@@ -218,22 +240,22 @@ def main():
     # res = g4i.get_events(user_id="identity--5710089b-bec8-4913-b674-bf7c6be221ae")
     # pprint(res)
 
-    stix_id = "intrusion-set--899ce53f-13a0-479b-a0e4-67d46e241542"
-    related_ids = get_rels(stix_id=stix_id)
+    # stix_id = "intrusion-set--899ce53f-13a0-479b-a0e4-67d46e241542"
+    # related_ids = get_rels(stix_id=stix_id)
 
-    tmp_ids = related_ids[:]
-    for _id in tmp_ids:
-        sub_rels = get_rels(stix_id=_id)
-        related_ids += sub_rels
+    # tmp_ids = related_ids[:]
+    # for _id in tmp_ids:
+    #     sub_rels = get_rels(stix_id=_id)
+    #     related_ids += sub_rels
 
-    objects = g4i.get_objects(user_id=g4i.identity['id'], obj_ids=related_ids)
+    # objects = g4i.get_objects(user_id=g4i.identity['id'], obj_ids=related_ids)
 
-    bundle = {"type": "bundle",
-              "id": get_deterministic_uuid(prefix='bundle--',
-                                           seed='fuck-bundles'),
-              "objects": objects}
-    with open('mitre.json', 'w') as outfile:
-        json.dump(bundle, outfile)
+    # bundle = {"type": "bundle",
+    #           "id": get_deterministic_uuid(prefix='bundle--',
+    #                                        seed='fuck-bundles'),
+    #           "objects": objects}
+    # with open('mitre.json', 'w') as outfile:
+    #     json.dump(bundle, outfile)
 
     # # Version testing
     # objects = []

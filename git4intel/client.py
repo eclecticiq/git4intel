@@ -332,7 +332,8 @@ class Client(Elasticsearch):
             time.sleep(2)
         return True
 
-    def set_tlpplus(self, user_id, tlp_marking_def_ref, distribution_refs):
+    def set_tlpplus(self, user_id, md_name, tlp_marking_def_ref,
+                    distribution_refs):
         """Creates and stores a tlp+ marking definition object for a named
         distribution list.
 
@@ -359,17 +360,19 @@ class Client(Elasticsearch):
             return False
         ref_list = distribution_refs[:]
         distribution_refs.append(tlp_marking_def_ref)
+        distribution_refs.append(md_name)
         distribution_refs = sorted(set(distribution_refs))
         md_id = get_deterministic_uuid(prefix='marking-definition--',
-                                       seed=str(ref_list))
+                                       seed=str(distribution_refs))
         if self.exists(index='marking-definition',
                        id=md_id.split('--')[1],
                        _source=False,
                        ignore=[400, 404]):
-            return md_id
+            return md_id,
         tlp_plus = TLPPlusMarking(tlp_marking_def_ref=tlp_marking_def_ref,
                                   distribution_refs=ref_list)
-        new_md = stix2.v21.MarkingDefinition(definition_type='tlp-plus',
+        new_md = stix2.v21.MarkingDefinition(name=md_name,
+                                             definition_type='tlp-plus',
                                              definition=tlp_plus,
                                              id=md_id,
                                              created_by_ref=user_id)
