@@ -342,10 +342,12 @@ class Client(Elasticsearch):
             their first query.
 
         Args:
-            md_obj (TYPE): Description
+            md_obj (:obj:`dict`): TLP+ object to be applied.
 
         Returns:
-            TYPE: Description
+            :obj:`bool`: ``True`` for either having successfully applied the
+            marking definition or not finding any distribution lists to apply;
+            `False`` if the object is not the correct type.
         """
         # Check to see if there are named distros. Only set for tlp+ atm
         if not md_obj['definition_type'] == 'tlp-plus':
