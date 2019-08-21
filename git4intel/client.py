@@ -720,7 +720,7 @@ class Client(Elasticsearch):
         return docs
 
     def get_molecule(self, user_id, stix_ids, schema_name, objs=None,
-                     query=None, pivot=None, _md=None):
+                     query=None, pivot=True, _md=None):
         """From a seed id and using a molecule schema, return all objects that
         comply with that schema.
 
@@ -757,15 +757,15 @@ class Client(Elasticsearch):
         """
         if _md is None:
             _md = True
-        if pivot is None:
-            pivot = True
+        if pivot:
+            check_lst = [True]
+        else:
+            check_lst = []
         if not isinstance(schema_name, str):
             return False
 
         failed = 0
         ids = stix_ids[:]
-
-        check_lst = []
         while True:
             old_len = len(ids)
             q_ids = []
@@ -789,6 +789,7 @@ class Client(Elasticsearch):
                 if not pivot:
                     try:
                         if check_lst[count] is True:
+                            count += 1
                             continue
                     except IndexError:
                         pass
@@ -819,34 +820,36 @@ class Client(Elasticsearch):
                             ids.append(value)
             ids = list(set(ids))
             new_len = len(ids)
-            if new_len == old_len:
-                if not objs:
-                    return ids
-                q_objs = []
-                for _id in ids:
-                    q_objs.append({"match": {"id": _id.split('--')[1]}})
-                if query:
-                    q = {"query": {"bool": {"must": [
-                                                query['query'],
-                                                {"bool": {"should": q_objs}}
-                                                ]}}}
-                else:
-                    q = {"query": {"bool": {"must": {"bool": {
-                                                        "should": q_objs}}}}}
-                res = self.search(user_id=user_id,
-                                  body=q,
-                                  schema=schema_name,
-                                  filter_path=['hits.hits._source'],
-                                  _md=_md)
-                output = []
-                if res:
-                    for hit in res['hits']['hits']:
-                        output.append(hit['_source'])
-                return output
+            all_schema_checked = all(check_lst)
+            if new_len == old_len and all_schema_checked is True:
+                break
             else:
                 failed += 1
-            if failed > 2:
+            if failed > len(schemas)*2:
                 return False
+        if new_len == 1:
+            print('Only found the seed object.')
+            return False
+        if not objs:
+            return ids
+        q_objs = []
+        for _id in ids:
+            q_objs.append({"match": {"id": _id.split('--')[1]}})
+        if query:
+            q = {"query": {"bool": {"must": [query['query'],
+                                             {"bool": {"should": q_objs}}]}}}
+        else:
+            q = {"query": {"bool": {"must": {"bool": {"should": q_objs}}}}}
+        res = self.search(user_id=user_id,
+                          body=q,
+                          schema=schema_name,
+                          filter_path=['hits.hits._source'],
+                          _md=_md)
+        output = []
+        if res:
+            for hit in res['hits']['hits']:
+                output.append(hit['_source'])
+        return output
 
     def get_incidents(self, user_id, focus=None):
         """EXAMPLE IMPLEMENTATION OF g4i. Use the molecule schema method to
@@ -912,7 +915,8 @@ class Client(Elasticsearch):
                 return False
             org_ids = []
             for org in org_objs:
-                org_ids.append({"match": {"target_ref": org['id'].split('--')[1]}})
+                org_id = org['id'].split('--')[1]
+                org_ids.append({"match": {"target_ref": org_id}})
 
             q = {"query": {"bool": {"must": [
                                 {"match": {"relationship_type": "targets"}},
@@ -927,8 +931,9 @@ class Client(Elasticsearch):
             for obj in res['hits']['hits']:
                 seeds.append(obj['_source']['source_ref'])
         elif focus == 'my_sectors':
-            q = {"query": {"bool": {"must": [{"match": {"identity_class": 'organization'}},
-                                             {"exists": {"field": "sectors"}}]}}}
+            q = {"query": {"bool": {"must": [
+                            {"match": {"identity_class": 'organization'}},
+                            {"exists": {"field": "sectors"}}]}}}
             org_objs = self.get_molecule(user_id=user_id,
                                          stix_ids=[user_id],
                                          schema_name='org',
@@ -960,7 +965,8 @@ class Client(Elasticsearch):
                 return False
             org_ids = []
             for hit in res['hits']['hits']:
-                org_ids.append({"match": {"target_ref": hit['_source']['id'].split('--')[1]}})
+                hit_id = hit['_source']['id'].split('--')[1]
+                org_ids.append({"match": {"target_ref": hit_id}})
 
             q = {"query": {"bool": {"must": [
                                 {"match": {"relationship_type": "targets"}},
@@ -988,7 +994,8 @@ class Client(Elasticsearch):
                 return False
             org_ids = []
             for org in org_objs:
-                org_ids.append({"match": {"target_ref": org['id'].split('--')[1]}})
+                org_id = org['id'].split('--')[1]
+                org_ids.append({"match": {"target_ref": org_id}})
 
             q = {"query": {"bool": {"must": [
                                 {"match": {"relationship_type": "targets"}},
@@ -1027,11 +1034,12 @@ class Client(Elasticsearch):
                 try:
                     if inc_obj['relationship_type'] != 'phase-of':
                         continue
-                    phase_objs = self.get_molecule(user_id=user_id,
-                                                   stix_ids=[inc_obj['source_ref']],
-                                                   schema_name='phase',
-                                                   objs=True,
-                                                   pivot=False)
+                    phase_objs = self.get_molecule(
+                                           user_id=user_id,
+                                           stix_ids=[inc_obj['source_ref']],
+                                           schema_name='phase',
+                                           objs=True,
+                                           pivot=False)
                     inc.append(phase_objs)
                 except KeyError:
                     pass
@@ -1072,7 +1080,8 @@ class Client(Elasticsearch):
         output = []
         for seed in seeds:
             res = self.get_molecule(user_id=user_id, stix_ids=[seed],
-                                    schema_name='event', pivot=False, objs=True)
+                                    schema_name='event', pivot=False,
+                                    objs=True)
             output.append(res)
         return output
 
