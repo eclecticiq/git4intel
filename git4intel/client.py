@@ -17,6 +17,7 @@ from pprint import pprint
 import time
 
 from .utils import (
+    bulk_data,
     compare_mappings,
     get_all_schemas,
     get_deterministic_uuid,
@@ -192,7 +193,7 @@ class Client(Elasticsearch):
                                              "filter": _filter}}}
         return super().search(**kwargs)
 
-    def index(self, user_id, up_version=None, **kwargs):
+    def index(self, user_id, up_version=True, **kwargs):
         obj_id_parts = kwargs['body']['id'].split('--')
         index_name = obj_id_parts[0]
         doc_id = obj_id_parts[1]
@@ -201,6 +202,8 @@ class Client(Elasticsearch):
             kwargs['index'] = index_name
         if 'id' not in kwargs:
             kwargs['id'] = doc_id
+        if 'refresh' not in kwargs:
+            kwargs['refresh'] = False
         if not self.exists(index=index_name,
                            id=doc_id,
                            _source=False,
@@ -209,9 +212,6 @@ class Client(Elasticsearch):
             if res['result'] == 'created':
                 return kwargs['body']['id']
             return False
-
-        if up_version is None:
-            up_version = True
 
         if not up_version:
             return False
@@ -227,6 +227,36 @@ class Client(Elasticsearch):
             print('Failed to revoke updated object.')
             return False
         return new_objs[1]['id']
+
+    def index_objects(self, user_id, objects, up_version=True, refresh=False):
+        """Wrapper for the ``index()`` method to handle a list of objects.
+
+        Args:
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
+            objects (:obj:`list` of :obj:`dict`): List of JSON serializable
+                stix2 object dictionaries.
+            up_version (:obj:`bool`, optional): Pass through to index() to
+                determine if stix up-versioning should be applied.
+            refresh (:obj:`bool`, optional): Pass through to core elasticsearch
+                index() function to determine the refresh policy.
+        """
+        if isinstance(objects, list):
+            last_obj = objects.pop(0)
+            id_list = []
+            for obj in objects:
+                res = self.index(user_id=user_id, up_version=up_version,
+                                 body=obj, refresh=False)
+                if res:
+                    id_list.append(res)
+            # Honour refresh on the last object
+            res = self.index(user_id=user_id, up_version=up_version,
+                             body=last_obj, refresh=refresh)
+            if res:
+                id_list.append(res)
+            return id_list
+        return self.index(user_id=user_id, up_version=up_version,
+                          body=objects, refresh=refresh)
 
     def store_core_data(self):
         """Should be run once for setup of the necessary CTI core data to turn
@@ -273,30 +303,9 @@ class Client(Elasticsearch):
             return False
         return True
 
-    def index_objects(self, user_id, objects):
-        """Wrapper for the ``index()`` method to handle a list of objects.
-
-        Args:
-            user_id (:obj:`str`): STIX2 identity object reference id for the
-                user running the function.
-            objects (:obj:`list` of :obj:`dict`): List of JSON serializable
-                stix2 object dictionaries.
-        """
-        if isinstance(objects, list):
-            id_list = []
-            for obj in objects:
-                res = self.index(user_id=user_id, body=obj)
-                if res:
-                    id_list.append(res)
-            return id_list
-        return self.index(user_id=user_id, body=objects)
-
     def update_md(self, md_obj):
         # Check to see if there are named distros. Only set for tlp+ atm
         if not md_obj['definition_type'] == 'tlp-plus':
-            return False
-        if not self.wait_until_indexed(md_obj['id']):
-            print('Could not update marking definition aliases.')
             return False
 
         aliases_info = self.cat.aliases(format='json')
@@ -320,18 +329,6 @@ class Client(Elasticsearch):
                 done_aliases.append(alias_info['alias'])
         return True
 
-    def wait_until_indexed(self, stix_id):
-        fails = 0
-        if not self.exists(index='marking-definition',
-                           id=stix_id.split('--')[1],
-                           _source=False,
-                           ignore=[400, 404]):
-            if fails > 3:
-                return False
-            fails += 1
-            time.sleep(2)
-        return True
-
     def set_tlpplus(self, user_id, md_name, tlp_marking_def_ref,
                     distribution_refs):
         """Creates and stores a tlp+ marking definition object for a named
@@ -340,6 +337,8 @@ class Client(Elasticsearch):
         Args:
             user_id (:obj:`str`): STIX2 identity object reference id for the
                 user running the function.
+            md_name (:obj:`str`): Free text string for the name of the tlp+
+                marking definition.
             tlp_marking_def_ref (:obj:`str`): STIX2 identity object reference
                 id for the TLP marking definition (RED or AMBER) to which the
                 tlp+ marking definition refers.
@@ -377,7 +376,8 @@ class Client(Elasticsearch):
                                              id=md_id,
                                              created_by_ref=user_id)
         md_json = json.loads(new_md.serialize())
-        if not self.index_objects(user_id=user_id, objects=md_json):
+        if not self.index_objects(user_id=user_id, objects=md_json,
+                                  refresh='wait_for'):
             return False
 
         if not self.update_md(md_json):
@@ -423,6 +423,10 @@ class Client(Elasticsearch):
                 user running the function.
             index_alias (:obj:`str`): The index string being used in the query
                 (that will have the alias filter).
+            force_refresh (:obj:`bool`): Even if an existing filter is found,
+                refresh it anyway (useful if you suspect that a new marking
+                definition has been applied that might be applicable to the
+                user - but much slower as index alises have to be rebuilt).
 
         Returns:
             :obj:`str`: User and time specific alias to be used as the new
@@ -942,6 +946,18 @@ class Client(Elasticsearch):
         return output
 
     def get_events(self, user_id):
+        """EXAMPLE IMPLEMENTATION OF g4i. Gets event molecules that were
+        created by anyone within the user's organisation.
+
+        Args:
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
+
+        Returns:
+            :obj:`list` of :obj:`list` of :obj:`dict`: Array of event arrays.
+            Each event array containing the stix objects fromn the event
+            molecule associated with the seed id.
+        """
         id_list = []
         org_ids = self.get_molecule(user_id=user_id,
                                     stix_ids=[user_id],

@@ -90,6 +90,7 @@ def make_incident(user_id, target_org, tlp, tlp_dist=None):
         else:
             tlp_def_ref = stix2.v21.common.TLP_RED.id
         tlp = g4i.set_tlpplus(user_id=user_id,
+                              md_name="Super Secret Distro...",
                               tlp_marking_def_ref=tlp_def_ref,
                               distribution_refs=tlp_dist)[0]
     obs1 = stix2.v21.IPv4Address(value='62.171.220.83')
@@ -179,27 +180,27 @@ def get_rels(stix_id):
 
 def main():
 
-    author = "identity--6d9f5924-fe28-4579-853b-0e3d77536ad9"
-    recipient = "identity--ed059e4f-1810-4f16-9cb5-4a8ba7dc9333"
+    # author = "identity--6d9f5924-fe28-4579-853b-0e3d77536ad9"
+    # recipient = "identity--ed059e4f-1810-4f16-9cb5-4a8ba7dc9333"
 
-    print(g4i.set_tlpplus(user_id=author,
-                          md_name="Super Secret Distro List!!!",
-                          tlp_marking_def_ref=stix2.v21.common.TLP_RED.id,
-                          distribution_refs=[author, recipient]))
+    # print(g4i.set_tlpplus(user_id=author,
+    #                       md_name="Super Secret Distro List!!!",
+    #                       tlp_marking_def_ref=stix2.v21.common.TLP_RED.id,
+    #                       distribution_refs=[author, recipient]))
 
-    time.sleep(2)
+    # time.sleep(2)
 
-    print(g4i.set_tlpplus(user_id=author,
-                          md_name="Super Secret Distro List!!!",
-                          tlp_marking_def_ref=stix2.v21.common.TLP_RED.id,
-                          distribution_refs=[author, recipient]))
+    # print(g4i.set_tlpplus(user_id=author,
+    #                       md_name="Super Secret Distro List!!!",
+    #                       tlp_marking_def_ref=stix2.v21.common.TLP_RED.id,
+    #                       distribution_refs=[author, recipient]))
 
-    time.sleep(2)
+    # time.sleep(2)
 
-    print(g4i.set_tlpplus(user_id=author,
-                          md_name="Banter network...",
-                          tlp_marking_def_ref=stix2.v21.common.TLP_RED.id,
-                          distribution_refs=[author, recipient]))
+    # print(g4i.set_tlpplus(user_id=author,
+    #                       md_name="Banter network...",
+    #                       tlp_marking_def_ref=stix2.v21.common.TLP_RED.id,
+    #                       distribution_refs=[author, recipient]))
 
     # mol = g4i.get_molecule(
     #        user_id=g4i.identity['id'],
@@ -272,41 +273,43 @@ def main():
     # print(g4i.store_core_data())
     # print(g4i.data_primer())
 
-    # # Make org 1:
-    # org1, users1 = make_org(username1="User1",
-    #                         username2="User2",
-    #                         orgname="Acme Corps")
-    # # Event, phase and incident (green)
-    # green_inc1, inc_ids1 = make_incident(user_id=users1[1],
-    #                                      target_org=users1[0],
-    #                                      tlp='green')
-    # # Event, phase and incident (white)
-    # green_inc2, inc_ids2 = make_incident(user_id=users1[2],
-    #                                      target_org=users1[0],
-    #                                      tlp='white')
+    # Make org 1:
+    org1, users1 = make_org(username1="User1",
+                            username2="User2",
+                            orgname="Acme Corps")
+    # Event, phase and incident (green)
+    green_inc1, inc_ids1 = make_incident(user_id=users1[1],
+                                         target_org=users1[0],
+                                         tlp='green')
+    # Event, phase and incident (white)
+    green_inc2, inc_ids2 = make_incident(user_id=users1[2],
+                                         target_org=users1[0],
+                                         tlp='white')
 
-    # # Make org 2:
-    # org2, users2 = make_org(username1="User1",
-    #                         username2="User2",
-    #                         orgname="Arkham Ventures")
-    # # Event, phase and incident (red)
-    # red_inc1, inc_ids3 = make_incident(user_id=users2[1],
-    #                                    target_org=users2[0],
-    #                                    tlp='red',
-    #                                    tlp_dist=[users1[1], users2[1]])
+    # Make org 2:
+    org2, users2 = make_org(username1="User1",
+                            username2="User2",
+                            orgname="Arkham Ventures")
+    # Event, phase and incident (red)
+    red_inc1, inc_ids3 = make_incident(user_id=users2[1],
+                                       target_org=users2[0],
+                                       tlp='red',
+                                       tlp_dist=[users1[1], users2[1]])
 
-    # objects = org1 + green_inc1 + green_inc2 + org2 + red_inc1
-    # bundle = {"type": "bundle",
-    #           "id": get_deterministic_uuid(prefix='bundle--',
-    #                                        seed='fuck-bundles'),
-    #           "objects": objects}
-    # with open('data.json', 'w') as outfile:
-    #     json.dump(bundle, outfile)
+    objects = org1 + green_inc1 + green_inc2 + org2 + red_inc1
+    bundle = {"type": "bundle",
+              "id": get_deterministic_uuid(prefix='bundle--',
+                                           seed='fuck-bundles'),
+              "objects": objects}
+    with open('data.json', 'w') as outfile:
+        json.dump(bundle, outfile)
 
-    # print('Storing sample data...')
-    # print(g4i.index_objects(user_id=users1[1], objects=objects))
-
-    # time.sleep(5)
+    print('Storing sample data...')
+    start = time.time()
+    print(g4i.index_objects(user_id=users1[1], objects=objects,
+                            refresh='wait_for'))
+    end = time.time()
+    print(end-start)
 
     # print('Get org1 info...')
     # start = time.time()

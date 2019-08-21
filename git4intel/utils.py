@@ -98,6 +98,17 @@ def new_obj_version(user_id, stix_object):
     return [ver_rel, stix_object]
 
 
+def bulk_data(objects):
+    for obj in objects:
+        obj_type = obj['type']
+        obj_id = obj['id'].split('--')[1]
+        yield {
+            "_index": obj_type,
+            "_id": obj_id,
+            "_source": obj,
+        }
+
+
 # SYSTEM INFO:
 def get_system_id(id_only=False):
     system_id = stix2.v21.Identity(
