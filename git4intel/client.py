@@ -1106,7 +1106,8 @@ class Client(Elasticsearch):
             res = self.get_molecule(user_id=user_id, stix_ids=[seed],
                                     schema_name='event', pivot=False,
                                     objs=True)
-            output.append(res)
+            if res:
+                output.append(res)
         return output
 
     def get_countries(self):
