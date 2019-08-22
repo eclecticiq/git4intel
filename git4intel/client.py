@@ -724,6 +724,29 @@ class Client(Elasticsearch):
         """From a seed id and using a molecule schema, return all objects that
         comply with that schema.
 
+        If pivot is set to ``True`` (default) the method will keep running on a
+        single schema until it exhausts all matches. If it doesn't get any on
+        the first try it will stop straight away (since re-runs won't help).
+
+        If pivot is set to ``False`` the method will split the schema in to
+        components and search over each component in turn. It will still quit
+        if no hits are found on any component, but if it finds some hits then
+        it will re-run to see if it can fill the gaps (ie: the id refs it finds
+        in run 1 may be applicable to schema components that were skipped
+        earlier). Currently set to re-run twice before giving up. This will be
+        the hook for partial matches for further analysis.
+
+        .. note::
+
+            With pivot set to ``False``, so long as the search results grow on
+            each iteration, the method will trust that your molecule is going
+            somewhere. However, if your molecule is very linear and/or you pick
+            a seed id that is on the edge of the molecule, this will result in
+            multiple retries and degrade performance. To optimise performance,
+            select a seed id for an object that is central to a molecule (eg:
+            has more than 1 relationship) to ensure that the id list grows at a
+            healthy rate.
+
         Args:
             user_id (:obj:`str`): STIX2 identity object reference id for the
                 user running the function.
@@ -757,12 +780,15 @@ class Client(Elasticsearch):
         """
         if _md is None:
             _md = True
-        if pivot:
-            check_lst = [True]
-        else:
-            check_lst = []
         if not isinstance(schema_name, str):
             return False
+
+        if pivot:
+            schemas = [schema_name]
+        else:
+            schema_data = get_schema(schema_name)
+            schemas = schema_data['bool']['should']
+        check_lst = []
 
         failed = 0
         ids = stix_ids[:]
@@ -779,20 +805,14 @@ class Client(Elasticsearch):
                             "fields": ["*_ref", "*_refs"],
                             "query": q_str}})
             q = {"query": {"bool": {"must": {"bool": {"should": q_ids}}}}}
-            if pivot:
-                schemas = [schema_name]
-            else:
-                schema_data = get_schema(schema_name)
-                schemas = schema_data['bool']['should']
             count = 0
             for schema in schemas:
-                if not pivot:
-                    try:
-                        if check_lst[count] is True:
-                            count += 1
-                            continue
-                    except IndexError:
-                        pass
+                try:
+                    if check_lst[count] is True and not pivot:
+                        count += 1
+                        continue
+                except IndexError:
+                    pass
                 res = self.search(user_id=user_id,
                                   body=q,
                                   schema=schema,
@@ -802,12 +822,11 @@ class Client(Elasticsearch):
                                                'hits.hits._source.*_ref',
                                                'hits.hits._source.*_refs'],
                                   _md=_md)
-                if not pivot:
-                    try:
-                        check_lst[count] = bool(res)
-                    except IndexError:
-                        check_lst.append(bool(res))
-                    count += 1
+                try:
+                    check_lst[count] = bool(res)
+                except IndexError:
+                    check_lst.append(bool(res))
+                count += 1
                 if res:
                     for hit in res['hits']['hits']:
                         for value in list(hit['_source'].values()):
@@ -820,12 +839,17 @@ class Client(Elasticsearch):
                             ids.append(value)
             ids = list(set(ids))
             new_len = len(ids)
-            all_schema_checked = all(check_lst)
-            if new_len == old_len and all_schema_checked is True:
+            if not any(check_lst):
+                print('No hits for that schema and seed combination.')
+                return False
+            if new_len == old_len and all(check_lst) is True:
+                # No more growth and hits on all schema components
                 break
-            else:
+            if new_len == old_len and all(check_lst) is False:
+                # No more results and still some gaps - worth a rerun...
                 failed += 1
-            if failed > len(schemas)*2:
+            if failed > 2:
+                print('Partial molecule matches found, but no full molecules.')
                 return False
         if new_len == 1:
             print('Only found the seed object.')
