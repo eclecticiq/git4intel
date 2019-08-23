@@ -188,7 +188,7 @@ class Client(Elasticsearch):
                     for _schema in schema:
                         schemas.append(get_schema(_schema))
                 for _schema in schemas:
-                    _schema_should += _schema['bool']['should']
+                    _schema_should += _schema['core'] + _schema['ext']
 
             _filter = {"bool": {"must": [{"bool": {"should": _schema_should}},
                                          _filter]}}
@@ -455,9 +455,9 @@ class Client(Elasticsearch):
             return True
         os_group['object_refs'].append(stix_id)
 
-        res = self.index(user_id=user_id, body=os_group)
-        self.os_group_id = res
-        return res
+        res = self.index(user_id=user_id, body=os_group, refresh='wait_for')
+        self.os_group_id = res[0]
+        return res[0]
 
     # GETS:
     def get_id_markings(self, user_id, index_alias, force_refresh=False):
@@ -511,7 +511,6 @@ class Client(Elasticsearch):
         self.indices.delete_alias(index='_all',
                                   name=[md_alias_root + '*'],
                                   ignore=[400, 404])
-
         os_list = self.get_object(user_id=self.identity['id'],
                                   obj_id=self.os_group_id,
                                   _md=False)['object_refs']
@@ -720,7 +719,7 @@ class Client(Elasticsearch):
         return docs
 
     def get_molecule(self, user_id, stix_ids, schema_name, objs=None,
-                     query=None, pivot=True, _md=None):
+                     query=None, pivot=False, _md=None):
         """From a seed id and using a molecule schema, return all objects that
         comply with that schema.
 
@@ -763,8 +762,9 @@ class Client(Elasticsearch):
                 will be applied as an *and* for the moleule search.
             pivot (:obj:`bool`, optional): ``True`` to allow pivoting to other
                 molecules of the same schema (eg: where another incident
-                molecule shares an assigned user); ``False`` breaks down the
-                query schema to ensure only the targeted molecule is returned.
+                molecule shares an assigned user); ``False`` (default) breaks
+                down the query schema to ensure only the targeted object's
+                molecule is returned.
             _md (:obj:`bool`, optional): Defaults to ``True`` to ensure that
                 users are only able to see data in the results that they are
                 allowed to as per stix2 marking definitions (md). Should only
@@ -784,14 +784,20 @@ class Client(Elasticsearch):
             return False
 
         if pivot:
-            schemas = [schema_name]
+            # In pivot mode, just get all objects that could be relevant (core
+            #   and ext)
+            schema_template = get_schema(schema_name)
+            should_list = schema_template['core'] + schema_template['ext']
+            schemas = {"core": [{"bool": {"should": should_list}}]}
         else:
+            # In non-pivot, just get core now, but 
             schema_data = get_schema(schema_name)
-            schemas = schema_data['bool']['should']
-        check_lst = []
+            schemas = {"core": schema_data['core'], "ext": schema_data['ext']}
+        check_lst = {'core': [], 'ext': []}
 
         failed = 0
         ids = stix_ids[:]
+        ext_ids = []
         while True:
             old_len = len(ids)
             q_ids = []
@@ -806,54 +812,63 @@ class Client(Elasticsearch):
                             "query": q_str}})
             q = {"query": {"bool": {"must": {"bool": {"should": q_ids}}}}}
             count = 0
-            for schema in schemas:
-                try:
-                    if check_lst[count] is True and not pivot:
-                        count += 1
-                        continue
-                except IndexError:
-                    pass
-                res = self.search(user_id=user_id,
-                                  body=q,
-                                  schema=schema,
-                                  _source_excludes=["created_by_ref",
-                                                    "object_marking_refs"],
-                                  filter_path=['hits.hits._source.id',
-                                               'hits.hits._source.*_ref',
-                                               'hits.hits._source.*_refs'],
-                                  _md=_md)
-                try:
-                    check_lst[count] = bool(res)
-                except IndexError:
-                    check_lst.append(bool(res))
-                count += 1
-                if res:
-                    for hit in res['hits']['hits']:
-                        for value in list(hit['_source'].values()):
-                            if isinstance(value, list):
-                                for sub_value in value:
-                                    if not sub_value:
-                                        continue
-                                    ids.append(sub_value)
-                                continue
-                            ids.append(value)
+            for key in schemas:
+                for schema in schemas[key]:
+                    try:
+                        if check_lst[key][count] is True and not pivot:
+                            count += 1
+                            continue
+                    except IndexError:
+                        pass
+                    res = self.search(user_id=user_id,
+                                      body=q,
+                                      schema=schema,
+                                      _source_excludes=["created_by_ref",
+                                                        "object_marking_refs"],
+                                      filter_path=['hits.hits._source.id',
+                                                   'hits.hits._source.*_ref',
+                                                   'hits.hits._source.*_refs'],
+                                      _md=_md)
+                    try:
+                        check_lst[key][count] = bool(res)
+                    except IndexError:
+                        check_lst[key].append(bool(res))
+                    count += 1
+                    if res:
+                        for hit in res['hits']['hits']:
+                            if not pivot and key == 'ext':
+                                try:
+                                    ext_ids.append(hit['_source']['id'])
+                                    continue
+                                except KeyError:
+                                    pass
+                            for value in list(hit['_source'].values()):
+                                if isinstance(value, list):
+                                    for sub_value in value:
+                                        if not sub_value:
+                                            continue
+                                        ids.append(sub_value)
+                                    continue
+                                ids.append(value)
             ids = list(set(ids))
             new_len = len(ids)
-            if not any(check_lst):
+            if not any(check_lst['core']):
                 print('No hits for that schema and seed combination.')
                 return False
-            if new_len == old_len and all(check_lst) is True:
-                # No more growth and hits on all schema components
+            if new_len == old_len and all(check_lst['core']) is True:
+                # No more growth and hits on all core schema components
                 break
-            if new_len == old_len and all(check_lst) is False:
+            if new_len == old_len and all(check_lst['core']) is False:
                 # No more results and still some gaps - worth a rerun...
                 failed += 1
             if failed > 2:
                 print('Partial molecule matches found, but no full molecules.')
-                break
+                return False
         if new_len == 1:
             print('Only found the seed object.')
             return False
+        if not pivot:
+            ids += ext_ids
         if not objs:
             return ids
         q_objs = []
@@ -1302,8 +1317,9 @@ class Client(Elasticsearch):
             except AttributeError:
                 doc = obj
             if obj['type'] == 'marking-definition':
-                self.set_new_osdm(user_id=self.identity['id'],
-                                  stix_id=obj['id'])
+                res = self.set_new_osdm(user_id=self.identity['id'],
+                                        stix_id=obj['id'])
+                print('Added new Mitre Attack os dm: ' + res)
             if not self.index(user_id=self.identity['id'], body=doc):
                 return False
         return True

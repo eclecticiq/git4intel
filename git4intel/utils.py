@@ -371,7 +371,8 @@ def get_marking_definitions(created_by_ref):
     os_group = stix2.v21.Grouping(id=os_group_id,
                                   name=os_group_name,
                                   context=os_group_context,
-                                  object_refs=os_objs)
+                                  object_refs=os_objs,
+                                  object_marking_refs=[tlp_white_dm.id])
 
     dm_objs = [
         tlp_red_dm,

@@ -1,23 +1,22 @@
 {
-    "bool": {
-        "should": [
-            {"bool": {"must": [
-                {"match": {"type": "identity"}},
-                {"bool": {"should": [
-                    {"match": {"identity_class": "individual"}},
-                    {"match": {"identity_class": "system"}}
-                ]}}
-            ]}},
-            {"bool": {"must": [
-                {"match": {"type": "identity"}},
-                {"match": {"identity_class": "organization"}}
-            ]}},
-            {"bool": {"must": [
-                {"match": {"type": "relationship"}},
-                {"match": {"relationship_type": "member-of"}},
-                {"match": {"source_ref": "identity--"}},
-                {"match": {"target_ref": "identity--"}}
+    "core": [
+        {"bool": {"must": [
+            {"match": {"type": "identity"}},
+            {"bool": {"should": [
+                {"match": {"identity_class": "individual"}},
+                {"match": {"identity_class": "system"}}
             ]}}
-        ]
-    }
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "identity"}},
+            {"match": {"identity_class": "organization"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "member-of"}},
+            {"match": {"source_ref": "identity--"}},
+            {"match": {"target_ref": "identity--"}}
+        ]}}
+    ],
+    "ext": []
 }

@@ -196,6 +196,19 @@ def get_rels(stix_id):
 
 def main():
 
+    # os_group = "grouping--5de44717-4f2a-42b9-9bdf-a1ea101f7d6e"
+    # res = g4i.get_object(user_id=g4i.identity['id'],
+    #                      obj_id=os_group)
+    # pprint(res)
+
+    # stix_id = "attack-pattern--2f8d3c0c-084f-4202-b988-5d756faf6185"
+
+    # res = g4i.get_molecule(user_id=g4i.identity['id'],
+    #                        stix_ids=[stix_id],
+    #                        schema_name='phase',
+    #                        pivot=True)
+    # pprint(res)
+
     # obj_id = "intrusion-set--6a2e693f-24e5-451a-9f88-b36a108e5662"
     # id_parts = obj_id.split('--')
     # _index = id_parts[0]
@@ -318,8 +331,8 @@ def main():
     # g4i.index_objects(user_id="identity--084bcd40-a2ed-4420-84db-04444bd0e763",
     #                   objects=bundle['objects'])
 
-    # print(g4i.store_core_data())
-    # print(g4i.data_primer())
+    print(g4i.store_core_data())
+    print(g4i.data_primer())
 
     # Make org 1:
     org1, users1 = make_org(username1="User1",

@@ -22,3 +22,11 @@ def resolve_upversions():
     # Identify up-versioned objects and suggest resolutions for non-breaking
     #   rollups. (Think git merge).
     pass
+
+
+def generic_to_specific():
+    # Identify objects that are "generic" (such as an Identity that refers to
+    #   an entire sector) and resolve them to specific objects (such as
+    #   specific organisations) by applying correct molecule definition
+    #   structures.
+    pass
