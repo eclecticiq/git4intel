@@ -1,0 +1,34 @@
+{
+    "core": [
+        {"bool": {"must": [
+            {"match": {"type": "attack-pattern"}},
+            {"match": {"created_by_ref": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5"}}
+        ]}},
+        {"bool": {"should": [
+            {"match": {"type": "tool"}},
+            {"match": {"type": "malware"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "uses"}},
+            {"match": {"target_ref": "attack-pattern--"}},
+            {"bool": {"should": [
+                {"match": {"source_ref": "attack-pattern--"}},
+                {"match": {"source_ref": "malware--"}},
+                {"match": {"source_ref": "tool--"}}
+            ]}}
+        ]}}
+    ],
+    "ext": [
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "uses"}},
+            {"match": {"source_ref": "intrusion-set--"}},
+            {"bool": {"should": [
+                {"match": {"target_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "malware--"}},
+                {"match": {"target_ref": "tool--"}}
+            ]}}
+        ]}}
+    ]
+}

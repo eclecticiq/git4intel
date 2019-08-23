@@ -1,0 +1,38 @@
+{
+    "core": [
+        {"bool": {"must": [
+            {"match": {"type": "threat-actor"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "intrusion-set"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "attributed-to"}},
+            {"match": {"source_ref": "intrusion-set--"}},
+            {"match": {"target_ref": "threat-actor--"}}
+        ]}}
+    ],
+    "ext": [
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "attributed-to"}},
+            {"match": {"source_ref": "campaign--"}},
+            {"bool": {"should": [
+                {"match": {"target_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "malware--"}},
+                {"match": {"target_ref": "tool--"}}
+            ]}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "uses"}},
+            {"match": {"source_ref": "attack-pattern--"}},
+            {"bool": {"should": [
+                {"match": {"target_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "malware--"}},
+                {"match": {"target_ref": "tool--"}}
+            ]}}
+        ]}}
+    ]
+}

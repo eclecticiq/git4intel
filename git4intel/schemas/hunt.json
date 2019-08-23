@@ -1,0 +1,18 @@
+{
+    "core": [
+        {"bool": {"must": [
+            {"match": {"type": "indicator"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "indicates"}},
+            {"match": {"source_ref": "indicator--"}},
+            {"bool": {"should": [
+                {"match": {"target_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "malware--"}},
+                {"match": {"target_ref": "tool--"}}
+            ]}}
+        ]}}
+    ],
+    "ext": []
+}

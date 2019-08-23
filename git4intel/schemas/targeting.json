@@ -1,0 +1,30 @@
+{
+    "core": [
+        {"bool": {"must": [
+            {"match": {"type": "campaign"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "identity"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "targets"}},
+            {"match": {"source_ref": "campaign--"}},
+            {"match": {"target_ref": "identity--"}}
+        ]}}
+    ],
+    "ext": [
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "attributed-to"}},
+            {"match": {"source_ref": "campaign--"}},
+            {"match": {"target_ref": "intrusion-set--"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "uses"}},
+            {"match": {"source_ref": "campaign--"}},
+            {"match": {"target_ref": "attack-pattern--"}}
+        ]}}
+    ]
+}
