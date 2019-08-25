@@ -17,9 +17,7 @@
                 {"match": {"source_ref": "malware--"}},
                 {"match": {"source_ref": "tool--"}}
             ]}}
-        ]}}
-    ],
-    "ext": [
+        ]}},
         {"bool": {"must": [
             {"match": {"type": "relationship"}},
             {"match": {"relationship_type": "uses"}},
@@ -29,6 +27,24 @@
                 {"match": {"target_ref": "malware--"}},
                 {"match": {"target_ref": "tool--"}}
             ]}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "mitigates"}},
+            {"match": {"source_ref": "course-of-action--"}},
+            {"bool": {"should": [
+                {"match": {"target_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "malware--"}},
+                {"match": {"target_ref": "tool--"}}
+            ]}}
+        ]}}
+    ],
+    "ext": [
+        {"bool": {"must": [
+            {"match": {"type": "intrusion-set"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "course-of-action"}}
         ]}}
     ]
 }

@@ -565,6 +565,7 @@ class Client(Elasticsearch):
         self.indices.put_alias(index=alias_mapping,
                                name=md_alias_name,
                                body=body)
+        pprint(body)
         return md_alias_name
 
     def get_free_text(self, user_id, phrase, schema=None):
