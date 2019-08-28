@@ -237,6 +237,10 @@ def get_rels(stix_id):
 
 def main():
 
+    # For the test, do a full index purge first...
+    print(g4i.indices.delete(index=['_all']))
+
+    # Lay out the core data and data primer...
     print(g4i.store_core_data())
     print(g4i.data_primer())
 
