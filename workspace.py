@@ -336,24 +336,24 @@ def main():
     # res = g4i.indices.get_alias(name="intel--d9482fd5-eea2-4416-b82f-d15fc03e9b57--19081916")
     # pprint(res)
 
-  #   md_obj = {
-  #   "definition_type": "tlp-plus",
-  #   "definition": {
-  #     "tlp_marking_def_ref": "marking-definition--5e57c739-391a-4eb3-b6be-7d15ca92d5ed",
-  #     "distribution_refs": [
-  #       "identity--279707f3-fc49-40a6-b7c4-b4a58e235804",
-  #       "identity--01f471c6-f620-4733-925b-4bb8bb7a33ac"
-  #     ]
-  #   },
-  #   "id": "marking-definition--1bd25494-8cbb-42d5-aa78-e7d332a253d4",
-  #   "created_by_ref": "identity--01f471c6-f620-4733-925b-4bb8bb7a33ac",
-  #   "type": "marking-definition",
-  #   "spec_version": "2.1",
-  #   "created": "2019-08-19T11:25:17.684909Z"
-  # }
+    #   md_obj = {
+    #   "definition_type": "tlp-plus",
+    #   "definition": {
+    #     "tlp_marking_def_ref": "marking-definition--5e57c739-391a-4eb3-b6be-7d15ca92d5ed",
+    #     "distribution_refs": [
+    #       "identity--279707f3-fc49-40a6-b7c4-b4a58e235804",
+    #       "identity--01f471c6-f620-4733-925b-4bb8bb7a33ac"
+    #     ]
+    #   },
+    #   "id": "marking-definition--1bd25494-8cbb-42d5-aa78-e7d332a253d4",
+    #   "created_by_ref": "identity--01f471c6-f620-4733-925b-4bb8bb7a33ac",
+    #   "type": "marking-definition",
+    #   "spec_version": "2.1",
+    #   "created": "2019-08-19T11:25:17.684909Z"
+    # }
 
-  #   res = g4i.update_md(md_obj=md_obj)
-  #   print(res)
+    #   res = g4i.update_md(md_obj=md_obj)
+    #   print(res)
 
     # res = g4i.get_events(user_id="identity--5710089b-bec8-4913-b674-bf7c6be221ae")
     # pprint(res)

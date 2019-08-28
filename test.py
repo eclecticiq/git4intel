@@ -1,54 +1,30 @@
 import git4intel
 import stix2
-from datetime import datetime
-import random
-import uuid
 import json
 from slugify import slugify
 from pprint import pprint
+import random
+import uuid
+from datetime import datetime
 import time
-import unittest
-import re
+import sys
 
-index_names = {
-    'artifact': ['intel', 'sco'],
-    'attack-pattern': ['intel', 'sdo'],
-    'autonomous-system': ['intel', 'sco'],
-    'campaign': ['intel', 'sdo'],
-    'course-of-action': ['intel', 'sdo'],
-    'directory': ['intel', 'sco'],
-    'domain-name': ['intel', 'sco'],
-    'email-addr': ['intel', 'sco'],
-    'email-message': ['intel', 'sco'],
-    'file': ['intel', 'sco'],
-    'grouping': ['intel', 'sdo'],
-    'identity': ['intel', 'sdo'],
-    'indicator': ['intel', 'sdo'],
-    'intrusion-set': ['intel', 'sdo'],
-    'ipv4-addr': ['intel', 'sco'],
-    'ipv6-addr': ['intel', 'sco'],
-    'location': ['intel', 'sdo'],
-    'mac-addr': ['intel', 'sco'],
-    'malware': ['intel', 'sdo'],
-    'marking-definition': ['intel'],
-    'mutex': ['intel', 'sco'],
-    'network-traffic': ['intel', 'sco'],
-    'note': ['intel', 'sdo'],
-    'observed-data': ['intel', 'sdo'],
-    'opinion': ['intel', 'sdo'],
-    'process': ['intel', 'sco'],
-    'relationship': ['intel', 'sro'],
-    'report': ['intel', 'sdo'],
-    'sighting': ['intel', 'sro'],
-    'software': ['intel', 'sco'],
-    'threat-actor': ['intel', 'sdo'],
-    'tool': ['intel', 'sdo'],
-    'url': ['intel', 'sco'],
-    'user-account': ['intel', 'sco'],
-    'vulnerability': ['intel', 'sdo'],
-    'windows-registry-key': ['intel', 'sco'],
-    'x509-certificate': ['intel', 'sco'],
-}
+g4i = git4intel.Client('localhost:9200')
+
+admin_fields = [
+    'spec_version',
+    'id',
+    'created',
+    'modified',
+    'created_by_ref',
+    'revoked',
+    'confidence',
+    'lang',
+    'object_marking_refs',
+    'granular_markings',
+    'defanged',
+    'external_references'
+]
 
 
 def get_deterministic_uuid(prefix=None, seed=None):
@@ -63,375 +39,334 @@ def get_deterministic_uuid(prefix=None, seed=None):
     return "{}{}".format(prefix, stix_id)
 
 
-def make_valid_commit(user_id):
-    ipv4 = stix2.v21.IPv4Address(value='62.171.220.83')
-    domain_name = stix2.v21.DomainName(value='www.altavista.com')
-    sco_data = stix2.v21.ObservedData(first_observed=datetime.now(),
-                                      last_observed=datetime.now(),
-                                      number_observed=1,
-                                      object_refs=[ipv4.id, domain_name.id],
-                                      created_by_ref=user_id)
+def make_org(username1, username2, orgname):
+    pii_dm = g4i.pii_marking['id']
+    sector = slugify("IT Consulting & Other Services")
+    location = "location--ed901153-d634-4825-aea4-64f771c30433"
+    user1 = stix2.v21.Identity(name=username1,
+                               identity_class='individual',
+                               sectors=[sector],
+                               object_marking_refs=[pii_dm])
 
-    objs = [sco_data, domain_name, ipv4]
-    grouping = stix2.v21.Grouping(context='event',
-                                  object_refs=objs,
-                                  created_by_ref=user_id)
-    objs.append(grouping)
-    bundle = json.loads(stix2.v21.Bundle(objs).serialize())
-    return bundle
+    user2 = stix2.v21.Identity(name=username2,
+                               identity_class='individual',
+                               sectors=[sector],
+                               object_marking_refs=[pii_dm])
 
+    org = stix2.v21.Identity(name=orgname,
+                             identity_class='organization',
+                             sectors=[sector],
+                             object_marking_refs=[pii_dm])
 
-def make_valid_commit2(user_id):
-    ipv4 = stix2.v21.IPv4Address(value='8.8.8.8')
-    domain_name = stix2.v21.EmailAddress(value='admin@local.host')
-    sco_data = stix2.v21.ObservedData(first_observed=datetime.now(),
-                                      last_observed=datetime.now(),
-                                      number_observed=1,
-                                      object_refs=[ipv4.id, domain_name.id],
-                                      created_by_ref=user_id)
+    member1 = stix2.v21.Relationship(created_by_ref=user1.id,
+                                     source_ref=user1.id,
+                                     target_ref=org.id,
+                                     relationship_type='member-of',
+                                     object_marking_refs=[pii_dm])
 
-    objs = [sco_data, domain_name, ipv4]
-    grouping = stix2.v21.Grouping(context='event',
-                                  object_refs=objs,
-                                  created_by_ref=user_id)
-    objs.append(grouping)
-    bundle = json.loads(stix2.v21.Bundle(objs).serialize())
-    return bundle
+    member2 = stix2.v21.Relationship(created_by_ref=user2.id,
+                                     source_ref=user2.id,
+                                     target_ref=org.id,
+                                     relationship_type='member-of',
+                                     object_marking_refs=[pii_dm])
 
+    org_loc = stix2.v21.Relationship(created_by_ref=org.id,
+                                     source_ref=org.id,
+                                     target_ref=location,
+                                     relationship_type='incorporated-at',
+                                     object_marking_refs=[pii_dm])
 
-def make_report(user_id):
-    report = stix2.v21.Report(
-              name="Single IP address",
-              created_by_ref=user_id,
-              description="62.171.220.83",
-              published=datetime.now(),
-              report_types='threat-report',
-              object_refs=['location--53c87d5c-a55c-4f4c-a98e-e216e91ef895'])
-    return json.loads(report.serialize())
+    user1_loc = stix2.v21.Relationship(created_by_ref=user1.id,
+                                       source_ref=user1.id,
+                                       target_ref=location,
+                                       relationship_type='operates-at',
+                                       object_marking_refs=[pii_dm])
 
+    user2_loc = stix2.v21.Relationship(created_by_ref=user2.id,
+                                       source_ref=user2.id,
+                                       target_ref=location,
+                                       relationship_type='operates-at',
+                                       object_marking_refs=[pii_dm])
 
-def new_user(username):
-    # Feel free to add any details you like to the user/org,
-    #   these are just the basics...
-    new_username = username
-    user_loc_id = "location--53c87d5c-a55c-4f4c-a98e-e216e91ef895"
-    user_id = stix2.v21.Identity(
-                         identity_class='individual',
-                         name=new_username,
-                         sectors=[slugify("IT Consulting & Other Services")])
-    loc_rel = stix2.v21.Relationship(
-                        created_by_ref=user_id.id,
-                        source_ref=user_id.id,
-                        target_ref=user_loc_id,
-                        relationship_type='operates-at')
-    bundle = json.loads(stix2.v21.Bundle([user_id, loc_rel]).serialize())
-    return json.loads(user_id.serialize()), bundle
+    objects = [user1, user2, org, member1, member2, org_loc, user1_loc,
+               user2_loc]
+
+    bundle = json.loads(stix2.v21.Bundle(objects=objects).serialize())
+    return bundle['objects'], [org.id, user1.id, user2.id]
 
 
-def new_org(created_by_ref):
-    # Feel free to add any details you like to the user/org,
-    #   these are just the basics...
-    new_org_name = 'Acme Inc'
-    org_loc_id = "location--53c87d5c-a55c-4f4c-a98e-e216e91ef895"
-    org_id = stix2.v21.Identity(
-                        created_by_ref=created_by_ref,
-                        identity_class='organization',
-                        name=new_org_name,
-                        sectors=[slugify("IT Consulting & Other Services")])
-    loc_rel = stix2.v21.Relationship(
-                        source_ref=org_id.id,
-                        target_ref=org_loc_id,
-                        relationship_type='incorporated-at')
-    bundle = json.loads(stix2.v21.Bundle([org_id, loc_rel]).serialize())
-    return org_id, bundle
+def make_incident(user_id, target_org, tlp, tlp_dist=None):
+    if tlp == 'white':
+        tlp = stix2.v21.common.TLP_WHITE.id
+    elif tlp == 'green':
+        tlp = stix2.v21.common.TLP_GREEN.id
+    elif tlp == 'amber' or tlp == 'red':
+        if tlp == 'amber':
+            tlp_def_ref = stix2.v21.common.TLP_AMBER.id
+        else:
+            tlp_def_ref = stix2.v21.common.TLP_RED.id
+        tlp = g4i.set_tlpplus(user_id=user_id,
+                              md_name="Super Secret Distro...",
+                              tlp_marking_def_ref=tlp_def_ref,
+                              distribution_refs=tlp_dist)[0]
+    obs1 = stix2.v21.IPv4Address(value='62.171.220.83')
+    obs2 = stix2.v21.DomainName(value='www.altavista.com')
+    obsdata = stix2.v21.ObservedData(created_by_ref=user_id,
+                                     first_observed=datetime.now(),
+                                     last_observed=datetime.now(),
+                                     number_observed=1,
+                                     object_refs=[obs1.id, obs2.id],
+                                     object_marking_refs=[tlp])
+    pattern = (
+       "[file:hashes.'SHA-256' = "
+       "'aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019f']")
+    ind = stix2.v21.Indicator(created_by_ref=user_id,
+                              name='EVENT',
+                              pattern=pattern,
+                              pattern_type='stix',
+                              valid_from=datetime.now(),
+                              indicator_types=['malicious-activity'],
+                              object_marking_refs=[tlp])
+
+    based = stix2.v21.Relationship(created_by_ref=user_id,
+                                   source_ref=ind.id,
+                                   target_ref=obsdata.id,
+                                   relationship_type='based-on',
+                                   object_marking_refs=[tlp])
+    phase_atp = stix2.v21.AttackPattern(created_by_ref=user_id,
+                                        name='PHASE',
+                                        aliases=['EIQ-PHASE-derp'],
+                                        object_marking_refs=[tlp])
+    indicate = stix2.v21.Relationship(created_by_ref=user_id,
+                                      source_ref=ind.id,
+                                      target_ref=phase_atp.id,
+                                      relationship_type='indicates',
+                                      object_marking_refs=[tlp])
+    mitre_id = "attack-pattern--4b74a1d4-b0e9-4ef1-93f1-14ecc6e2f5b5"
+    instance = stix2.v21.Relationship(created_by_ref=user_id,
+                                      source_ref=phase_atp.id,
+                                      target_ref=mitre_id,
+                                      relationship_type='instance-of',
+                                      object_marking_refs=[tlp])
+    inc_props = {'x_eiq_assigned_to_ref': user_id,
+                 'x_eiq_priority': 'High'}
+    inc_atp = stix2.v21.AttackPattern(created_by_ref=user_id,
+                                      name='INCIDENT',
+                                      custom_properties=inc_props,
+                                      object_marking_refs=[tlp])
+    phase_of = stix2.v21.Relationship(created_by_ref=user_id,
+                                      source_ref=phase_atp.id,
+                                      target_ref=inc_atp.id,
+                                      relationship_type='phase-of',
+                                      object_marking_refs=[tlp])
+    targets = stix2.v21.Relationship(created_by_ref=user_id,
+                                     source_ref=inc_atp.id,
+                                     target_ref=target_org,
+                                     relationship_type='targets',
+                                     object_marking_refs=[tlp])
+
+    objects = [obs1, obs2, obsdata, ind, based, phase_atp, indicate,
+               instance, inc_atp, phase_of, targets]
+
+    bundle = json.loads(stix2.v21.Bundle(objects=objects).serialize())
+    return bundle['objects'], [phase_atp.id, inc_atp.id]
 
 
-class TestGit4intel(unittest.TestCase):
+def make_targeting(user_id, campaign_name, targeted_orgid, atp_id, iset_id=None):
 
-    def test_1_setup(self):
-        # Initialize
-        g4i = git4intel.Client('localhost:9200')
-        # Optional cleanup...
-        # g4i.indices.delete_alias(index='_all', name='_all')
-        # g4i.indices.delete(index='_all')
+    cam = stix2.v21.Campaign(created_by_ref=user_id,
+                             name=campaign_name,
+                             object_marking_refs=[stix2.v21.common.TLP_GREEN.id])
+    atp_rel = stix2.v21.Relationship(created_by_ref=user_id,
+                                     source_ref=cam.id,
+                                     target_ref=atp_id,
+                                     relationship_type='uses',
+                                     object_marking_refs=[stix2.v21.common.TLP_GREEN.id])
+    set_rel = stix2.v21.Relationship(created_by_ref=user_id,
+                                     source_ref=cam.id,
+                                     target_ref=iset_id,
+                                     relationship_type='attributed-to',
+                                     object_marking_refs=[stix2.v21.common.TLP_GREEN.id])
+    target = stix2.v21.Relationship(created_by_ref=user_id,
+                                    source_ref=cam.id,
+                                    target_ref=targeted_orgid,
+                                    relationship_type='targets',
+                                    object_marking_refs=[stix2.v21.common.TLP_GREEN.id])
+    objects = [cam, atp_rel, set_rel, target]
 
-        print('Setting up indices and loading core data sets...')
-        self.assertTrue(g4i.store_core_data())
+    bundle = json.loads(stix2.v21.Bundle(objects=objects).serialize())
+    return bundle['objects'], cam.id
 
-        index_info = g4i.cat.indices(format='json')
 
-        found_indices = []
-        for ind in index_info:
-            ind_name = ind['index'].split('--')
-            if len(ind_name) > 1:
-                self.assertTrue(ind_name[0] in index_names)
-                self.assertTrue(re.search("[0-9]{6}", ind_name[1]))
-                found_indices.append(ind_name[0])
+def make_attribution(user_id, actor_name, iset_id):
+    actor = stix2.v21.ThreatActor(created_by_ref=user_id,
+                                  name=actor_name,
+                                  threat_actor_types=["nation-state"],
+                                  object_marking_refs=[stix2.v21.common.TLP_GREEN.id])
+    att_rel = stix2.v21.Relationship(created_by_ref=user_id,
+                                     source_ref=iset_id,
+                                     target_ref=actor.id,
+                                     relationship_type='attributed-to',
+                                     object_marking_refs=[stix2.v21.common.TLP_GREEN.id])
+    objects = [actor, att_rel]
+    bundle = json.loads(stix2.v21.Bundle(objects=objects).serialize())
+    return bundle['objects'], actor.id
 
-        tmp_names = list(index_names.keys())
-        self.assertTrue(found_indices.sort() == tmp_names.sort())
 
-        aliases = g4i.cat.aliases(format='json')
-        alias_test = True
-        for alias in aliases:
-            if len(alias['index'].split('--')) > 1:
-                test_run = False
-                root_name = alias['index'].split('--')[0]
-                if root_name == alias['alias']:
-                    test_run = True
-                if alias['alias'] in index_names[root_name]:
-                    test_run = True
+def get_rels(stix_id):
+    q_id = stix_id.split('--')[1]
 
-                if not test_run:
-                    alias_test = False
+    q = {"query": {"bool": {"should": [
+                                {"match": {"source_ref": q_id}},
+                                {"match": {"target_ref": q_id}}
+    ]}}}
 
-        self.assertTrue(alias_test)
+    res = g4i.search(user_id=g4i.identity['id'], index='relationship',
+                     _md=False, body=q)
 
-    def test_2_setget_orgdata(self):
-        g4i = git4intel.Client('localhost:9200')
-        g4i.store_core_data()
+    id_list = []
+    for obj in res['hits']['hits']:
+        id_list.append(obj['_source']['id'])
+        if obj['_source']['source_ref'] == stix_id:
+            id_list.append(obj['_source']['target_ref'])
+        elif obj['_source']['target_ref'] == stix_id:
+            id_list.append(obj['_source']['source_ref'])
 
-        print('Creating dummy user account...')
-        user_id1, user_bundle1 = new_user('NEW UZ3R')
-        self.assertTrue(g4i.store_objects(user_bundle1['objects'], 'new_user'))
+    return list(set(id_list))
 
-        print('Creating dummy organisation account...')
-        org_id, org_bundle = new_org(user_id1['id'])
-        self.assertTrue(g4i.store_objects(org_bundle['objects'],
-                                          'new_org'))
 
-        print('Assigning created user to the created organisation...')
-        org_rel1 = stix2.v21.Relationship(created_by_ref=user_id1['id'],
-                                          source_ref=user_id1['id'],
-                                          target_ref=org_id['id'],
-                                          relationship_type='member-of')
-        org_rel1 = json.loads(org_rel1.serialize())
-        self.assertTrue(g4i.store_objects(org_rel1, 'new_org'))
+def main():
 
-        print('Create a second user account...')
-        user_id2, user_bundle2 = new_user('Another NEW UZ3R')
-        self.assertTrue(g4i.store_objects(user_bundle2['objects'],
-                                          'new_user'))
+    print(g4i.store_core_data())
+    print(g4i.data_primer())
 
-        print('Invite second user to same organisation...')
-        org_rel2 = stix2.v21.Relationship(created_by_ref=user_id2['id'],
-                                          source_ref=user_id2['id'],
-                                          target_ref=org_id['id'],
-                                          relationship_type='member-of')
-        org_rel2 = json.loads(org_rel2.serialize())
-        self.assertTrue(g4i.store_objects(org_rel2, 'new_org'))
+    # Make org 1:
+    org1, users1 = make_org(username1="User1",
+                            username2="User2",
+                            orgname="Acme Corps")
+    # Event, phase and incident (green)
+    green_inc1, inc_ids1 = make_incident(user_id=users1[1],
+                                         target_org=users1[0],
+                                         tlp='green')
+    # Event, phase and incident (white)
+    green_inc2, inc_ids2 = make_incident(user_id=users1[2],
+                                         target_org=users1[0],
+                                         tlp='white')
 
-        print('Set a new incorporation location for the org...')
-        ao_rel = stix2.v21.Relationship(
-                created_by_ref=user_id2['id'],
-                source_ref=org_id['id'],
-                target_ref='location--70924011-7eb0-452d-aaca-15b0979791c6',
-                relationship_type='incorporated-at')
-        ao_rel = json.loads(ao_rel.serialize())
-        self.assertTrue(g4i.store_objects(ao_rel, 'new_org'))
+    atp_id = "attack-pattern--6aac77c4-eaf2-4366-8c13-ce50ab951f38"
+    iset_id = "intrusion-set--06a11b7e-2a36-47fe-8d3e-82c265df3258"
 
-        time.sleep(2)
+    # Do some targeting analysis...
+    cam, cam_id = make_targeting(user_id=users1[1],
+                                 campaign_name="CAMPAIGN",
+                                 targeted_orgid=users1[0],
+                                 atp_id=atp_id,
+                                 iset_id=iset_id)
 
-        start = time.time()
-        org_info = g4i.get_molecule(user_id=user_id2['id'],
-                                    stix_id=user_id2['id'],
-                                    schema='org')
-        end = time.time()
-        print('Get my org data took: ' + str(end-start))
+    # Do some attribution analysis...
+    actor, actor_id = make_attribution(user_id=users1[1],
+                                       actor_name="THREAT ACTOR",
+                                       iset_id=iset_id)
 
-        org_ids = []
-        ind_ids = []
-        rels = {}
-        for obj in org_info:
-            if obj['type'] == 'identity':
-                if obj['identity_class'] == 'organization':
-                    org_ids.append(obj['id'])
-                else:
-                    ind_ids.append(obj['id'])
-            elif obj['type'] == 'relationship':
-                rels[obj['source_ref']] = obj['target_ref']
+    # Make org 2:
+    org2, users2 = make_org(username1="User1",
+                            username2="User2",
+                            orgname="Arkham Ventures")
+    # Event, phase and incident (red)
+    red_inc1, inc_ids3 = make_incident(user_id=users2[1],
+                                       target_org=users2[0],
+                                       tlp='red',
+                                       tlp_dist=[users1[1], users2[1]])
 
-        self.assertTrue(len(org_ids) > 0)
-        self.assertTrue(len(ind_ids) > 0)
+    objects = org1 + green_inc1 + green_inc2 + org2 + red_inc1 + cam + actor
+    bundle = {"type": "bundle",
+              "id": get_deterministic_uuid(prefix='bundle--',
+                                           seed='fuck-bundles'),
+              "objects": objects}
+    with open('data.json', 'w') as outfile:
+        json.dump(bundle, outfile)
 
-        rel_test = True
-        for rel in rels:
-            test_run = False
-            if rel in org_ids:
-                if rels[rel] in ind_ids:
-                    test_run = True
-            if rel in ind_ids:
-                if rels[rel] in org_ids:
-                    test_run = True
-            if not test_run:
-                rel_test = False
+    print('Storing sample data...')
+    start = time.time()
+    print(g4i.index_objects(user_id=users1[1], objects=objects,
+                            refresh='wait_for'))
+    end = time.time()
+    print(end-start)
 
-        self.assertTrue(rel_test)
+    print('Get org1 info...')
+    start = time.time()
+    res = g4i.get_molecule(user_id=users1[1],
+                           stix_ids=[users1[0]],
+                           schema_name='org',
+                           objs=True,
+                           pivot=True)
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
-    def test_3_setget_intel(self):
-        g4i = git4intel.Client('localhost:9200')
-        g4i.store_core_data()
+    print('Get inc1...')
+    start = time.time()
+    res = g4i.get_molecule(user_id=users1[1],
+                           stix_ids=[inc_ids1[1]],
+                           schema_name='incident',
+                           objs=True,
+                           pivot=False)
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
-        # Make a valid commit from Adam's suggested 'event' data as a grouping
-        print('Making 2 event commits...')
-        user_id1, user_bundle1 = new_user('NEW UZ3R')
-        bundle = make_valid_commit(user_id1['id'])
-        self.assertTrue(g4i.store_objects(objects=bundle['objects'],
-                                          molecule_types='event'))
-        user_id2, user_bundle2 = new_user('Another NEW UZ3R')
-        bundle = make_valid_commit2(user_id2['id'])
-        self.assertTrue(g4i.store_objects(objects=bundle['objects'],
-                                          molecule_types='event'))
+    print('Try to get red inc when not on distro...')
+    start = time.time()
+    res = g4i.get_molecule(user_id=users1[2],
+                           stix_ids=[inc_ids3[1]],
+                           schema_name='incident',
+                           objs=True,
+                           pivot=False)
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
-        print('Making random report...')
-        report = make_report(user_id1['id'])
-        self.assertTrue(g4i.store_objects(objects=report))
+    print('Get remediations for an attack pattern...')
+    start = time.time()
+    res = g4i.get_molecule(user_id=users1[2],
+                           stix_ids=["attack-pattern--4b74a1d4-b0e9-4ef1-93f1-14ecc6e2f5b5"],
+                           schema_name='remediation',
+                           objs=True,
+                           pivot=False)
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
-    def test_5_get_objects(self):
-        # Test for search where objid is known
-        # Include searches for values within
-        g4i = git4intel.Client('localhost:9200')
-        g4i.store_core_data()
+    print('Get MC-specific incident format...')
+    start = time.time()
+    res = g4i.get_incidents(user_id=users1[1],
+                            focus='assigned')
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
-        user_id1, user_bundle1 = new_user('NEW UZ3R')
-        report = make_report(user_id1['id'])
-        g4i.store_objects(objects=report)
+    print('Get targeting of campaign...')
+    start = time.time()
+    res = g4i.get_molecule(user_id=users1[2],
+                           stix_ids=[cam_id],
+                           schema_name='targeting',
+                           objs=True,
+                           pivot=False)
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
-        # Give enough time to index...
-        time.sleep(2)
-
-        obj_id = report['id']
-        # Search just objid (test correct id)
-        res = g4i.get_objects(user_id=user_id1['id'], obj_ids=[obj_id])
-        self.assertTrue(res[0]['id'] == obj_id)
-
-        value = '62.171.220.83'
-        # Search objid with values (test value contained - str search)
-        res = g4i.get_objects(user_id=user_id1['id'],
-                              obj_ids=[obj_id],
-                              values=[value])
-        self.assertTrue(value in str(res))
-
-    # def test_6_get_content(self):
-    #     # Test for search where objid is not known
-    #     # Include:
-    #     # - searches for values within
-    #     # - searches for certain types
-    #     # - searches for grouping special case
-    #     # - Combinations of above
-
-    #     g4i = git4intel.Client('localhost:9200')
-    #     g4i.store_core_data()
-
-    #     user_id1, user_bundle1 = new_user('NEW UZ3R')
-    #     bundle = make_valid_commit(user_id1['id'])
-    #     g4i.store_objects(objects=bundle['objects'], molecule_types='event')
-    #     org_id, org_bundle = new_org(user_id1['id'])
-    #     g4i.store_objects(org_bundle['objects'], 'register_org')
-    #     user_id2, user_bundle2 = new_user('Another NEW UZ3R')
-    #     bundle = make_valid_commit2(user_id2['id'])
-    #     g4i.store_objects(objects=bundle['objects'], molecule_types='event')
-
-    #     report = make_report(user_id1['id'])
-    #     self.assertTrue(g4i.store_objects(objects=report))
-
-    #     time.sleep(2)
-
-    #     # Values only - observable value (report and sco)
-    #     value = '62.171.220.83'
-    #     res = g4i.get_content(user_id=user_id1['id'],
-    #                           values=[value])
-
-    #     for obj in res:
-    #         if obj['id'] == report['id']:
-    #             self.assertTrue(value in str(obj))
-    #         elif obj['type'] == 'grouping' or obj['type'] == 'observed-data':
-    #             test_value = obj['x_eiq_object_refs_objects'][0]['value']
-    #             self.assertTrue(test_value == value)
-    #         else:
-    #             self.assertTrue(False)
-    #     self.assertTrue(len(res) == 3)
-
-    #     # Types only
-    #     _type = 'observed-data'
-    #     res = g4i.get_content(user_id=user_id1['id'],
-    #                           types=[_type])
-    #     for obj in res:
-    #         if obj['type'] == 'observed-data':
-    #             test_value = obj['x_eiq_object_refs_objects']
-    #             self.assertTrue(len(test_value) == 2)
-    #         else:
-    #             self.assertTrue(False)
-    #     self.assertTrue(len(res) == 1)
-
-    #     # Grouping with context set - event
-    #     group_type = 'event'
-    #     res = g4i.get_content(user_id=user_id1['id'],
-    #                           types=['grouping'],
-    #                           group_contexts=[group_type])
-    #     for obj in res:
-    #         if obj['type'] == 'grouping':
-    #             self.assertTrue(obj['context'] == 'event')
-
-    #     # Values and types - report/sco filter
-    #     res = g4i.get_content(user_id=user_id1['id'],
-    #                           types=[_type],
-    #                           values=[value])
-    #     for obj in res:
-    #         if obj['type'] == 'observed-data':
-    #             test_value = obj['x_eiq_object_refs_objects'][0]['value']
-    #             self.assertTrue(test_value == value)
-    #         else:
-    #             self.assertTrue(False)
-
-    #     # Values and grouping with context - ip address from event
-    #     res = g4i.get_content(user_id=user_id1['id'],
-    #                           types=['grouping'],
-    #                           group_contexts=[group_type],
-    #                           values=[value])
-    #     for obj in res:
-    #         if obj['type'] == 'grouping':
-    #             self.assertTrue(obj['context'] == 'event')
-    #             test_value = obj['x_eiq_object_refs_objects'][0]['value']
-    #             self.assertTrue(test_value == value)
-    #         else:
-    #             self.assertTrue(False)
-
-    #     # Additional types and grouping with context - grouping and identity
-    #     res = g4i.get_content(user_id=user_id1['id'],
-    #                           types=['grouping', 'identity'],
-    #                           group_contexts=[group_type])
-    #     for obj in res:
-    #         if obj['type'] == 'grouping':
-    #             self.assertTrue(obj['context'] == 'event')
-    #             self.assertTrue(len(obj['x_eiq_object_refs_objects']) == 3)
-    #             for obs in obj['x_eiq_object_refs_objects']:
-    #                 self.assertTrue(type(obs) is dict)
-    #         elif obj['type'] == 'identity':
-    #             self.assertTrue(True)
-    #         else:
-    #             self.assertTrue(False)
-    #     self.assertTrue(len(res) == 2)
-
-    #     # Values, types and grouping with context - grouping, identity and sco
-    #     #   value
-    #     res = g4i.get_content(user_id=user_id1['id'],
-    #                           types=['grouping', 'report'],
-    #                           group_contexts=[group_type],
-    #                           values=[value])
-    #     for obj in res:
-    #         if obj['type'] == 'grouping':
-    #             self.assertTrue(obj['context'] == 'event')
-    #             test_value = obj['x_eiq_object_refs_objects'][0]['value']
-    #             self.assertTrue(test_value == value)
-    #         elif obj['type'] == 'report':
-    #             self.assertTrue(value in str(obj))
-    #         else:
-    #             self.assertTrue(False)
-    #     self.assertTrue(len(res) == 2)
-
-    #     # Eventually add my_org_only == False when md filtering applied
+    print('Get attribution of intrusion set...')
+    start = time.time()
+    res = g4i.get_molecule(user_id=users1[2],
+                           stix_ids=[actor_id],
+                           schema_name='attribution',
+                           objs=True,
+                           pivot=False)
+    end = time.time()
+    pprint(res)
+    print(end-start)
 
 
 if __name__ == '__main__':
-    unittest.main()
+    main()

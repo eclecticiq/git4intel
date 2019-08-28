@@ -565,7 +565,6 @@ class Client(Elasticsearch):
         self.indices.put_alias(index=alias_mapping,
                                name=md_alias_name,
                                body=body)
-        pprint(body)
         return md_alias_name
 
     def get_free_text(self, user_id, phrase, schema=None):
@@ -791,7 +790,7 @@ class Client(Elasticsearch):
             should_list = schema_template['core'] + schema_template['ext']
             schemas = {"core": [{"bool": {"should": should_list}}]}
         else:
-            # In non-pivot, just get core now, but 
+            # In non-pivot, just get core now, but
             schema_data = get_schema(schema_name)
             schemas = {"core": schema_data['core'], "ext": schema_data['ext']}
         check_lst = {'core': [], 'ext': []}
