@@ -15,6 +15,8 @@ from stix2.v21 import CustomMarking
 from stix2.properties import ListProperty, ReferenceProperty
 from pprint import pprint
 import time
+import requests
+from datetime import datetime
 
 from .utils import (
     compare_mappings,
@@ -192,8 +194,8 @@ class Client(Elasticsearch):
 
             _filter = {"bool": {"must": [{"bool": {"should": _schema_should}},
                                          _filter]}}
-        kwargs['body'] = {"query": {"bool": {"must": kwargs['body']['query'],
-                                             "filter": _filter}}}
+        kwargs['body']["query"] = {"bool": {"must": kwargs['body']['query'],
+                                            "filter": _filter}}
         return super().search(**kwargs)
 
     def index(self, user_id, up_version=True, **kwargs):
@@ -536,17 +538,18 @@ class Client(Elasticsearch):
                                      pivot=True)
         org_should = [{"match": {
                         "definition.distribution_refs": user_id_split}}]
-        for org in org_objs:
-            org_id = org['id']
-            if org['type'] == 'organization':
-                org_should.append({"match": {"definition.distribution_refs":
-                                   org_id.split('--')[1]}})
-            valid_refs.append(
-                {"bool": {"must": [
-                    {"match": {"id": org_id.split('--')[1]}},
-                    {"match": {"object_marking_refs":
-                               self.pii_marking['id'].split('--')[1]}}
-                ]}})
+        if org_objs:
+            for org in org_objs:
+                org_id = org['id']
+                if org['type'] == 'organization':
+                    org_should.append({"match": {"definition.distribution_refs":
+                                       org_id.split('--')[1]}})
+                valid_refs.append(
+                    {"bool": {"must": [
+                        {"match": {"id": org_id.split('--')[1]}},
+                        {"match": {"object_marking_refs":
+                                   self.pii_marking['id'].split('--')[1]}}
+                    ]}})
         q = {"query": {"bool": {"should": org_should}}}
         res = self.search(user_id=user_id,
                           index='marking-definition',
@@ -820,6 +823,7 @@ class Client(Elasticsearch):
                             continue
                     except IndexError:
                         pass
+                    pprint(q)
                     res = self.search(user_id=user_id,
                                       body=q,
                                       schema=schema,
@@ -862,7 +866,6 @@ class Client(Elasticsearch):
                 # No more results and still some gaps - worth a rerun...
                 failed += 1
             if failed > 2:
-                pprint(ids)
                 print('Partial molecule matches found, but no full molecules.')
                 return False
         if new_len == 1:
@@ -1324,3 +1327,24 @@ class Client(Elasticsearch):
             if not self.index(user_id=self.identity['id'], body=doc):
                 return False
         return True
+
+    def get_yara(self):
+
+        from bs4 import BeautifulSoup
+        r = requests.get("https://github.com/Yara-Rules/rules/tree/master/Exploit-Kits")
+        print(r.text)
+        soup = BeautifulSoup(r.text)
+        for link in soup.findAll('a', attrs={'href': re.compile("^http://")}):
+            print(link.get('href'))
+
+        # r = requests.get(url)
+        # pattern = (r.text)
+        # ind = stix2.v21.Indicator(created_by_ref=user_id,
+        #                           name='HUNT',
+        #                           pattern=pattern,
+        #                           pattern_type='yara',
+        #                           valid_from=datetime.now(),
+        #                           indicator_types=['malicious-activity'],
+        #                           object_marking_refs=[stix2.v21.common.TLP_GREEN.id])
+
+        # print(r.text)
