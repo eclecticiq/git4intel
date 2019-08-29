@@ -823,7 +823,6 @@ class Client(Elasticsearch):
                             continue
                     except IndexError:
                         pass
-                    pprint(q)
                     res = self.search(user_id=user_id,
                                       body=q,
                                       schema=schema,
@@ -866,6 +865,7 @@ class Client(Elasticsearch):
                 # No more results and still some gaps - worth a rerun...
                 failed += 1
             if failed > 2:
+                pprint(ids)
                 print('Partial molecule matches found, but no full molecules.')
                 return False
         if new_len == 1:

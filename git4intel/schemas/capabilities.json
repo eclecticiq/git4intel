@@ -1,0 +1,59 @@
+{
+    "core": [
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "uses"}},
+            {"match": {"source_ref": "intrusion-set--"}},
+            {"bool": {"should": [
+                {"match": {"target_ref": "tool--"}},
+                {"match": {"target_ref": "malware--"}},
+                {"match": {"target_ref": "attack-pattern--"}}
+            ]}}
+        ]}}
+    ],
+    "ext": [
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "uses"}},
+            {"match": {"source_ref": "intrusion-set--"}},
+            {"match": {"target_ref": "attack-pattern--"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "uses"}},
+            {"match": {"source_ref": "intrusion-set--"}},
+            {"match": {"target_ref": "malware--"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "uses"}},
+            {"match": {"source_ref": "intrusion-set--"}},
+            {"match": {"target_ref": "tool--"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "uses"}},
+            {"match": {"source_ref": "attack-pattern--"}},
+            {"bool": {"should": [
+                {"match": {"target_ref": "tool--"}},
+                {"match": {"target_ref": "malware--"}}
+            ]}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "intrusion-set"}},
+            {"match": {"created_by_ref": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "malware"}},
+            {"match": {"created_by_ref": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "tool"}},
+            {"match": {"created_by_ref": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "attack-pattern"}},
+            {"match": {"created_by_ref": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5"}}
+        ]}}
+    ]
+}

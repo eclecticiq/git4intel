@@ -282,7 +282,22 @@ def get_yara(user_id):
 
 def main():
 
-    get_yara(user_id=g4i.identity['id'])
+    iset = "malware--5f9f7648-04ba-4a9f-bb4c-2a13e74572bd"
+
+    res = g4i.get_molecule(user_id=g4i.identity['id'],
+                           stix_ids=[iset],
+                           schema_name="capabilities",
+                           objs=True)
+
+    pprint(res)
+    bundle = {"type": "bundle",
+              "id": get_deterministic_uuid(prefix='bundle--',
+                                           seed='fuck-bundles'),
+              "objects": res}
+    with open('gamaredon.json', 'w') as outfile:
+        json.dump(bundle, outfile)
+
+    # get_yara(user_id=g4i.identity['id'])
 
     # mitre_atp = "tool--aafea02e-ece5-4bb2-91a6-3bf8c7f38a39"
 
