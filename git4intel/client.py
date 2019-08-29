@@ -194,8 +194,8 @@ class Client(Elasticsearch):
 
             _filter = {"bool": {"must": [{"bool": {"should": _schema_should}},
                                          _filter]}}
-        kwargs['body']["query"] = {"bool": {"must": kwargs['body']['query'],
-                                            "filter": _filter}}
+        kwargs['body'] = {"query": {"bool": {"must": kwargs['body']['query'],
+                                             "filter": _filter}}}
         return super().search(**kwargs)
 
     def index(self, user_id, up_version=True, **kwargs):
@@ -865,7 +865,6 @@ class Client(Elasticsearch):
                 # No more results and still some gaps - worth a rerun...
                 failed += 1
             if failed > 2:
-                pprint(ids)
                 print('Partial molecule matches found, but no full molecules.')
                 return False
         if new_len == 1:
