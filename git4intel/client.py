@@ -194,8 +194,8 @@ class Client(Elasticsearch):
 
             _filter = {"bool": {"must": [{"bool": {"should": _schema_should}},
                                          _filter]}}
-        kwargs['body']["query"]["filter"] = _filter
-        pprint(kwargs['body'])
+        kwargs['body']["query"] = {"bool": {"must": kwargs['body']['query'],
+                                            "filter": _filter}}
         return super().search(**kwargs)
 
     def index(self, user_id, up_version=True, **kwargs):
