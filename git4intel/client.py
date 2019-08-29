@@ -194,8 +194,8 @@ class Client(Elasticsearch):
 
             _filter = {"bool": {"must": [{"bool": {"should": _schema_should}},
                                          _filter]}}
-        kwargs['body']["query"] = {"bool": {"must": kwargs['body']['query'],
-                                            "filter": _filter}}
+        kwargs['body']["query"]["filter"] = _filter
+        pprint(kwargs['body'])
         return super().search(**kwargs)
 
     def index(self, user_id, up_version=True, **kwargs):
@@ -1083,7 +1083,8 @@ class Client(Elasticsearch):
                                            schema_name='phase',
                                            objs=True,
                                            pivot=False)
-                    inc.append(phase_objs)
+                    if phase_objs:
+                        inc.append(phase_objs)
                 except KeyError:
                     pass
             output.append(inc)

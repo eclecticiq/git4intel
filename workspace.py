@@ -261,8 +261,13 @@ def get_yara(user_id):
     tmp_pattern = "[file:hashes.'SHA-256' = 'aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019f']"
     for url in urls:
         r = requests.get(url)
+        yara_desc = re.search('description = "(.*)"', r.text)
+        if yara_desc:
+            name = yara_desc.group(1)
+        else:
+            name = 'HUNT'
         ind = stix2.v21.Indicator(created_by_ref=user_id,
-                                  name='HUNT',
+                                  name=name,
                                   pattern_type='yara',
                                   pattern=tmp_pattern,
                                   valid_from=datetime.now(),
@@ -270,34 +275,34 @@ def get_yara(user_id):
                                   object_marking_refs=[stix2.v21.common.TLP_GREEN.id])
         ind = json.loads(ind.serialize())
         ind['pattern'] = base64.b64encode(str(r.text).encode())
-        objects.append(ind)
+        print(ind['name'], ind['id'])
+        print(g4i.index(user_id=g4i.identity['id'], body=ind))
 
-        yara_desc = re.search('description = "(.*)"', r.text)
-        if yara_desc:
-            q = {"min_score": 5,
-                 "query": {"multi_match": {"query": yara_desc.group(1)}}}
-            data = g4i.search(user_id=user_id, body=q)
-            pprint(data)
+        q = {"query": {"more_like_this": {"fields": ["name", "description"],
+                                          "like": name}}}
+        # pprint(q)
+        res = g4i.search(user_id=user_id, index='indicator', body=q)
+        pprint(res)
 
 
 def main():
 
-    iset = "malware--5f9f7648-04ba-4a9f-bb4c-2a13e74572bd"
+    # iset = "malware--5f9f7648-04ba-4a9f-bb4c-2a13e74572bd"
 
-    res = g4i.get_molecule(user_id=g4i.identity['id'],
-                           stix_ids=[iset],
-                           schema_name="capabilities",
-                           objs=True)
+    # res = g4i.get_molecule(user_id=g4i.identity['id'],
+    #                        stix_ids=[iset],
+    #                        schema_name="capabilities",
+    #                        objs=True)
 
-    pprint(res)
-    bundle = {"type": "bundle",
-              "id": get_deterministic_uuid(prefix='bundle--',
-                                           seed='fuck-bundles'),
-              "objects": res}
-    with open('gamaredon.json', 'w') as outfile:
-        json.dump(bundle, outfile)
+    # pprint(res)
+    # bundle = {"type": "bundle",
+    #           "id": get_deterministic_uuid(prefix='bundle--',
+    #                                        seed='fuck-bundles'),
+    #           "objects": res}
+    # with open('gamaredon.json', 'w') as outfile:
+    #     json.dump(bundle, outfile)
 
-    # get_yara(user_id=g4i.identity['id'])
+    get_yara(user_id=g4i.identity['id'])
 
     # mitre_atp = "tool--aafea02e-ece5-4bb2-91a6-3bf8c7f38a39"
 
