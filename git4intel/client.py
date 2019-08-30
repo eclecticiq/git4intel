@@ -610,6 +610,34 @@ class Client(Elasticsearch):
             output.append(hit_row)
         return output
 
+    def get_phase_count(self, user_id, mitre_atp_id, days=30):
+        """Gets the number of phases that have been categorised to this Mitre
+        ATT&CK pattern within a given time period.
+
+        .. note::
+
+            Currently not supporting core overload capabilities (marking
+            definition and molecule filters). The former needs implementing as
+            an overload of es.count(), the latter probably should not be
+            implemented as molecules have little effect here.
+
+        Args:
+            user_id (:obj:`str`): STIX2 identity object reference id for the
+                user running the function.
+            mitre_atp_id (:obj:`str`): STIX2 identity object reference id for
+                the Mitre Att&ck pattern
+            days (:obj:`int`): How far back to check from now (days)
+        """
+        day_str = "now-" + str(days) + "d/d"
+        day_q = {"range": {"created": {"gte": day_str, "lt": "now/d"}}}
+        obj_q = {"bool": {"must": [
+                    {"match": {"relationship_type": "phase-of"}},
+                    {"match": {"target_ref": mitre_atp_id}}
+        ]}}
+        q = {"query": {"bool": {"must": [day_q, obj_q]}}}
+        res = self.count(index='relationship', body=q)
+        return res['count']
+
     def get_object(self, user_id, obj_id, _md=True, values=None):
         """Wrapper for the ``get_objects()`` function to get an object from
         it's stix id.

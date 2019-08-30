@@ -40,7 +40,8 @@ admin_fields = [
     'object_marking_refs',
     'granular_markings',
     'defanged',
-    'external_references'
+    'external_references',
+    'valid_from'
 ]
 
 
@@ -273,13 +274,11 @@ def get_yara(user_id):
                                   valid_from=datetime.now(),
                                   indicator_types=['malicious-activity'],
                                   object_marking_refs=[stix2.v21.common.TLP_GREEN.id])
-        print(stix2.v21.common.TLP_GREEN.id)
-        print(stix2.v21.common.TLP_WHITE.id)
-        q = {'query': {'bool': {'filter': {'bool': {'should': [{'bool': {'must_not': {'exists': {'field': 'revoked'}}}},
-                                                   {'bool': {'must_not': {'match': {'revoked': True}}}}]}},
-                    'must': {'match': {'context': 'os-data-markings'}}}}}
-        res = g4i.search(user_id=user_id, index='marking-definition', body=q)
-        pprint(res)
+        # q = {'query': {'bool': {'filter': {'bool': {'should': [{'bool': {'must_not': {'exists': {'field': 'revoked'}}}},
+        #                                            {'bool': {'must_not': {'match': {'revoked': True}}}}]}},
+        #             'must': {'match': {'context': 'os-data-markings'}}}}}
+        # res = g4i.search(user_id=user_id, index='marking-definition', body=q)
+        # pprint(res)
         ind = json.loads(ind.serialize())
         ind['pattern'] = base64.b64encode(str(r.text).encode())
         print(ind['name'], ind['id'])
@@ -289,7 +288,10 @@ def get_yara(user_id):
         _index = id_parts[0]
         _id = id_parts[1]
 
-        q = {"query": {"more_like_this": {"fields": ["name"],
+        obj_fields = list(ind.keys())
+        fields = [field for field in obj_fields if field not in admin_fields]
+
+        q = {"query": {"more_like_this": {"fields": fields,
                                           "like": {"_index": _index, "_id": _id}}}}
         # pprint(q)
         res = g4i.search(user_id=user_id, index='intel', body=q)
@@ -297,6 +299,11 @@ def get_yara(user_id):
 
 
 def main():
+
+    mitre_atp_id = "attack-pattern--4b74a1d4-b0e9-4ef1-93f1-14ecc6e2f5b5"
+
+    print(g4i.get_phase_count(user_id=g4i.identity['id'],
+                              mitre_atp_id=mitre_atp_id))
 
     # iset = "malware--5f9f7648-04ba-4a9f-bb4c-2a13e74572bd"
 
@@ -468,132 +475,132 @@ def main():
     # print(g4i.store_core_data())
     # print(g4i.data_primer())
 
-    # Make org 1:
-    org1, users1 = make_org(username1="User1",
-                            username2="User2",
-                            orgname="Acme Corps")
-    # Event, phase and incident (green)
-    green_inc1, inc_ids1 = make_incident(user_id=users1[1],
-                                         target_org=users1[0],
-                                         tlp='green')
-    # Event, phase and incident (white)
-    green_inc2, inc_ids2 = make_incident(user_id=users1[2],
-                                         target_org=users1[0],
-                                         tlp='white')
+    # # Make org 1:
+    # org1, users1 = make_org(username1="User1",
+    #                         username2="User2",
+    #                         orgname="Acme Corps")
+    # # Event, phase and incident (green)
+    # green_inc1, inc_ids1 = make_incident(user_id=users1[1],
+    #                                      target_org=users1[0],
+    #                                      tlp='green')
+    # # Event, phase and incident (white)
+    # green_inc2, inc_ids2 = make_incident(user_id=users1[2],
+    #                                      target_org=users1[0],
+    #                                      tlp='white')
 
-    atp_id = "attack-pattern--6aac77c4-eaf2-4366-8c13-ce50ab951f38"
-    iset_id = "intrusion-set--06a11b7e-2a36-47fe-8d3e-82c265df3258"
+    # atp_id = "attack-pattern--6aac77c4-eaf2-4366-8c13-ce50ab951f38"
+    # iset_id = "intrusion-set--06a11b7e-2a36-47fe-8d3e-82c265df3258"
 
-    # Do some targeting analysis...
-    cam, cam_id = make_targeting(user_id=users1[1],
-                                 campaign_name="CAMPAIGN",
-                                 targeted_orgid=users1[0],
-                                 atp_id=atp_id,
-                                 iset_id=iset_id)
+    # # Do some targeting analysis...
+    # cam, cam_id = make_targeting(user_id=users1[1],
+    #                              campaign_name="CAMPAIGN",
+    #                              targeted_orgid=users1[0],
+    #                              atp_id=atp_id,
+    #                              iset_id=iset_id)
 
-    # Do some attribution analysis...
-    actor, actor_id = make_attribution(user_id=users1[1],
-                                       actor_name="THREAT ACTOR",
-                                       iset_id=iset_id)
+    # # Do some attribution analysis...
+    # actor, actor_id = make_attribution(user_id=users1[1],
+    #                                    actor_name="THREAT ACTOR",
+    #                                    iset_id=iset_id)
 
-    # Make org 2:
-    org2, users2 = make_org(username1="User1",
-                            username2="User2",
-                            orgname="Arkham Ventures")
-    # Event, phase and incident (red)
-    red_inc1, inc_ids3 = make_incident(user_id=users2[1],
-                                       target_org=users2[0],
-                                       tlp='red',
-                                       tlp_dist=[users1[1], users2[1]])
+    # # Make org 2:
+    # org2, users2 = make_org(username1="User1",
+    #                         username2="User2",
+    #                         orgname="Arkham Ventures")
+    # # Event, phase and incident (red)
+    # red_inc1, inc_ids3 = make_incident(user_id=users2[1],
+    #                                    target_org=users2[0],
+    #                                    tlp='red',
+    #                                    tlp_dist=[users1[1], users2[1]])
 
-    objects = org1 + green_inc1 + green_inc2 + org2 + red_inc1 + cam + actor
-    bundle = {"type": "bundle",
-              "id": get_deterministic_uuid(prefix='bundle--',
-                                           seed='fuck-bundles'),
-              "objects": objects}
-    with open('data.json', 'w') as outfile:
-        json.dump(bundle, outfile)
+    # objects = org1 + green_inc1 + green_inc2 + org2 + red_inc1 + cam + actor
+    # bundle = {"type": "bundle",
+    #           "id": get_deterministic_uuid(prefix='bundle--',
+    #                                        seed='fuck-bundles'),
+    #           "objects": objects}
+    # with open('data.json', 'w') as outfile:
+    #     json.dump(bundle, outfile)
 
-    print('Storing sample data...')
-    start = time.time()
-    print(g4i.index_objects(user_id=users1[1], objects=objects,
-                            refresh='wait_for'))
-    end = time.time()
-    print(end-start)
+    # print('Storing sample data...')
+    # start = time.time()
+    # print(g4i.index_objects(user_id=users1[1], objects=objects,
+    #                         refresh='wait_for'))
+    # end = time.time()
+    # print(end-start)
 
-    print('Get org1 info...')
-    start = time.time()
-    res = g4i.get_molecule(user_id=users1[1],
-                           stix_ids=[users1[0]],
-                           schema_name='org',
-                           objs=True,
-                           pivot=True)
-    end = time.time()
-    pprint(res)
-    print(end-start)
+    # print('Get org1 info...')
+    # start = time.time()
+    # res = g4i.get_molecule(user_id=users1[1],
+    #                        stix_ids=[users1[0]],
+    #                        schema_name='org',
+    #                        objs=True,
+    #                        pivot=True)
+    # end = time.time()
+    # pprint(res)
+    # print(end-start)
 
-    print('Get inc1...')
-    start = time.time()
-    res = g4i.get_molecule(user_id=users1[1],
-                           stix_ids=[inc_ids1[1]],
-                           schema_name='incident',
-                           objs=True,
-                           pivot=False)
-    end = time.time()
-    pprint(res)
-    print(end-start)
+    # print('Get inc1...')
+    # start = time.time()
+    # res = g4i.get_molecule(user_id=users1[1],
+    #                        stix_ids=[inc_ids1[1]],
+    #                        schema_name='incident',
+    #                        objs=True,
+    #                        pivot=False)
+    # end = time.time()
+    # pprint(res)
+    # print(end-start)
 
-    print('Try to get red inc when not on distro...')
-    start = time.time()
-    res = g4i.get_molecule(user_id=users1[2],
-                           stix_ids=[inc_ids3[1]],
-                           schema_name='incident',
-                           objs=True,
-                           pivot=False)
-    end = time.time()
-    pprint(res)
-    print(end-start)
+    # print('Try to get red inc when not on distro...')
+    # start = time.time()
+    # res = g4i.get_molecule(user_id=users1[2],
+    #                        stix_ids=[inc_ids3[1]],
+    #                        schema_name='incident',
+    #                        objs=True,
+    #                        pivot=False)
+    # end = time.time()
+    # pprint(res)
+    # print(end-start)
 
-    print('Get remediations for an attack pattern...')
-    start = time.time()
-    res = g4i.get_molecule(user_id=users1[2],
-                           stix_ids=["attack-pattern--4b74a1d4-b0e9-4ef1-93f1-14ecc6e2f5b5"],
-                           schema_name='remediation',
-                           objs=True,
-                           pivot=False)
-    end = time.time()
-    pprint(res)
-    print(end-start)
+    # print('Get remediations for an attack pattern...')
+    # start = time.time()
+    # res = g4i.get_molecule(user_id=users1[2],
+    #                        stix_ids=["attack-pattern--4b74a1d4-b0e9-4ef1-93f1-14ecc6e2f5b5"],
+    #                        schema_name='remediation',
+    #                        objs=True,
+    #                        pivot=False)
+    # end = time.time()
+    # pprint(res)
+    # print(end-start)
 
-    print('Get MC-specific incident format...')
-    start = time.time()
-    res = g4i.get_incidents(user_id=users1[1],
-                            focus='assigned')
-    end = time.time()
-    pprint(res)
-    print(end-start)
+    # print('Get MC-specific incident format...')
+    # start = time.time()
+    # res = g4i.get_incidents(user_id=users1[1],
+    #                         focus='assigned')
+    # end = time.time()
+    # pprint(res)
+    # print(end-start)
 
-    print('Get targeting of campaign...')
-    start = time.time()
-    res = g4i.get_molecule(user_id=users1[2],
-                           stix_ids=[cam_id],
-                           schema_name='targeting',
-                           objs=True,
-                           pivot=False)
-    end = time.time()
-    pprint(res)
-    print(end-start)
+    # print('Get targeting of campaign...')
+    # start = time.time()
+    # res = g4i.get_molecule(user_id=users1[2],
+    #                        stix_ids=[cam_id],
+    #                        schema_name='targeting',
+    #                        objs=True,
+    #                        pivot=False)
+    # end = time.time()
+    # pprint(res)
+    # print(end-start)
 
-    print('Get attribution of intrusion set...')
-    start = time.time()
-    res = g4i.get_molecule(user_id=users1[2],
-                           stix_ids=[actor_id],
-                           schema_name='attribution',
-                           objs=True,
-                           pivot=False)
-    end = time.time()
-    pprint(res)
-    print(end-start)
+    # print('Get attribution of intrusion set...')
+    # start = time.time()
+    # res = g4i.get_molecule(user_id=users1[2],
+    #                        stix_ids=[actor_id],
+    #                        schema_name='attribution',
+    #                        objs=True,
+    #                        pivot=False)
+    # end = time.time()
+    # pprint(res)
+    # print(end-start)
 
 
 if __name__ == '__main__':
