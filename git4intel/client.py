@@ -30,6 +30,7 @@ from .utils import (
     get_system_id,
     get_system_org,
     get_system_to_org,
+    hits_from_res,
     md_time_index,
     new_obj_version,
     stix_to_elk,
@@ -179,7 +180,7 @@ class Client(Elasticsearch):
         if schema:
             _schema_should = []
             if isinstance(schema, dict):
-                _schema_should = [schema]
+                _schema_should = schema
             else:
                 if schema == 'all':
                     schemas = get_all_schemas()
@@ -191,11 +192,10 @@ class Client(Elasticsearch):
                         schemas.append(get_schema(_schema))
                 for _schema in schemas:
                     _schema_should += _schema['core'] + _schema['ext']
-
-            _filter = {"bool": {"must": [{"bool": {"should": _schema_should}},
-                                         _filter]}}
-        kwargs['body'] = {"query": {"bool": {"must": kwargs['body']['query'],
-                                             "filter": _filter}}}
+                _schema_should = {"bool": {"should": _schema_should}}
+            _filter = {"bool": {"must": [_schema_should, _filter]}}
+        kwargs['body']['query'] = {"bool": {"must": kwargs['body']['query'],
+                                            "filter": _filter}}
         return super().search(**kwargs)
 
     def index(self, user_id, up_version=True, **kwargs):
@@ -539,7 +539,7 @@ class Client(Elasticsearch):
         org_should = [{"match": {
                         "definition.distribution_refs": user_id_split}}]
         if org_objs:
-            for org in org_objs:
+            for org in hits_from_res(org_objs):
                 org_id = org['id']
                 if org['type'] == 'organization':
                     org_should.append({"match": {"definition.distribution_refs":
@@ -557,9 +557,9 @@ class Client(Elasticsearch):
                           filter_path=['hits.hits._source.id'],
                           _md=False)
         if res:
-            for hit in res['hits']['hits']:
+            for hit in hits_from_res(res):
                 valid_refs.append({"match": {"object_marking_refs":
-                                  hit['_source']['id'].split('--')[1]}})
+                                  hit['id'].split('--')[1]}})
         body = {"filter": {"bool": {"should": valid_refs}}}
         alias_info = self.cat.aliases(name=index_alias, format='json')
         alias_mapping = []
@@ -589,19 +589,20 @@ class Client(Elasticsearch):
             that meet the query criteria.
         """
         output = []
-        q = {"query": {"multi_match": {"query": phrase}}}
+        q = {"query": {"multi_match": {"query": phrase}},
+             "sort": [
+                {"created": "desc"}]}
         res = self.search(user_id=user_id, body=q)
+        pprint(res)
         if not res['hits']['hits']:
             return False
         if not schema:
-            for hit in res['hits']['hits']:
-                output.append(hit['_source'])
-            return output
+            return res
 
-        for hit in res['hits']['hits']:
-            hit_row = [hit['_source']]
+        for hit in hits_from_res(res):
+            hit_row = [hit]
             molecule = self.get_molecule(user_id=user_id,
-                                         stix_ids=[hit['_source']['id']],
+                                         stix_ids=[hit['id']],
                                          schema_name=schema,
                                          objs=True,
                                          pivot=False)
@@ -841,7 +842,6 @@ class Client(Elasticsearch):
             q_ids.append({"query_string": {
                             "fields": ["*_ref", "*_refs"],
                             "query": q_str}})
-            q = {"query": {"bool": {"must": {"bool": {"should": q_ids}}}}}
             count = 0
             for key in schemas:
                 for schema in schemas[key]:
@@ -851,6 +851,7 @@ class Client(Elasticsearch):
                             continue
                     except IndexError:
                         pass
+                    q = {"query": {"bool": {"should": q_ids}}}
                     res = self.search(user_id=user_id,
                                       body=q,
                                       schema=schema,
@@ -866,14 +867,14 @@ class Client(Elasticsearch):
                         check_lst[key].append(bool(res))
                     count += 1
                     if res:
-                        for hit in res['hits']['hits']:
+                        for hit in hits_from_res(res):
                             if not pivot and key == 'ext':
                                 try:
-                                    ext_ids.append(hit['_source']['id'])
+                                    ext_ids.append(hit['id'])
                                     continue
                                 except KeyError:
                                     pass
-                            for value in list(hit['_source'].values()):
+                            for value in list(hit.values()):
                                 if isinstance(value, list):
                                     for sub_value in value:
                                         if not sub_value:
@@ -909,17 +910,12 @@ class Client(Elasticsearch):
             q = {"query": {"bool": {"must": [query['query'],
                                              {"bool": {"should": q_objs}}]}}}
         else:
-            q = {"query": {"bool": {"must": {"bool": {"should": q_objs}}}}}
-        res = self.search(user_id=user_id,
-                          body=q,
-                          schema=schema_name,
-                          filter_path=['hits.hits._source'],
-                          _md=_md)
-        output = []
-        if res:
-            for hit in res['hits']['hits']:
-                output.append(hit['_source'])
-        return output
+            q = {"query": {"bool": {"should": q_objs}}}
+        return self.search(user_id=user_id,
+                           body=q,
+                           schema=schema_name,
+                           filter_path=['hits.hits._source'],
+                           _md=_md)
 
     def get_incidents(self, user_id, focus=None):
         """EXAMPLE IMPLEMENTATION OF g4i. Use the molecule schema method to
@@ -961,15 +957,17 @@ class Client(Elasticsearch):
         if focus == 'assigned':
             q = {"query": {"bool":
                            {"must":
-                            {"match": {"x_eiq_assigned_to_ref": userid}}}}}
+                            {"match": {"x_eiq_assigned_to_ref": userid}}}},
+                 "sort": [
+                    {"created": "desc"}]}
             res = self.search(user_id=user_id, index='attack-pattern', body=q,
                               schema='incident',
                               filter_path=['hits.hits._source.id'])
             if not res:
                 print('No assigned incidents')
                 return False
-            for hit in res['hits']['hits']:
-                seeds.append(hit['_source']['id'])
+            for hit in hits_from_res(res):
+                seeds.append(hit['id'])
         elif focus == 'my_org':
             q = {"query": {"bool":
                            {"must":
@@ -984,13 +982,16 @@ class Client(Elasticsearch):
                 print('No organizations in org chart.')
                 return False
             org_ids = []
-            for org in org_objs:
+            for org in hits_from_res(org_objs):
                 org_id = org['id'].split('--')[1]
                 org_ids.append({"match": {"target_ref": org_id}})
 
             q = {"query": {"bool": {"must": [
                                 {"match": {"relationship_type": "targets"}},
-                                {"bool": {"should": org_ids}}]}}}
+                                {"match": {"source_ref": "attack-pattern--"}},
+                                {"bool": {"should": org_ids}}]}},
+                 "sort": [
+                    {"created": {"order": "desc"}}]}
             res = self.search(user_id=user_id, index='relationship', body=q,
                               filter_path=['hits.hits._source.source_ref'])
             if not res:
@@ -998,8 +999,8 @@ class Client(Elasticsearch):
                       'High five your neighbour.')
                 return False
 
-            for obj in res['hits']['hits']:
-                seeds.append(obj['_source']['source_ref'])
+            for obj in hits_from_res(res):
+                seeds.append(obj['source_ref'])
         elif focus == 'my_sectors':
             q = {"query": {"bool": {"must": [
                             {"match": {"identity_class": 'organization'}},
@@ -1014,7 +1015,7 @@ class Client(Elasticsearch):
                 print('No organizations in org chart.')
                 return False
             sectors = []
-            for obj in org_objs:
+            for obj in hits_from_res(org_objs):
                 sectors += obj['sectors']
             if not sectors:
                 print('No sectors defined on organizations.')
@@ -1034,13 +1035,15 @@ class Client(Elasticsearch):
                 print('No incidents in defined sectors.')
                 return False
             org_ids = []
-            for hit in res['hits']['hits']:
-                hit_id = hit['_source']['id'].split('--')[1]
+            for hit in hits_from_res(res):
+                hit_id = hit['id'].split('--')[1]
                 org_ids.append({"match": {"target_ref": hit_id}})
 
             q = {"query": {"bool": {"must": [
                                 {"match": {"relationship_type": "targets"}},
-                                {"bool": {"should": org_ids}}]}}}
+                                {"bool": {"should": org_ids}}]}},
+                 "sort": [
+                    {"created": "desc"}]}
             # MDs reapplied here to ensure PII and other markings are respected
             res = self.search(user_id=user_id, index='relationship', body=q,
                               filter_path=['hits.hits._source.source_ref'])
@@ -1049,8 +1052,8 @@ class Client(Elasticsearch):
                       'High five your neighbour.')
                 return False
 
-            for obj in res['hits']['hits']:
-                seeds.append(obj['_source']['source_ref'])
+            for obj in hits_from_res(res):
+                seeds.append(obj['source_ref'])
         elif focus == 'my_ao':
             q = {"query": {"match": {"identity_class": 'organization'}}}
             org_objs = self.get_molecule(user_id=user_id,
@@ -1063,13 +1066,15 @@ class Client(Elasticsearch):
                 print('No organizations in geo region.')
                 return False
             org_ids = []
-            for org in org_objs:
+            for org in hits_from_res(org_objs):
                 org_id = org['id'].split('--')[1]
                 org_ids.append({"match": {"target_ref": org_id}})
 
             q = {"query": {"bool": {"must": [
                                 {"match": {"relationship_type": "targets"}},
-                                {"bool": {"should": org_ids}}]}}}
+                                {"bool": {"should": org_ids}}]}},
+                 "sort": [
+                    {"created": "desc"}]}
             res = self.search(user_id=user_id, index='relationship', body=q,
                               filter_path=['hits.hits._source.source_ref'])
             if not res:
@@ -1077,18 +1082,20 @@ class Client(Elasticsearch):
                       'High five your neighbour.')
                 return False
 
-            for obj in res['hits']['hits']:
-                seeds.append(obj['_source']['source_ref'])
+            for obj in hits_from_res(res):
+                seeds.append(obj['source_ref'])
         else:
             # Assume global
-            q = {"query": {"exists": {"field": 'x_eiq_assigned_to_ref'}}}
+            q = {"query": {"exists": {"field": 'x_eiq_assigned_to_ref'}},
+                 "sort": [
+                    {"created": "desc"}]}
             res = self.search(user_id=user_id, index='attack-pattern', body=q,
                               filter_path=['hits.hits._source.id'])
             if not res:
                 print('No incidents assigned.')
                 return False
-            for hit in res['hits']['hits']:
-                seeds.append(hit['_source']['id'])
+            for hit in hits_from_res(res):
+                seeds.append(hit['id'])
 
         output = []
         for seed in seeds:
@@ -1097,12 +1104,14 @@ class Client(Elasticsearch):
                                          schema_name='incident',
                                          objs=True,
                                          pivot=False)
-            if not inc_objs or len(inc_objs) < 2:
+            if not inc_objs:
                 continue
-            inc = inc_objs[:]
-            for inc_obj in inc_objs:
+            inc = []
+            for inc_obj in hits_from_res(inc_objs):
+                inc.append(inc_obj)
                 try:
                     if inc_obj['relationship_type'] != 'phase-of':
+                        print(inc_obj['created'])
                         continue
                     phase_objs = self.get_molecule(
                                            user_id=user_id,
@@ -1111,7 +1120,7 @@ class Client(Elasticsearch):
                                            objs=True,
                                            pivot=False)
                     if phase_objs:
-                        inc.append(phase_objs)
+                        inc.append(list(hits_from_res(phase_objs)))
                 except KeyError:
                     pass
             output.append(inc)
@@ -1139,14 +1148,16 @@ class Client(Elasticsearch):
             if org_id.split('--')[0] == 'identity':
                 id_list.append({"match": {"created_by_ref":
                                           org_id.split('--')[1]}})
-        q = {"query": {"bool": {"should": id_list}}}
+        q = {"query": {"bool": {"should": id_list}},
+             "sort": [
+                {"created": "desc"}]}
         res = self.search(user_id=user_id, index='observed-data', body=q,
                           filter_path=['hits.hits._source.id'])
         seeds = []
         if not res:
             return False
-        for hit in res['hits']['hits']:
-            seeds.append(hit['_source']['id'])
+        for hit in hits_from_res(res):
+            seeds.append(hit['id'])
 
         output = []
         for seed in seeds:
@@ -1154,7 +1165,7 @@ class Client(Elasticsearch):
                                     schema_name='event', pivot=False,
                                     objs=True)
             if res:
-                output.append(res)
+                output.append(list(hits_from_res(res)))
         return output
 
     def get_countries(self):
@@ -1171,10 +1182,12 @@ class Client(Elasticsearch):
         res = self.search(user_id=self.identity['id'],
                           index='location',
                           body=q,
-                          _source=['name', 'id'])
+                          _source=['name', 'id'],
+                          filter_path=['hits.hits._source.id',
+                                       'hits.hits._source.name'])
         countries = {}
-        for hit in res['hits']['hits']:
-            countries[hit['_source']['id']] = hit['_source']['name']
+        for hit in hits_from_res(res):
+            countries[hit['id']] = hit['name']
         return countries
 
     # SETUP:

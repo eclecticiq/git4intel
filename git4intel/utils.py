@@ -39,6 +39,11 @@ def get_deterministic_uuid(prefix=None, seed=None):
     return "{}{}".format(prefix, stix_id)
 
 
+def hits_from_res(es_res):
+    for source in es_res['hits']['hits']:
+        yield source.get('_source', None)
+
+
 def update(d, u):
     for k, v in u.items():
         if isinstance(v, collections.Mapping):

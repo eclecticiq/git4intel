@@ -300,10 +300,21 @@ def get_yara(user_id):
 
 def main():
 
-    mitre_atp_id = "attack-pattern--4b74a1d4-b0e9-4ef1-93f1-14ecc6e2f5b5"
+    # res = g4i.get_free_text(user_id=g4i.identity['id'], phrase='Secret')
+    # pprint(res)
 
-    print(g4i.get_phase_count(user_id=g4i.identity['id'],
-                              mitre_atp_id=mitre_atp_id))
+    # assertion = {
+    #     "id": get_deterministic_uuid(prefix='assertion--'),
+    #     "type": "assertion",
+    #     "in_object_refs": ["relationship--41414141-4141-4141-4141-414141414141"],
+    #     "out_object_refs": ["relationship--42424242-4242-4242-4242-424242424242"]
+    # }
+    # print(json.dumps(assertion))
+
+    # mitre_atp_id = "attack-pattern--4b74a1d4-b0e9-4ef1-93f1-14ecc6e2f5b5"
+
+    # print(g4i.get_phase_count(user_id=g4i.identity['id'],
+    #                           mitre_atp_id=mitre_atp_id))
 
     # iset = "malware--5f9f7648-04ba-4a9f-bb4c-2a13e74572bd"
 
@@ -483,6 +494,8 @@ def main():
     # green_inc1, inc_ids1 = make_incident(user_id=users1[1],
     #                                      target_org=users1[0],
     #                                      tlp='green')
+
+    # time.sleep(5)
     # # Event, phase and incident (white)
     # green_inc2, inc_ids2 = make_incident(user_id=users1[2],
     #                                      target_org=users1[0],
@@ -514,12 +527,12 @@ def main():
     #                                    tlp_dist=[users1[1], users2[1]])
 
     # objects = org1 + green_inc1 + green_inc2 + org2 + red_inc1 + cam + actor
-    # bundle = {"type": "bundle",
-    #           "id": get_deterministic_uuid(prefix='bundle--',
-    #                                        seed='fuck-bundles'),
-    #           "objects": objects}
-    # with open('data.json', 'w') as outfile:
-    #     json.dump(bundle, outfile)
+    # # bundle = {"type": "bundle",
+    # #           "id": get_deterministic_uuid(prefix='bundle--',
+    # #                                        seed='fuck-bundles'),
+    # #           "objects": objects}
+    # # with open('data.json', 'w') as outfile:
+    # #     json.dump(bundle, outfile)
 
     # print('Storing sample data...')
     # start = time.time()
@@ -575,7 +588,7 @@ def main():
     # print('Get MC-specific incident format...')
     # start = time.time()
     # res = g4i.get_incidents(user_id=users1[1],
-    #                         focus='assigned')
+    #                         focus='my_org')
     # end = time.time()
     # pprint(res)
     # print(end-start)
