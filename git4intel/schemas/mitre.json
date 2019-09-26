@@ -1,5 +1,6 @@
 {
-    "core": [
+    "name": "mitre",
+    "core": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "attack-pattern"}},
             {"match": {"created_by_ref": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5"}}
@@ -38,13 +39,13 @@
                 {"match": {"target_ref": "tool--"}}
             ]}}
         ]}}
-    ],
-    "ext": [
+    ]}},
+    "ext": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "intrusion-set"}}
         ]}},
         {"bool": {"must": [
             {"match": {"type": "course-of-action"}}
         ]}}
-    ]
+    ]}}
 }

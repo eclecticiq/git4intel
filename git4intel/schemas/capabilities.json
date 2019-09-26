@@ -1,5 +1,6 @@
 {
-    "core": [
+    "name": "capabilities",
+    "core": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "relationship"}},
             {"match": {"relationship_type": "uses"}},
@@ -10,8 +11,8 @@
                 {"match": {"target_ref": "attack-pattern--"}}
             ]}}
         ]}}
-    ],
-    "ext": [
+    ]}},
+    "ext": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "relationship"}},
             {"match": {"relationship_type": "uses"}},
@@ -55,5 +56,5 @@
             {"match": {"type": "attack-pattern"}},
             {"match": {"created_by_ref": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5"}}
         ]}}
-    ]
+    ]}}
 }

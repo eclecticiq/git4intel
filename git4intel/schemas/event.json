@@ -1,5 +1,6 @@
 {
-    "core": [
+    "name": "events",
+    "core": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "observed-data"}},
             {"exists": {"field": "object_refs"}}
@@ -24,13 +25,13 @@
                                 {"match": {"type": "network-traffic"}},
                                 {"match": {"type": "url"}}
         ]}}}}
-    ],
-    "ext": [
+    ]}},
+    "ext": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "relationship"}},
             {"match": {"relationship_type": "based-on"}},
             {"match": {"source_ref": "indicator--"}},
             {"match": {"target_ref": "observed-data--"}}
         ]}}
-    ]
+    ]}}
 }

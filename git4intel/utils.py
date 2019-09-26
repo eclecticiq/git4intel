@@ -72,25 +72,6 @@ def todays_index(index_alias):
     return (index_alias + '--' + datetime.now().strftime("%y%m%d"))
 
 
-def get_schema(schema_name, all=False):
-    schema_name = schema_name + '.json'
-    try:
-        return json.loads(pkg_resources.read_text(schemas, schema_name))
-    except FileNotFoundError:
-        print('No schema by that name')
-        return False
-
-
-def get_all_schemas():
-    schema_list = []
-    for schema_name in pkg_resources.contents(schemas):
-        if not schema_name[-5:] == '.json':
-            continue
-        schema = json.loads(pkg_resources.read_text(schemas, schema_name))
-        schema_list.append(schema)
-    return schema_list
-
-
 def new_obj_version(user_id, stix_object):
     old_id = stix_object['id']
     new_id = get_deterministic_uuid(prefix=old_id.split('--')[0] + '--')
@@ -287,6 +268,9 @@ def stix_to_elk(obj, stix_ver):
         if prop_type not in unsupported_props:
             update(mapping['mappings']['properties'], stixprop_to_field(
                 prop, prop_list[prop]))
+    if obj._type == 'attack-pattern':
+        mapping['mappings']['properties']['x_eiq_assigned_to_ref'] = {'type': 'text', "analyzer": "stixid_analyzer"}
+        mapping['mappings']['properties']['x_eiq_priority'] = {'type': 'keyword'}
     return mapping
 
 

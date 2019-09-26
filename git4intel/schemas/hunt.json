@@ -1,5 +1,6 @@
 {
-    "core": [
+    "name": "hunt",
+    "core": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "indicator"}}
         ]}},
@@ -13,6 +14,6 @@
                 {"match": {"target_ref": "tool--"}}
             ]}}
         ]}}
-    ],
-    "ext": []
+    ]}},
+    "ext": {"bool": {"should": []}}
 }

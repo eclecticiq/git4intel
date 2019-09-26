@@ -1,5 +1,6 @@
 {
-    "core": [
+    "name": "org",
+    "core": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "identity"}},
             {"bool": {"should": [
@@ -17,6 +18,6 @@
             {"match": {"source_ref": "identity--"}},
             {"match": {"target_ref": "identity--"}}
         ]}}
-    ],
-    "ext": []
+    ]}},
+    "ext": {"bool": {"should": []}}
 }

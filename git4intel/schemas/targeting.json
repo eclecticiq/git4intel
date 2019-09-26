@@ -1,5 +1,6 @@
 {
-    "core": [
+    "name": "targeting",
+    "core": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "campaign"}}
         ]}},
@@ -12,8 +13,8 @@
             {"match": {"source_ref": "campaign--"}},
             {"match": {"target_ref": "identity--"}}
         ]}}
-    ],
-    "ext": [
+    ]}},
+    "ext": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "relationship"}},
             {"match": {"relationship_type": "attributed-to"}},
@@ -26,5 +27,5 @@
             {"match": {"source_ref": "campaign--"}},
             {"match": {"target_ref": "attack-pattern--"}}
         ]}}
-    ]
+    ]}}
 }

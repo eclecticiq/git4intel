@@ -18,14 +18,21 @@ import time
 import requests
 from datetime import datetime
 
+try:
+    import importlib.resources as pkg_resources
+except ImportError:
+    # Try backported to PY<37 `importlib_resources`.
+    import importlib_resources as pkg_resources
+
+from . import schemas
+
+
 from .utils import (
     compare_mappings,
-    get_all_schemas,
     get_deterministic_uuid,
     get_locations,
     get_marking_definitions,
     get_pii_marking,
-    get_schema,
     get_stix_ver_name,
     get_system_id,
     get_system_org,
@@ -124,6 +131,9 @@ class Client(Elasticsearch):
         else:
             raise ValueError("Multiple active OS marking groups detected.")
 
+    def real_search(self, **kwargs):
+        return super().search(**kwargs)
+
     def search(self, user_id, schema=None, _md=None, revoked=None, **kwargs):
         """Wrapper for the elasticsearch ``search()`` method.
 
@@ -176,22 +186,22 @@ class Client(Elasticsearch):
                                         "field": "revoked"}}}},
                                     {"bool": {"must_not": {"match": {
                                         "revoked": True}}}}]}}
-
         if schema:
             _schema_should = []
             if isinstance(schema, dict):
                 _schema_should = schema
             else:
                 if schema == 'all':
-                    schemas = get_all_schemas()
+                    schemas = self.get_all_schemas()
                 else:
                     if isinstance(schema, str):
                         schema = [schema]
                     schemas = []
                     for _schema in schema:
-                        schemas.append(get_schema(_schema))
+                        schemas.append(self.get_schema(_schema))
                 for _schema in schemas:
-                    _schema_should += _schema['core'] + _schema['ext']
+                    _schema_should += (_schema['core']['bool']['should'] +
+                                       _schema['ext']['bool']['should'])
                 _schema_should = {"bool": {"should": _schema_should}}
             _filter = {"bool": {"must": [_schema_should, _filter]}}
         kwargs['body']['query'] = {"bool": {"must": kwargs['body']['query'],
@@ -216,9 +226,12 @@ class Client(Elasticsearch):
             objects originally submitted or the newly created objects if
             up-versioning occurs).
         """
-        obj_id_parts = kwargs['body']['id'].split('--')
-        index_name = obj_id_parts[0]
-        doc_id = obj_id_parts[1]
+        try:
+            obj_id_parts = kwargs['body']['id'].split('--')
+            index_name = obj_id_parts[0]
+            doc_id = obj_id_parts[1]
+        except KeyError:
+            pass
 
         if 'index' not in kwargs:
             kwargs['index'] = index_name
@@ -226,13 +239,13 @@ class Client(Elasticsearch):
             kwargs['id'] = doc_id
         if 'refresh' not in kwargs:
             kwargs['refresh'] = False
-        if not self.exists(index=index_name,
-                           id=doc_id,
+        if not self.exists(index=kwargs['index'],
+                           id=kwargs['id'],
                            _source=False,
                            ignore=[400, 404]):
             res = super().index(**kwargs)
             if res['result'] == 'created':
-                return kwargs['body']['id']
+                return kwargs['id']
             return False
 
         if not up_version:
@@ -280,6 +293,61 @@ class Client(Elasticsearch):
         return self.index(user_id=user_id, up_version=up_version,
                           body=objects, refresh=refresh)
 
+    def __load_schemas(self):
+        mappings = self.indices.get_mapping(index="_all")
+        master_map = {}
+        for mapping in mappings:
+            if mapping[:1] == '.':
+                continue
+            master_map.update(mappings[mapping]['mappings']['properties'])
+        master_map['core'] = {'type': 'percolator'}
+        master_map['ext'] = {'type': 'percolator'}
+        master_map = {
+            "settings": {
+                "analysis": {
+                    "analyzer": {
+                        "stixid_analyzer": {
+                            "tokenizer": "id_split"
+                        }
+                    },
+                    "tokenizer": {
+                        "id_split": {
+                            "type": "pattern",
+                            "pattern": "--"
+                        }
+                    }
+                }
+
+            },
+            'mappings': {'properties': master_map}}
+
+        self.indices.create(index="stix-perc", body=master_map, ignore=400)
+        for schema_name in pkg_resources.contents(schemas):
+            if not schema_name[-5:] == '.json':
+                continue
+            schema = json.loads(pkg_resources.read_text(schemas, schema_name))
+            if 'id' in schema:
+                _id = schema['id']
+            else:
+                _id = get_deterministic_uuid(prefix='percolator--',
+                                             seed=schema['name'])
+            self.index(user_id=self.identity['id'], index='stix-perc',
+                       id=_id, body=schema, refresh='wait_for')
+        return
+
+    def get_schema(self, schema_name):
+        return self.get(index='stix-perc',
+                        id=get_deterministic_uuid(prefix='percolator--',
+                                                  seed=schema_name))['_source']
+
+    def get_all_schemas(self):
+        q = {"query": {"match_all": {}}}
+        res = self.search(user=self.identity['id'], index='stix-perc', body=q)
+        schema_list = []
+        for obj in hits_from_res(res):
+            schema_list.append(obj)
+        return schema_list
+
     def store_core_data(self):
         """Should be run once for setup of the necessary CTI core data to turn
         elasticsearch in to a CTI repository.
@@ -295,6 +363,7 @@ class Client(Elasticsearch):
         - stores location objects as per the UN M49 standard.
         """
         self.__setup_es(self.stix_ver)
+        self.__load_schemas()
         system_id = get_system_id()
         org_id = get_system_org(self.identity['id'])
         if not self.index_objects(user_id=self.identity['id'],
@@ -810,6 +879,9 @@ class Client(Elasticsearch):
             :obj:`list` of :obj:`dict`: List of JSON serializable python
             dictionaries of the stix2 objects.
         """
+
+        
+
         if _md is None:
             _md = True
         if not isinstance(schema_name, str):
@@ -818,13 +890,15 @@ class Client(Elasticsearch):
         if pivot:
             # In pivot mode, just get all objects that could be relevant (core
             #   and ext)
-            schema_template = get_schema(schema_name)
-            should_list = schema_template['core'] + schema_template['ext']
+            schema_template = self.get_schema(schema_name)
+            should_list = (schema_template['core']['bool']['should'] +
+                           schema_template['ext']['bool']['should'])
             schemas = {"core": [{"bool": {"should": should_list}}]}
         else:
             # In non-pivot, just get core now, but
-            schema_data = get_schema(schema_name)
-            schemas = {"core": schema_data['core'], "ext": schema_data['ext']}
+            schema_data = self.get_schema(schema_name)
+            schemas = {"core": schema_data['core']['bool']['should'],
+                       "ext": schema_data['ext']['bool']['should']}
         check_lst = {'core': [], 'ext': []}
 
         failed = 0

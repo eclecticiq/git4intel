@@ -1,5 +1,6 @@
 {
-    "core": [
+    "name": "remediation",
+    "core": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "relationship"}},
             {"match": {"relationship_type": "mitigates"}},
@@ -12,6 +13,6 @@
         {"bool": {"must": [
             {"match": {"type": "course-of-action"}}
         ]}}
-    ],
-    "ext": []
+    ]}},
+    "ext": {"bool": {"should": []}}
 }

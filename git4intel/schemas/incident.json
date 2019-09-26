@@ -1,31 +1,34 @@
 {
-    "core": [
-        {"bool": {"must": [
-            {"match": {"type": "attack-pattern"}},
-            {"match": {"x_eiq_assigned_to_ref": "identity--"}},
-            {"exists": {"field": "x_eiq_priority"}}
-        ]}},
-        {"bool": {"must": [
-            {"match": {"type": "identity"}},
-            {"bool": {"should": [
-                {"match": {"identity_class": "individual"}},
-                {"match": {"identity_class": "system"}},
-                {"match": {"identity_class": "organization"}}
+    "name": "incident",
+    "core": 
+        {"bool": {"should": [
+            {"bool": {"must": [
+                {"match": {"type": "attack-pattern"}},
+                {"match": {"x_eiq_assigned_to_ref": "identity--"}},
+                {"exists": {"field": "x_eiq_priority"}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "identity"}},
+                {"bool": {"should": [
+                    {"match": {"identity_class": "individual"}},
+                    {"match": {"identity_class": "system"}},
+                    {"match": {"identity_class": "organization"}}
+                ]}}
+            ]}},
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"match": {"relationship_type": "targets"}},
+                {"match": {"source_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "identity--"}}
             ]}}
         ]}},
-        {"bool": {"must": [
-            {"match": {"type": "relationship"}},
-            {"match": {"relationship_type": "targets"}},
-            {"match": {"source_ref": "attack-pattern--"}},
-            {"match": {"target_ref": "identity--"}}
+    "ext":
+        {"bool": {"should": [
+            {"bool": {"must": [
+                {"match": {"type": "relationship"}},
+                {"match": {"relationship_type": "phase-of"}},
+                {"match": {"source_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "attack-pattern--"}}
+            ]}}
         ]}}
-    ],
-    "ext": [
-        {"bool": {"must": [
-            {"match": {"type": "relationship"}},
-            {"match": {"relationship_type": "phase-of"}},
-            {"match": {"source_ref": "attack-pattern--"}},
-            {"match": {"target_ref": "attack-pattern--"}}
-        ]}}
-    ]
 }

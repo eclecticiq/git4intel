@@ -1,5 +1,6 @@
 {
-    "core": [
+    "name": "phase",
+    "core": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "indicator"}},
             {"bool": {"should": [
@@ -18,8 +19,8 @@
             {"match": {"source_ref": "indicator--"}},
             {"match": {"target_ref": "attack-pattern--"}}
         ]}}
-    ],
-    "ext": [
+    ]}},
+    "ext": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "relationship"}},
             {"match": {"relationship_type": "phase-of"}},
@@ -38,5 +39,5 @@
             {"match": {"source_ref": "attack-pattern--"}},
             {"match": {"target_ref": "attack-pattern--"}}
         ]}}
-    ]
+    ]}}
 }
