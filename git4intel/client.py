@@ -332,13 +332,12 @@ class Client(Elasticsearch):
                 _id = get_deterministic_uuid(prefix='percolator--',
                                              seed=schema['name'])
             self.index(user_id=self.identity['id'], index='stix-perc',
-                       id=_id, body=schema, refresh='wait_for')
+                       id=_id.split('--')[1], body=schema, refresh='wait_for')
         return
 
     def get_schema(self, schema_name):
-        return self.get(index='stix-perc',
-                        id=get_deterministic_uuid(prefix='percolator--',
-                                                  seed=schema_name))['_source']
+        _id = get_deterministic_uuid(prefix='percolator--', seed=schema_name)
+        return self.get_object(user_id=self.identity['id'], obj_id=_id, _md=False)
 
     def get_all_schemas(self):
         q = {"query": {"match_all": {}}}
@@ -804,6 +803,8 @@ class Client(Elasticsearch):
         for obj_id in obj_ids:
             id_parts = obj_id.split('--')
             _index = id_parts[0]
+            if _index == 'percolator':
+                _index = 'stix-perc'
             _id = id_parts[1]
             if _md:
                 md_alias = self.get_id_markings(user_id=user_id,
@@ -879,8 +880,6 @@ class Client(Elasticsearch):
             :obj:`list` of :obj:`dict`: List of JSON serializable python
             dictionaries of the stix2 objects.
         """
-
-        
 
         if _md is None:
             _md = True
