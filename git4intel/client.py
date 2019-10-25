@@ -337,7 +337,8 @@ class Client(Elasticsearch):
 
     def get_schema(self, schema_name):
         _id = get_deterministic_uuid(prefix='percolator--', seed=schema_name)
-        return self.get_object(user_id=self.identity['id'], obj_id=_id, _md=False)
+        schema = self.get_object(user_id=self.identity['id'], obj_id=_id, _md=False)
+        return schema
 
     def get_all_schemas(self):
         q = {"query": {"match_all": {}}}
@@ -661,7 +662,6 @@ class Client(Elasticsearch):
              "sort": [
                 {"created": "desc"}]}
         res = self.search(user_id=user_id, body=q)
-        pprint(res)
         if not res['hits']['hits']:
             return False
         if not schema:
@@ -803,9 +803,10 @@ class Client(Elasticsearch):
         for obj_id in obj_ids:
             id_parts = obj_id.split('--')
             _index = id_parts[0]
+            _id = id_parts[1]
             if _index == 'percolator':
                 _index = 'stix-perc'
-            _id = id_parts[1]
+                _id = 'percolator--' + id_parts[1]
             if _md:
                 md_alias = self.get_id_markings(user_id=user_id,
                                                 index_alias=_index)
@@ -1184,7 +1185,6 @@ class Client(Elasticsearch):
                 inc.append(inc_obj)
                 try:
                     if inc_obj['relationship_type'] != 'phase-of':
-                        print(inc_obj['created'])
                         continue
                     phase_objs = self.get_molecule(
                                            user_id=user_id,
@@ -1217,6 +1217,8 @@ class Client(Elasticsearch):
                                     stix_ids=[user_id],
                                     schema_name='org',
                                     pivot=True)
+        if not org_ids:
+            return False
         for org_id in org_ids:
             if org_id.split('--')[0] == 'identity':
                 id_list.append({"match": {"created_by_ref":
