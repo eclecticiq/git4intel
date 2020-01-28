@@ -293,7 +293,7 @@ def get_pii_marking(created_by_ref):
         id='marking-definition--d7c85080-576f-4b99-aae3-69d05b2d3bf2',
         created='2019-07-20T00:00:00.000Z',
         created_by_ref=created_by_ref,
-        name='Personally Identifiable Information',
+        # name='Personally Identifiable Information',
         definition_type='statement',
         definition=stix2.v21.StatementMarking(
             statement="Personally identifiable data is stored in this system"
@@ -314,7 +314,7 @@ def get_os_licence(created_by_ref):
         id='marking-definition--17e2aadf-7b8e-41fb-b70d-18b864b89a64',
         created='2019-07-20T00:00:00.000Z',
         created_by_ref=created_by_ref,
-        name='Apache 2.0',
+        # name='Apache 2.0',
         definition_type='statement',
         definition=stix2.v21.StatementMarking(
             statement="All data submitted to this repository defaults to the "
