@@ -69,9 +69,9 @@ sdo_indices = [
 
 @CustomMarking('x-tlpplus-marking', [
     ('tlp_marking_def_ref', ReferenceProperty(
-        type='marking-definition', required=True)),
+        valid_types='marking-definition', required=True)),
     ('distribution_refs', ListProperty(
-        ReferenceProperty(type='identity'), required=True))
+        ReferenceProperty(valid_types='identity'), required=True))
 ])
 class TLPPlusMarking(object):
     pass
@@ -806,7 +806,7 @@ class Client(Elasticsearch):
             _id = id_parts[1]
             if _index == 'percolator':
                 _index = 'stix-perc'
-                _id = 'percolator--' + id_parts[1]
+                _id = id_parts[1]
             if _md:
                 md_alias = self.get_id_markings(user_id=user_id,
                                                 index_alias=_index)
@@ -897,6 +897,7 @@ class Client(Elasticsearch):
         else:
             # In non-pivot, just get core now, but
             schema_data = self.get_schema(schema_name)
+            print(schema_data)
             schemas = {"core": schema_data['core']['bool']['should'],
                        "ext": schema_data['ext']['bool']['should']}
         check_lst = {'core': [], 'ext': []}

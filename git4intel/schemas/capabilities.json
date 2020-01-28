@@ -2,14 +2,7 @@
     "name": "capabilities",
     "core": {"bool": {"should": [
         {"bool": {"must": [
-            {"match": {"type": "relationship"}},
-            {"match": {"relationship_type": "uses"}},
-            {"match": {"source_ref": "intrusion-set--"}},
-            {"bool": {"should": [
-                {"match": {"target_ref": "tool--"}},
-                {"match": {"target_ref": "malware--"}},
-                {"match": {"target_ref": "attack-pattern--"}}
-            ]}}
+            {"match": {"type": "attack-pattern"}}
         ]}}
     ]}},
     "ext": {"bool": {"should": [

@@ -1,4 +1,5 @@
 import git4intel
+from git4intel.utils import hits_from_res
 import stix2
 import json
 from slugify import slugify
@@ -301,10 +302,33 @@ def get_yara(user_id):
 
 def main():
 
-    res = g4i.get(index='stix-perc',
-                  id='percolator--741d4b93-54be-4b4f-a329-9d128bef25d9')
+    # g4i.store_core_data()
+    # g4i.data_primer()
 
-    pprint(res)
+    # ind = stix2.v21.Indicator(created_by_ref='identity--ce5be1f3-92b4-4a92-a42a-706bf061e2c7',
+    #                           )
+
+    # rel = stix2.v21.Relationship(created_by_ref='identity--ce5be1f3-92b4-4a92-a42a-706bf061e2c7',
+    #                              target_ref='observed-data--ecbf04c1-97eb-44cc-b690-d7e1303b4558',
+    #                              source_ref=ind.id)
+
+    # user_id = 'identity--ce5be1f3-92b4-4a92-a42a-706bf061e2c7'
+
+    # # obs = stix2.v21.URL(value='www.badthing.com',
+    # #                     id='url--f2b7580e-487f-4b23-a0f8-7bdef90be36f')
+
+    # # print(g4i.get(index='url', id='f2b7580e-487f-4b23-a0f8-7bdef90be36f'))
+
+    # res = g4i.get_events(user_id=user_id)
+    # pprint(res)
+
+    # print(obs)
+    # print(g4i.index(user_id=user_id, body=obs))
+
+    # res = g4i.get(index='stix-perc',
+    #               id='percolator--741d4b93-54be-4b4f-a329-9d128bef25d9')
+
+    # pprint(res)
 
     # res = g4i.get_free_text(user_id=g4i.identity['id'], phrase='Secret')
     # pprint(res)
@@ -711,6 +735,34 @@ def main():
     # start = time.time()
     # res = g4i.get_incidents(user_id=users1[1],
     #                         focus='my_org')
+
+    user_id = 'identity--e10f7a0f-ef60-4ba6-a34e-3fb20849cea5'
+    event_id = 'observed-data--438aa167-dc89-4b8d-8042-89a724b9a114'
+    atp_id = 'attack-pattern--8c32eb4d-805f-4fc5-bf60-c4d476c131b5'
+
+    # res = g4i.get_incidents(user_id=user_id,
+    #                         focus='all')
+
+    # res = g4i.get_molecule(user_id=user_id, stix_ids=[event_id],
+    #                                 schema_name='event', pivot=False,
+    #                                 objs=True)
+
+    # res = g4i.get_events(user_id=user_id)
+
+    res = g4i.get_molecule(
+            user_id=user_id,
+            stix_ids=[atp_id],
+            schema_name="capabilities",
+            objs=True,
+            pivot=False)
+
+    pprint(res)
+
+    # out = []
+    # for obj in hits_from_res(res):
+    #     out.append(obj)
+    # print(out)
+
     # end = time.time()
     # pprint(res)
     # print(end-start)

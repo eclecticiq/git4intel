@@ -1,5 +1,5 @@
 {
-    "name": "events",
+    "name": "event",
     "core": {"bool": {"should": [
         {"bool": {"must": [
             {"match": {"type": "observed-data"}},
