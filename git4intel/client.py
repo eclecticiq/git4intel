@@ -897,7 +897,6 @@ class Client(Elasticsearch):
         else:
             # In non-pivot, just get core now, but
             schema_data = self.get_schema(schema_name)
-            print(schema_data)
             schemas = {"core": schema_data['core']['bool']['should'],
                        "ext": schema_data['ext']['bool']['should']}
         check_lst = {'core': [], 'ext': []}

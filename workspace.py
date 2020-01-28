@@ -738,7 +738,7 @@ def main():
 
     user_id = 'identity--e10f7a0f-ef60-4ba6-a34e-3fb20849cea5'
     event_id = 'observed-data--438aa167-dc89-4b8d-8042-89a724b9a114'
-    atp_id = 'attack-pattern--8c32eb4d-805f-4fc5-bf60-c4d476c131b5'
+    atp_id = 'malware--5f9f7648-04ba-4a9f-bb4c-2a13e74572bd'
 
     # res = g4i.get_incidents(user_id=user_id,
     #                         focus='all')
