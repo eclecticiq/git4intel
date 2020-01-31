@@ -12,6 +12,12 @@
             {"match": {"relationship_type": "targets"}},
             {"match": {"source_ref": "campaign--"}},
             {"match": {"target_ref": "identity--"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "attributed-to"}},
+            {"match": {"source_ref": "campaign--"}},
+            {"match": {"target_ref": "intrusion-set--"}}
         ]}}
     ]}},
     "ext": {"bool": {"should": [

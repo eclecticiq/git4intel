@@ -969,10 +969,10 @@ class Client(Elasticsearch):
                 failed += 1
             if failed > 2:
                 print('Partial molecule matches found, but no full molecules.')
-                return False
+                break
         if new_len == 1:
             print('Only found the seed object.')
-            return False
+            # return False
         if not pivot:
             ids += ext_ids
         if not objs:
