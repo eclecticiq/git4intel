@@ -302,10 +302,9 @@ def get_yara(user_id):
 
 def main():
 
+    g4i.store_core_data()
+    g4i.data_primer()
     print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
-
-    # g4i.store_core_data()
-    # g4i.data_primer()
 
     # ind = stix2.v21.Indicator(created_by_ref='identity--ce5be1f3-92b4-4a92-a42a-706bf061e2c7',
     #                           )

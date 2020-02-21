@@ -7,7 +7,8 @@
         ]}},
         {"bool": {"should": [
             {"match": {"type": "tool"}},
-            {"match": {"type": "malware"}}
+            {"match": {"type": "malware"}},
+            {"match": {"type": "indicator"}}
         ]}},
         {"bool": {"must": [
             {"match": {"type": "relationship"}},
@@ -38,6 +39,16 @@
                 {"match": {"target_ref": "malware--"}},
                 {"match": {"target_ref": "tool--"}}
             ]}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "indicates"}},
+            {"match": {"source_ref": "indicator--"}},
+            {"bool": {"should": [
+                {"match": {"target_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "malware--"}},
+                {"match": {"target_ref": "tool--"}}
+            ]}}
         ]}}
     ]}},
     "ext": {"bool": {"should": [
@@ -46,6 +57,9 @@
         ]}},
         {"bool": {"must": [
             {"match": {"type": "course-of-action"}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "indicator"}}
         ]}}
     ]}}
 }

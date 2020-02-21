@@ -1454,19 +1454,14 @@ class Client(Elasticsearch):
             failed. (Brutal, I know.)
         """
         atk_patt_re = r'TA\d{4}|[T|S|G|M]\d{4}'
-        objs = []
         author_id = get_deterministic_uuid(prefix='identity--', seed='teoseller')
         if not self.exists(index='identity', id=author_id[1]):
-            print('id does not exist')
             author = stix2.v21.Identity(
                             id=author_id,
                             name='Filippo Mottini',
                             identity_class='individual',
                             contact_information='https://github.com/teoseller')
-            objs.append(author)
-            print('created: ' + author.id)
-        else:
-            print('id exists')
+            print(self.index(user_id=self.identity['id'], body=json.loads(author.serialize())))
         obj_md_refs = [
             'marking-definition--17e2aadf-7b8e-41fb-b70d-18b864b89a64',
             stix2.v21.common.TLP_GREEN.id
@@ -1497,7 +1492,7 @@ class Client(Elasticsearch):
                                       valid_from=datetime.now(),
                                       indicator_types=['malicious-activity'],
                                       object_marking_refs=obj_md_refs)
-                        objs.append(ind)
+                        print(self.index(user_id=self.identity['id'], body=json.loads(ind.serialize())))
                         group_ids.append(ind.id)
 
                         try:
@@ -1515,8 +1510,7 @@ class Client(Elasticsearch):
                                   "query": {
                                     "bool": {
                                       "must": [
-                                        {"match": {"external_references.external_id": atk_id}},
-                                        {"match": {"created_by_ref": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5"}}
+                                        {"match": {"external_references.external_id": atk_id}}
                                       ]
                                     }
                                   }
@@ -1525,24 +1519,24 @@ class Client(Elasticsearch):
                             }
                             res = self.real_search(index='attack-pattern', body=q,
                                                    filter_path=['hits.hits._source.id'])
+                            print(atk_id, res)
                             if not res:
                                 continue
                             for atp_id in hits_from_res(res):
                                 indicates = stix2.v21.Relationship(
                                                created_by_ref=author_id,
                                                source_ref=ind.id,
-                                               target_ref=atp_id,
+                                               target_ref=atp_id['id'],
                                                relationship_type='indicates',
                                                object_marking_refs=obj_md_refs)
-                                objs.append(indicates)
+                                print(self.index(user_id=self.identity['id'], body=json.loads(indicates.serialize())))
                 osq_group = stix2.v21.Grouping(
                            object_refs=group_ids,
                            context='osquery-pack',
                            description=desc,
                            object_marking_refs=obj_md_refs)
-                objs.append(osq_group)
-
-        return json.loads(stix2.v21.Bundle(objects=objs).serialize())
+                print(self.index(user_id=self.identity['id'], body=json.loads(osq_group.serialize())))
+        return True
 
     def get_yara(self):
 
