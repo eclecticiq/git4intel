@@ -17,6 +17,7 @@ from pprint import pprint
 import time
 import requests
 from datetime import datetime
+import os
 
 try:
     import importlib.resources as pkg_resources
@@ -29,6 +30,7 @@ from . import schemas
 
 from .utils import (
     compare_mappings,
+    dir_recurse,
     get_deterministic_uuid,
     get_locations,
     get_marking_definitions,
@@ -1443,6 +1445,104 @@ class Client(Elasticsearch):
             if not self.index(user_id=self.identity['id'], body=doc):
                 return False
         return True
+
+    def get_osquery(self, filepath):
+        """Simple get for teoseller's osquery-attack library in stix2.
+
+        Returns:
+            :obj:`bool`: ``True`` for success; ``False`` if any store action
+            failed. (Brutal, I know.)
+        """
+        atk_patt_re = r'TA\d{4}|[T|S|G|M]\d{4}'
+        objs = []
+        author_id = get_deterministic_uuid(prefix='identity--', seed='teoseller')
+        if not self.exists(index='identity', id=author_id[1]):
+            print('id does not exist')
+            author = stix2.v21.Identity(
+                            id=author_id,
+                            name='Filippo Mottini',
+                            identity_class='individual',
+                            contact_information='https://github.com/teoseller')
+            objs.append(author)
+            print('created: ' + author.id)
+        else:
+            print('id exists')
+        obj_md_refs = [
+            'marking-definition--17e2aadf-7b8e-41fb-b70d-18b864b89a64',
+            stix2.v21.common.TLP_GREEN.id
+        ]
+        filepaths = dir_recurse(filepath, '.conf')
+        for filepath in filepaths:
+            with open(filepath, 'r') as f:
+                add_data = {}
+                data = json.loads(f.read())
+                group_ids = []
+                for field in data:
+                    # This author has grouped in to platforms. Atomisation...
+                    if field == 'platform':
+                        add_data[field] = data[field]
+                        continue
+                    if field == 'description':
+                        desc = data[field]
+                        continue
+                    if field != 'queries':
+                        continue
+                    # Grouping obj to point at atoms
+                    for query in data['queries']:
+                        ind = stix2.v21.Indicator(
+                                      created_by_ref=author_id,
+                                      name=query,
+                                      pattern=data['queries'][query],
+                                      pattern_type='osquery',
+                                      valid_from=datetime.now(),
+                                      indicator_types=['malicious-activity'],
+                                      object_marking_refs=obj_md_refs)
+                        objs.append(ind)
+                        group_ids.append(ind.id)
+
+                        try:
+                            atk_ids = re.findall(
+                                         atk_patt_re,
+                                         data['queries'][query]['description'])
+                        except KeyError:
+                            continue
+
+                        for atk_id in atk_ids:
+                            q = {
+                              "query": {
+                                "nested": {
+                                  "path": "external_references",
+                                  "query": {
+                                    "bool": {
+                                      "must": [
+                                        {"match": {"external_references.external_id": atk_id}},
+                                        {"match": {"created_by_ref": "identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5"}}
+                                      ]
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            res = self.real_search(index='attack-pattern', body=q,
+                                                   filter_path=['hits.hits._source.id'])
+                            if not res:
+                                continue
+                            for atp_id in hits_from_res(res):
+                                indicates = stix2.v21.Relationship(
+                                               created_by_ref=author_id,
+                                               source_ref=ind.id,
+                                               target_ref=atp_id,
+                                               relationship_type='indicates',
+                                               object_marking_refs=obj_md_refs)
+                                objs.append(indicates)
+                osq_group = stix2.v21.Grouping(
+                           object_refs=group_ids,
+                           context='osquery-pack',
+                           description=desc,
+                           object_marking_refs=obj_md_refs)
+                objs.append(osq_group)
+
+        return json.loads(stix2.v21.Bundle(objects=objs).serialize())
 
     def get_yara(self):
 

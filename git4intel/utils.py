@@ -7,6 +7,7 @@ import random
 import uuid
 from slugify import slugify
 from pprint import pprint
+import os
 
 try:
     import importlib.resources as pkg_resources
@@ -82,6 +83,16 @@ def new_obj_version(user_id, stix_object):
     ver_rel = json.loads(ver_rel.serialize())
     stix_object['id'] = new_id
     return [ver_rel, stix_object]
+
+
+def dir_recurse(top_level_dir, file_ext, file_list=[]):
+    for item in os.listdir(top_level_dir):
+        if item.endswith(file_ext):
+            file_list.append(os.path.join(top_level_dir, item))
+            continue
+        if os.path.isdir(item):
+            dir_recurse(os.path.join(top_level_dir, item), file_ext, file_list)
+    return file_list
 
 
 # SYSTEM INFO:

@@ -302,6 +302,8 @@ def get_yara(user_id):
 
 def main():
 
+    print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
+
     # g4i.store_core_data()
     # g4i.data_primer()
 
@@ -736,9 +738,9 @@ def main():
     # res = g4i.get_incidents(user_id=users1[1],
     #                         focus='my_org')
 
-    user_id = 'identity--e10f7a0f-ef60-4ba6-a34e-3fb20849cea5'
-    event_id = 'observed-data--438aa167-dc89-4b8d-8042-89a724b9a114'
-    atp_id = 'malware--5f9f7648-04ba-4a9f-bb4c-2a13e74572bd'
+    # user_id = 'identity--e10f7a0f-ef60-4ba6-a34e-3fb20849cea5'
+    # event_id = 'observed-data--438aa167-dc89-4b8d-8042-89a724b9a114'
+    # atp_id = 'malware--5f9f7648-04ba-4a9f-bb4c-2a13e74572bd'
 
     # res = g4i.get_incidents(user_id=user_id,
     #                         focus='all')
@@ -749,14 +751,14 @@ def main():
 
     # res = g4i.get_events(user_id=user_id)
 
-    res = g4i.get_molecule(
-            user_id=user_id,
-            stix_ids=[atp_id],
-            schema_name="capabilities",
-            objs=True,
-            pivot=False)
+    # res = g4i.get_molecule(
+    #         user_id=user_id,
+    #         stix_ids=[atp_id],
+    #         schema_name="capabilities",
+    #         objs=True,
+    #         pivot=False)
 
-    pprint(res)
+    # pprint(res)
 
     # out = []
     # for obj in hits_from_res(res):
