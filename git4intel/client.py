@@ -1454,7 +1454,8 @@ class Client(Elasticsearch):
             failed. (Brutal, I know.)
         """
         atk_patt_re = r'TA\d{4}|[T|S|G|M]\d{4}'
-        author_id = get_deterministic_uuid(prefix='identity--', seed='teoseller')
+        author_id = get_deterministic_uuid(prefix='identity--',
+                                           seed='teoseller')
         if not self.exists(index='identity', id=author_id[1]):
             author = stix2.v21.Identity(
                             id=author_id,
@@ -1463,8 +1464,10 @@ class Client(Elasticsearch):
                             contact_information='https://github.com/teoseller')
             print(self.index(user_id=self.identity['id'], body=json.loads(author.serialize())))
         obj_md_refs = [
+            # Apache 2.0 licence as per github repo
             'marking-definition--17e2aadf-7b8e-41fb-b70d-18b864b89a64',
-            stix2.v21.common.TLP_GREEN.id
+            # Still haven't got this fixed yet... but in this case, not explicitly stated
+            # stix2.v21.common.TLP_GREEN.id
         ]
         filepaths = dir_recurse(filepath, '.conf')
         for filepath in filepaths:

@@ -302,9 +302,20 @@ def get_yara(user_id):
 
 def main():
 
-    g4i.store_core_data()
-    g4i.data_primer()
+    print(g4i.store_core_data())
+    print(g4i.data_primer())
     print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
+
+    # Make org 1:
+    org1, users1 = make_org(username1="User1",
+                            username2="User2",
+                            orgname="Acme Corps")
+
+    print(org1)
+    print(users1)
+
+    print(g4i.index_objects(user_id=g4i.identity['id'], objects=org1,
+                            refresh='wait_for'))
 
     # ind = stix2.v21.Indicator(created_by_ref='identity--ce5be1f3-92b4-4a92-a42a-706bf061e2c7',
     #                           )
