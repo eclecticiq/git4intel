@@ -189,7 +189,7 @@ def stixprop_to_field(prop_name, prop):
         'BooleanProperty': 'boolean',
         'EnumProperty': 'keyword',
         'FloatProperty': 'float',
-        'HashesProperty': 'keyword',
+        'HashesProperty': 'object',
         'HexProperty': 'keyword',
         'IDProperty': 'tokenized',
         'IntegerProperty': 'integer',

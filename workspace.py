@@ -59,6 +59,48 @@ def get_deterministic_uuid(prefix=None, seed=None):
     return "{}{}".format(prefix, stix_id)
 
 
+def make_sighting(ind_id):
+
+    tlp = stix2.v21.common.TLP_GREEN.id
+    pii = g4i.pii_marking['id']
+    atime = '2020-02-24T13:18:21.477143Z'
+    ctime = '2020-02-24T13:18:19.477143Z'
+    mtime = '2020-02-24T13:18:20.477143Z'
+
+    sensor_name = 'OSQuery Agent 56b650'
+    sensor_id = get_deterministic_uuid(prefix='identity--',
+                                       seed=sensor_name)
+
+    sensor_ident = stix2.v21.Identity(id=sensor_id,
+                                      name=sensor_name,
+                                      identity_class='system',
+                                      object_marking_refs=[pii])
+
+    directory = stix2.v21.Directory(path="C:\\Windows\\%")
+    file = stix2.v21.File(hashes={'MD5': 'ce60a5c89ea89a8f7acd0103a786f407'},
+                          parent_directory_ref=directory.id,
+                          atime=atime,
+                          ctime=ctime,
+                          mtime=mtime)
+    obsdata = stix2.v21.ObservedData(created_by_ref=sensor_id,
+                                     first_observed=datetime.now(),
+                                     last_observed=datetime.now(),
+                                     number_observed=1,
+                                     object_refs=[file.id],
+                                     object_marking_refs=[tlp])
+
+    sighting = stix2.v21.Sighting(created_by_ref=sensor_id,
+                                  sighting_of_ref=ind_id,
+                                  observed_data_refs=[obsdata.id],
+                                  where_sighted_refs=[sensor_id],
+                                  object_marking_refs=[tlp])
+
+    objects = [directory, file, obsdata, sensor_ident, sighting]
+
+    bundle = json.loads(stix2.v21.Bundle(objects=objects).serialize())
+    return bundle
+
+
 def make_org(username1, username2, orgname):
     pii_dm = g4i.pii_marking['id']
     sector = slugify("IT Consulting & Other Services")
@@ -302,20 +344,52 @@ def get_yara(user_id):
 
 def main():
 
-    print(g4i.store_core_data())
-    print(g4i.data_primer())
-    print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
+    # print(g4i.store_core_data())
+    # print(g4i.data_primer())
+    # print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
 
-    # Make org 1:
-    org1, users1 = make_org(username1="User1",
-                            username2="User2",
-                            orgname="Acme Corps")
+    # # Make org 1:
+    # org1, users1 = make_org(username1="User1",
+    #                         username2="User2",
+    #                         orgname="Acme Corps")
 
-    print(org1)
-    print(users1)
+    # print(org1)
+    # print(users1)
 
-    print(g4i.index_objects(user_id=g4i.identity['id'], objects=org1,
+    # print(g4i.index_objects(user_id=g4i.identity['id'], objects=org1,
+    #                         refresh='wait_for'))
+
+    res = make_sighting(ind_id='indicator--a6855f67-9494-4fd6-8384-80c5d1b52b8c')
+    user_id = 'identity--87864f4b-839d-428f-96f9-455b9f00d445',
+
+    print(g4i.index_objects(user_id=user_id, objects=res['objects'],
                             refresh='wait_for'))
+
+
+    # q = {"query": {"match_all": {}}}
+
+    # intel_res = g4i.search(user_id='identity--87864f4b-839d-428f-96f9-455b9f00d445',
+    #                        index='intel', body=q)
+    # # tactic_res = g4i.search(user_id='identity--87864f4b-839d-428f-96f9-455b9f00d445',
+    # #                         index='x-mitre-tactic', body=q)
+    # # matrix_res = g4i.search(user_id='identity--87864f4b-839d-428f-96f9-455b9f00d445',
+    # #                         index='x-mitre-matrix', body=q)
+
+    # out = []
+    # for obj in hits_from_res(intel_res):
+    #     out.append(obj)
+
+    # bundle = {"type": "bundle",
+    #           "id": get_deterministic_uuid(prefix='bundle--',
+    #                                        seed='fuck-bundles'),
+    #           "objects": out}
+    # with open('out.json', 'w') as outfile:
+    #     json.dump(bundle, outfile)
+
+
+
+
+
 
     # ind = stix2.v21.Indicator(created_by_ref='identity--ce5be1f3-92b4-4a92-a42a-706bf061e2c7',
     #                           )
