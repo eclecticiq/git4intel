@@ -90,7 +90,7 @@ def dir_recurse(top_level_dir, file_ext, file_list=[]):
         if item.endswith(file_ext):
             file_list.append(os.path.join(top_level_dir, item))
             continue
-        if os.path.isdir(item):
+        if os.path.isdir(os.path.join(top_level_dir, item)):
             dir_recurse(os.path.join(top_level_dir, item), file_ext, file_list)
     return file_list
 

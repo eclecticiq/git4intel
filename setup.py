@@ -16,7 +16,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'elasticsearch',
-        'stix2eiq',
+        # 'stix2eiq',
         'fastjsonschema',
         'taxii2-client',
         'python-slugify',

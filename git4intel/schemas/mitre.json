@@ -49,6 +49,12 @@
                 {"match": {"target_ref": "malware--"}},
                 {"match": {"target_ref": "tool--"}}
             ]}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "derived-from"}},
+            {"match": {"source_ref": "indicator--"}},
+            {"match": {"target_ref": "indicator--"}},
         ]}}
     ]}},
     "ext": {"bool": {"should": [

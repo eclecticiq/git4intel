@@ -1446,6 +1446,68 @@ class Client(Elasticsearch):
                 return False
         return True
 
+    def get_tables(self, filepath):
+        tablename_re = r'table_name\("([^"]{1,128})"'
+        desc_re = r'description\("([^"]{1,99999})"'
+        schema_re = r'schema\(\[(.{1,999999})\]\)'
+        extschema_re = r'extended_schema\(.{1,128}, \[(.{1,99999})\]\)'
+        schemas_re = r'Column\("([^"]{1,32})", (\w{1,32}), "([^"]{1,64})"\)'
+
+        filepaths = dir_recurse(filepath, '.table')
+        tables = {}
+        for filepath in filepaths:
+            with open(filepath, 'r') as f:
+                data = f.read()
+            data = data.replace('\n', '')
+            tablename = re.findall(tablename_re, data)
+            desc = re.findall(desc_re, data)
+            schema = re.findall(schema_re, data)
+            extschema = re.findall(extschema_re, data)
+            tmp = ''.join(schema)
+            if extschema:
+                tmp_ext = ''.join(extschema)
+                tmp = tmp + tmp_ext
+            columns = re.findall(schemas_re, tmp)
+
+            table = {}
+            if desc:
+                table['description'] = desc[0]
+            if columns:
+                table['columns'] = columns
+
+            if tablename:
+                tables[tablename[0]] = table
+            else:
+                tables[os.path.basename(filepath).split('.')[0]] = table
+        return tables
+
+    def extract_known_atps(self, s):
+        atk_patt_re = r'TA\d{4}|[T|S|G|M]\d{4}'
+        atk_ids = re.findall(atk_patt_re, s)
+        obj_ids = []
+        for atk_id in atk_ids:
+            q = {
+              "query": {
+                "nested": {
+                  "path": "external_references",
+                  "query": {
+                    "bool": {
+                      "must": [
+                        {"match": {"external_references.external_id": atk_id}}
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+            res = self.real_search(index='attack-pattern', body=q,
+                                   filter_path=['hits.hits._source.id'])
+            if not res:
+                continue
+            for atp_id in hits_from_res(res):
+                obj_ids.append(atp_id['id'])
+        return obj_ids
+
     def get_osquery(self, filepath):
         """Simple get for teoseller's osquery-attack library in stix2.
 
@@ -1453,7 +1515,6 @@ class Client(Elasticsearch):
             :obj:`bool`: ``True`` for success; ``False`` if any store action
             failed. (Brutal, I know.)
         """
-        atk_patt_re = r'TA\d{4}|[T|S|G|M]\d{4}'
         author_id = get_deterministic_uuid(prefix='identity--',
                                            seed='teoseller')
         if not self.exists(index='identity', id=author_id[1]):
@@ -1472,73 +1533,71 @@ class Client(Elasticsearch):
         filepaths = dir_recurse(filepath, '.conf')
         for filepath in filepaths:
             with open(filepath, 'r') as f:
-                add_data = {}
                 data = json.loads(f.read())
-                group_ids = []
-                for field in data:
-                    # This author has grouped in to platforms. Atomisation...
-                    if field == 'platform':
-                        add_data[field] = data[field]
-                        continue
-                    if field == 'description':
-                        desc = data[field]
-                        continue
-                    if field != 'queries':
-                        continue
-                    # Grouping obj to point at atoms
-                    for query in data['queries']:
-                        ind = stix2.v21.Indicator(
-                                      created_by_ref=author_id,
-                                      name=query,
-                                      pattern=data['queries'][query],
-                                      pattern_type='osquery',
-                                      valid_from=datetime.now(),
-                                      indicator_types=['malicious-activity'],
-                                      object_marking_refs=obj_md_refs)
-                        print(self.index(user_id=self.identity['id'], body=json.loads(ind.serialize())))
-                        group_ids.append(ind.id)
 
-                        try:
-                            atk_ids = re.findall(
-                                         atk_patt_re,
-                                         data['queries'][query]['description'])
-                        except KeyError:
-                            continue
+            top_ind = stix2.v21.Indicator(
+                                  created_by_ref=author_id,
+                                  name=os.path.basename(filepath),
+                                  pattern=data,
+                                  pattern_type='osquery-pack',
+                                  valid_from=datetime.now(),
+                                  indicator_types=['malicious-activity'],
+                                  object_marking_refs=obj_md_refs)
+            print(self.index(user_id=self.identity['id'],
+                             body=json.loads(top_ind.serialize())))
+            try:
+                desc = data['description']
+                ref_atp_ids = self.extract_known_atps(desc)
+                for atp_id in ref_atp_ids:
+                    indicates = stix2.v21.Relationship(
+                                   created_by_ref=author_id,
+                                   source_ref=top_ind.id,
+                                   target_ref=atp_id,
+                                   relationship_type='indicates',
+                                   object_marking_refs=obj_md_refs)
+                    print(self.index(user_id=self.identity['id'],
+                                     body=json.loads(indicates.serialize())))
+            except KeyError:
+                pass
 
-                        for atk_id in atk_ids:
-                            q = {
-                              "query": {
-                                "nested": {
-                                  "path": "external_references",
-                                  "query": {
-                                    "bool": {
-                                      "must": [
-                                        {"match": {"external_references.external_id": atk_id}}
-                                      ]
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                            res = self.real_search(index='attack-pattern', body=q,
-                                                   filter_path=['hits.hits._source.id'])
-                            print(atk_id, res)
-                            if not res:
-                                continue
-                            for atp_id in hits_from_res(res):
-                                indicates = stix2.v21.Relationship(
-                                               created_by_ref=author_id,
-                                               source_ref=ind.id,
-                                               target_ref=atp_id['id'],
-                                               relationship_type='indicates',
-                                               object_marking_refs=obj_md_refs)
-                                print(self.index(user_id=self.identity['id'], body=json.loads(indicates.serialize())))
-                osq_group = stix2.v21.Grouping(
-                           object_refs=group_ids,
-                           context='osquery-pack',
-                           description=desc,
-                           object_marking_refs=obj_md_refs)
-                print(self.index(user_id=self.identity['id'], body=json.loads(osq_group.serialize())))
+            try:
+                queries = data['queries']
+            except KeyError:
+                continue
+
+            for query in queries:
+                ind = stix2.v21.Indicator(
+                              created_by_ref=author_id,
+                              name=query,
+                              pattern=data['queries'][query],
+                              pattern_type='osquery',
+                              valid_from=datetime.now(),
+                              indicator_types=['malicious-activity'],
+                              object_marking_refs=obj_md_refs)
+                print(self.index(user_id=self.identity['id'],
+                                 body=json.loads(ind.serialize())))
+                derived = stix2.v21.Relationship(
+                                   created_by_ref=author_id,
+                                   source_ref=ind.id,
+                                   target_ref=top_ind.id,
+                                   relationship_type='derived-from',
+                                   object_marking_refs=obj_md_refs)
+                print(self.index(user_id=self.identity['id'],
+                                 body=json.loads(derived.serialize())))
+                try:
+                    q_desc = data['description']
+                    ref_atp_ids = self.extract_known_atps(q_desc)
+                    for atp_id in ref_atp_ids:
+                        indicates = stix2.v21.Relationship(
+                                       created_by_ref=author_id,
+                                       source_ref=top_ind.id,
+                                       target_ref=atp_id,
+                                       relationship_type='indicates',
+                                       object_marking_refs=obj_md_refs)
+                        print(self.index(user_id=self.identity['id'],
+                                         body=json.loads(indicates.serialize())))
+                except KeyError:
+                    pass
         return True
 
     def get_yara(self):

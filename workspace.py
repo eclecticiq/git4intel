@@ -78,6 +78,7 @@ def make_sighting(ind_id):
 
     directory = stix2.v21.Directory(path="C:\\Windows\\%")
     file = stix2.v21.File(hashes={'MD5': 'ce60a5c89ea89a8f7acd0103a786f407'},
+                          name='ajbfjeklr.exe',
                           parent_directory_ref=directory.id,
                           atime=atime,
                           ctime=ctime,
@@ -344,9 +345,14 @@ def get_yara(user_id):
 
 def main():
 
-    # print(g4i.store_core_data())
-    # print(g4i.data_primer())
-    # print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
+    # tables = g4i.get_tables('/Users/cobsec/git/osquery/specs')
+
+    # with open('osquery_schema.json', 'w') as outfile:
+    #     json.dump(tables, outfile)
+
+    print(g4i.store_core_data())
+    print(g4i.data_primer())
+    print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
 
     # # Make org 1:
     # org1, users1 = make_org(username1="User1",
@@ -359,16 +365,19 @@ def main():
     # print(g4i.index_objects(user_id=g4i.identity['id'], objects=org1,
     #                         refresh='wait_for'))
 
-    res = make_sighting(ind_id='indicator--a6855f67-9494-4fd6-8384-80c5d1b52b8c')
-    user_id = 'identity--87864f4b-839d-428f-96f9-455b9f00d445',
+    # res = make_sighting(ind_id='indicator--a6855f67-9494-4fd6-8384-80c5d1b52b8c')
+    # print(res)
 
-    print(g4i.index_objects(user_id=user_id, objects=res['objects'],
-                            refresh='wait_for'))
+    # # with open('sighting.json', 'w') as outfile:
+    # #     json.dump(res, outfile)
+
+    # print(g4i.index_objects(user_id=users1[1], objects=res['objects'],
+    #                         refresh='wait_for'))
 
 
     # q = {"query": {"match_all": {}}}
 
-    # intel_res = g4i.search(user_id='identity--87864f4b-839d-428f-96f9-455b9f00d445',
+    # intel_res = g4i.search(user_id='identity--07d648ff-0aeb-4ccd-8aa5-8ac18d27f312',
     #                        index='intel', body=q)
     # # tactic_res = g4i.search(user_id='identity--87864f4b-839d-428f-96f9-455b9f00d445',
     # #                         index='x-mitre-tactic', body=q)
