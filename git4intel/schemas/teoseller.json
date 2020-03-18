@@ -1,0 +1,33 @@
+{
+    "name": "teoseller",
+    "core": {"bool": {"should": [
+        {"bool": {"must": [
+            {"match": {"type": "indicator"}},
+            {"bool": {"should": [
+                {"match": {"pattern-type": "osquery"}},
+                {"match": {"pattern-type": "osquery-pack"}}
+            ]}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "indicates"}},
+            {"match": {"source_ref": "indicator--"}},
+            {"bool": {"should": [
+                {"match": {"target_ref": "attack-pattern--"}},
+                {"match": {"target_ref": "malware--"}},
+                {"match": {"target_ref": "tool--"}}
+            ]}}
+        ]}},
+        {"bool": {"must": [
+            {"match": {"type": "relationship"}},
+            {"match": {"relationship_type": "derived-from"}},
+            {"match": {"source_ref": "indicator--"}},
+            {"match": {"target_ref": "indicator--"}},
+        ]}}
+    ]}},
+    "ext": {"bool": {"should": [
+        {"bool": {"must": [
+            {"match": {"type": "attack-pattern"}}
+        ]}}
+    ]}}
+}
