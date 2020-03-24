@@ -4,8 +4,8 @@
         {"bool": {"must": [
             {"match": {"type": "indicator"}},
             {"bool": {"should": [
-                {"match": {"pattern-type": "osquery"}},
-                {"match": {"pattern-type": "osquery-pack"}}
+                {"match": {"pattern_type": "osquery"}},
+                {"match": {"pattern_type": "osquery-pack"}}
             ]}}
         ]}},
         {"bool": {"must": [
@@ -22,12 +22,10 @@
             {"match": {"type": "relationship"}},
             {"match": {"relationship_type": "derived-from"}},
             {"match": {"source_ref": "indicator--"}},
-            {"match": {"target_ref": "indicator--"}},
+            {"match": {"target_ref": "indicator--"}}
         ]}}
     ]}},
     "ext": {"bool": {"should": [
-        {"bool": {"must": [
-            {"match": {"type": "attack-pattern"}}
-        ]}}
+        {"match": {"type": "attack-pattern"}}
     ]}}
 }

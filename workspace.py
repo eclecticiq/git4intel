@@ -13,6 +13,8 @@ import requests
 import base64
 import re
 
+from polylogyx_apis.api import PolylogyxApi
+
 from html.parser import HTMLParser
 from html.entities import name2codepoint
 
@@ -343,6 +345,95 @@ def get_yara(user_id):
         pprint(res)
 
 
+def capture_nodes(org_id):
+    # Get all nodes that are configured on a plgx server and add them to the
+    #  knowledge base. Return a list of possible tags to select from for
+    #  Rule/Pack deployment.
+
+    # Vanilla plgx server setup...
+    domain = '127.0.0.1'
+    username = 'admin'
+    password = 'admin'
+    plgx = PolylogyxApi(domain=domain, username=username, password=password)
+
+    # Get nodes and create identities for them
+    nodes = plgx.get_nodes()
+
+    all_tags = []
+    pii_dm = g4i.pii_marking['id']
+    for node in nodes['results']['data']:
+        if not node['is_active']:
+            continue
+        all_tags += node['tags']
+        # Create new identity object for node
+        stix_node = stix2.v21.Identity(created_by_ref=org_id,
+                                       id='identity--' + node['node_key'],
+                                       identity_class='system',
+                                       labels=node['tags'],
+                                       name=node['display_name'],
+                                       object_marking_refs=[pii_dm])
+        # Create 'deployed-by' relationship from node to org
+        node_rel = stix2.v21.Relationship(created_by_ref=org_id,
+                                          relationship_type='deployed-by',
+                                          source_ref=stix_node.id,
+                                          target_ref=org_id,
+                                          object_marking_refs=[pii_dm])
+        # Store new objects to knowledge base
+        print(g4i.index(user_id=g4i.identity['id'],
+                        body=json.loads(stix_node.serialize())))
+        print(g4i.index(user_id=g4i.identity['id'],
+                        body=json.loads(node_rel.serialize())))
+
+    # Return the list of all tags to be used in rule deployment
+    return all_tags
+
+
+def deploy_packs(threat_id, tags):
+    # Get data from graph walk down to Indicators:
+    # Note, this uses g4i molecule walk which requires some post-filtering.
+    #  Better to have 1-shot query if possible.
+    res = g4i.get_molecule(
+        user_id=g4i.identity['id'],
+        stix_ids=[threat_id],
+        schema_name="mitre",
+        objs=True,
+        pivot=False)
+    if not res:
+        return False
+
+    # Vanilla plgx server setup...
+    domain = '127.0.0.1'
+    username = 'admin'
+    password = 'admin'
+    plgx = PolylogyxApi(domain=domain, username=username, password=password)
+
+    # Post-filtering and deploy each pack...
+    out = []
+    for hit in hits_from_res(res):
+        if hit['type'] != 'indicator':
+            continue
+        if hit['pattern_type'] != 'osquery-pack':
+            continue
+        # Add tags which is the way to tell plgx server to deploy to nodes
+        #  that also have that tag.
+        new_pack = json.loads(hit['pattern'])
+        new_pack['tags'] = tags
+        new_pack = json.dumps(new_pack)
+
+        headers = {'x-access-token': plgx.AUTH_TOKEN,
+                   'content-type': 'application/json'}
+        url = plgx.base + "/distributed/add"
+        try:
+            response = requests.post(
+                url, json=new_pack, headers=headers,
+                verify=False, timeout=30)
+        except requests.RequestException as e:
+            out.append(dict(error=str(e)))
+        out.append(plgx._return_response_and_status_code(response))
+
+    return out
+
+
 def main():
 
     # tables = g4i.get_tables('/Users/cobsec/git/osquery/specs')
@@ -350,9 +441,68 @@ def main():
     # with open('osquery_schema.json', 'w') as outfile:
     #     json.dump(tables, outfile)
 
-    print(g4i.store_core_data())
-    print(g4i.data_primer())
-    print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
+    # print(g4i.store_core_data())
+    # print(g4i.data_primer())
+    # print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
+
+
+
+
+    # # Make some organisation objects for the users/org:
+    # objects, ids = make_org(username1="User1",
+    #                         username2="User2",
+    #                         orgname="Acme Corps")
+    # # Objects are in objects, org_id is the only id we need...
+    # org_id = ids[0]
+
+    # available_tags = capture_nodes(org_id=org_id)
+
+    # # Pick a tag to deploy new rules to...
+    # deploy_tag = available_tags[0]
+
+    # # Pick a threat to deploy rules for...
+    # pteranodon = 'malware--5f9f7648-04ba-4a9f-bb4c-2a13e74572bd'
+
+    # print(deploy_packs(threat_id=pteranodon, tags=[deploy_tag]))
+
+    r = requests.get('https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json')
+
+    if r.status_code != requests.codes.ok:
+        print('Failed to get Mitre Att&ck data')
+        return False
+
+    out = {}
+    pattern = re.compile(r'TA\d{4}|[T|S|G|M]\d{4}')
+    for obj in r.json()['objects']:
+        if 'external_references' not in obj:
+            continue
+        if 'kill_chain_phases' not in obj:
+            continue
+        for ref in obj['external_references']:
+            if 'external_id' not in ref:
+                continue
+            if pattern.search(ref['external_id']):
+                mitre_id = ref['external_id']
+                break
+        for phase in obj['kill_chain_phases']:
+            if phase['kill_chain_name'] != 'mitre-attack':
+                continue
+            phase_name = phase['phase_name']
+            break
+        try:
+            out[phase_name].append((mitre_id, obj['id']))
+        except KeyError:
+            out[phase_name] = [(mitre_id, obj['id'])]
+    with open('mitre_lookup.json', 'w') as outfile:
+        json.dump(out, outfile)
+
+                
+                # out[ref['external_id']] = [obj['id'], obj['name']]
+    # pprint(out)
+
+
+
+    # print(deploy_packs(pteranodon, ['all']))
 
     # # Make org 1:
     # org1, users1 = make_org(username1="User1",

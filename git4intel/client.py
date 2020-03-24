@@ -327,6 +327,7 @@ class Client(Elasticsearch):
         for schema_name in pkg_resources.contents(schemas):
             if not schema_name[-5:] == '.json':
                 continue
+            print('Loading: ' + schema_name)
             schema = json.loads(pkg_resources.read_text(schemas, schema_name))
             if 'id' in schema:
                 _id = schema['id']
@@ -1426,14 +1427,20 @@ class Client(Elasticsearch):
             :obj:`bool`: ``True`` for success; ``False`` if any store action
             failed. (Brutal, I know.)
         """
-        attack = {}
-        collection = Collection(
-            "https://cti-taxii.mitre.org/stix/collections/"
-            "95ecc380-afe9-11e4-9b6c-751b66dd541e")
-        tc_source = stix2.TAXIICollectionSource(collection)
-        attack = tc_source.query()
+        # attack = {}
+        # collection = Collection(
+        #     "https://cti-taxii.mitre.org/stix/collections/"
+        #     "95ecc380-afe9-11e4-9b6c-751b66dd541e")
+        # tc_source = stix2.TAXIICollectionSource(collection)
+        # attack = tc_source.query()
 
-        for obj in attack:
+        r = requests.get('https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json')
+
+        if r.status_code != requests.codes.ok:
+            print('Failed to get Mitre Att&ck data')
+            return False
+
+        for obj in r.json()['objects']:
             try:
                 doc = json.loads(obj.serialize())
             except AttributeError:
@@ -1515,15 +1522,17 @@ class Client(Elasticsearch):
             :obj:`bool`: ``True`` for success; ``False`` if any store action
             failed. (Brutal, I know.)
         """
+        objs = []
         author_id = get_deterministic_uuid(prefix='identity--',
                                            seed='teoseller')
-        if not self.exists(index='identity', id=author_id[1]):
-            author = stix2.v21.Identity(
-                            id=author_id,
-                            name='Filippo Mottini',
-                            identity_class='individual',
-                            contact_information='https://github.com/teoseller')
-            print(self.index(user_id=self.identity['id'], body=json.loads(author.serialize())))
+        # if not self.exists(index='identity', id=author_id[1]):
+        author = stix2.v21.Identity(
+                        id=author_id,
+                        name='Filippo Mottini',
+                        identity_class='individual',
+                        contact_information='https://github.com/teoseller')
+        # print(self.index(user_id=self.identity['id'], body=json.loads(author.serialize())))
+        objs.append(author)
         obj_md_refs = [
             # Apache 2.0 licence as per github repo
             'marking-definition--17e2aadf-7b8e-41fb-b70d-18b864b89a64',
@@ -1533,18 +1542,20 @@ class Client(Elasticsearch):
         filepaths = dir_recurse(filepath, '.conf')
         for filepath in filepaths:
             with open(filepath, 'r') as f:
-                data = json.loads(f.read())
-
+                fd = f.read()
+                data = json.loads(fd)
+                top_data = json.dumps(data)
             top_ind = stix2.v21.Indicator(
                                   created_by_ref=author_id,
-                                  name=os.path.basename(filepath),
-                                  pattern=data,
+                                  name=os.path.basename(filepath).split('.')[0],
+                                  pattern=top_data,
                                   pattern_type='osquery-pack',
                                   valid_from=datetime.now(),
                                   indicator_types=['malicious-activity'],
                                   object_marking_refs=obj_md_refs)
-            print(self.index(user_id=self.identity['id'],
-                             body=json.loads(top_ind.serialize())))
+            objs.append(top_ind)
+            # print(self.index(user_id=self.identity['id'],
+            #                  body=json.loads(top_ind.serialize())))
             try:
                 desc = data['description']
                 ref_atp_ids = self.extract_known_atps(desc)
@@ -1555,8 +1566,9 @@ class Client(Elasticsearch):
                                    target_ref=atp_id,
                                    relationship_type='indicates',
                                    object_marking_refs=obj_md_refs)
-                    print(self.index(user_id=self.identity['id'],
-                                     body=json.loads(indicates.serialize())))
+                    objs.append(indicates)
+                    # print(self.index(user_id=self.identity['id'],
+                    #                  body=json.loads(indicates.serialize())))
             except KeyError:
                 pass
 
@@ -1569,21 +1581,23 @@ class Client(Elasticsearch):
                 ind = stix2.v21.Indicator(
                               created_by_ref=author_id,
                               name=query,
-                              pattern=data['queries'][query],
+                              pattern=json.dumps(data['queries'][query]),
                               pattern_type='osquery',
                               valid_from=datetime.now(),
                               indicator_types=['malicious-activity'],
                               object_marking_refs=obj_md_refs)
-                print(self.index(user_id=self.identity['id'],
-                                 body=json.loads(ind.serialize())))
+                objs.append(ind)
+                # print(self.index(user_id=self.identity['id'],
+                #                  body=json.loads(ind.serialize())))
                 derived = stix2.v21.Relationship(
                                    created_by_ref=author_id,
                                    source_ref=ind.id,
                                    target_ref=top_ind.id,
                                    relationship_type='derived-from',
                                    object_marking_refs=obj_md_refs)
-                print(self.index(user_id=self.identity['id'],
-                                 body=json.loads(derived.serialize())))
+                objs.append(derived)
+                # print(self.index(user_id=self.identity['id'],
+                #                  body=json.loads(derived.serialize())))
                 try:
                     q_desc = data['description']
                     ref_atp_ids = self.extract_known_atps(q_desc)
@@ -1594,10 +1608,19 @@ class Client(Elasticsearch):
                                        target_ref=atp_id,
                                        relationship_type='indicates',
                                        object_marking_refs=obj_md_refs)
-                        print(self.index(user_id=self.identity['id'],
-                                         body=json.loads(indicates.serialize())))
+                        objs.append(indicates)
+                        # print(self.index(user_id=self.identity['id'],
+                        #                  body=json.loads(indicates.serialize())))
                 except KeyError:
                     pass
+        bundle = json.loads(stix2.v21.Bundle(objects=objs).serialize())
+        # bundle = {"type": "bundle",
+        #           "id": get_deterministic_uuid(prefix='bundle--',
+        #                                        seed='fuck-bundles'),
+        #           "objects": objs}
+        print(json.dumps(bundle))
+        with open('out.json', 'w') as outfile:
+            json.dump(bundle, outfile)
         return True
 
     def get_yara(self):
