@@ -1,5 +1,8 @@
+# Only needed for the CTI get, replace with your own
 import git4intel
 from git4intel.utils import hits_from_res
+
+# For the new plgx endpoints, install the cobsec fork
 from polylogyx_apis.api import PolylogyxApi
 
 import json
