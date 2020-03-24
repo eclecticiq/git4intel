@@ -105,6 +105,19 @@ def main():
 
     print(res)
 
+    try:
+        rule_data = plgx.get_rules()['results']['data']
+    except KeyError:
+        print('Failed to get rule data!')
+        return False
+
+    for rule in rule_data:
+        data = {'rule_id': rule['id']}
+        alert_results = plgx.get_alerts(data=data)
+        if alert_results['results']['status'] != 'success':
+            continue
+        print(len(alert_results['results']['data']))
+
 
 if __name__ == '__main__':
     main()
