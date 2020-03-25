@@ -1541,11 +1541,12 @@ class Client(Elasticsearch):
         ]
         filepaths = dir_recurse(filepath, '.conf')
         for filepath in filepaths:
+            name = os.path.basename(filepath).split('.')[0]
             with open(filepath, 'r') as f:
                 fd = f.read()
                 data = json.loads(fd)
+                data['name'] = name
                 top_data = json.dumps(data)
-            name = os.path.basename(filepath).split('.')[0]
             top_ind = stix2.v21.Indicator(
                                   id=get_deterministic_uuid(
                                         prefix='indicator--',
