@@ -443,7 +443,7 @@ def main():
 
     # print(g4i.store_core_data())
     # print(g4i.data_primer())
-    # print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
+    print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
 
 
 
@@ -464,37 +464,6 @@ def main():
     # pteranodon = 'malware--5f9f7648-04ba-4a9f-bb4c-2a13e74572bd'
 
     # print(deploy_packs(threat_id=pteranodon, tags=[deploy_tag]))
-
-    r = requests.get('https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json')
-
-    if r.status_code != requests.codes.ok:
-        print('Failed to get Mitre Att&ck data')
-        return False
-
-    out = {}
-    pattern = re.compile(r'TA\d{4}|[T|S|G|M]\d{4}')
-    for obj in r.json()['objects']:
-        if 'external_references' not in obj:
-            continue
-        if 'kill_chain_phases' not in obj:
-            continue
-        for ref in obj['external_references']:
-            if 'external_id' not in ref:
-                continue
-            if pattern.search(ref['external_id']):
-                mitre_id = ref['external_id']
-                break
-        for phase in obj['kill_chain_phases']:
-            if phase['kill_chain_name'] != 'mitre-attack':
-                continue
-            phase_name = phase['phase_name']
-            break
-        try:
-            out[phase_name].append((mitre_id, obj['id']))
-        except KeyError:
-            out[phase_name] = [(mitre_id, obj['id'])]
-    with open('mitre_lookup.json', 'w') as outfile:
-        json.dump(out, outfile)
 
                 
                 # out[ref['external_id']] = [obj['id'], obj['name']]

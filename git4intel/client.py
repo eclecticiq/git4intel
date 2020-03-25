@@ -1545,9 +1545,13 @@ class Client(Elasticsearch):
                 fd = f.read()
                 data = json.loads(fd)
                 top_data = json.dumps(data)
+            name = os.path.basename(filepath).split('.')[0]
             top_ind = stix2.v21.Indicator(
+                                  id=get_deterministic_uuid(
+                                        prefix='indicator--',
+                                        seed=name),
                                   created_by_ref=author_id,
-                                  name=os.path.basename(filepath).split('.')[0],
+                                  name=name,
                                   pattern=top_data,
                                   pattern_type='osquery-pack',
                                   valid_from=datetime.now(),
@@ -1579,6 +1583,9 @@ class Client(Elasticsearch):
 
             for query in queries:
                 ind = stix2.v21.Indicator(
+                              id=get_deterministic_uuid(
+                                        prefix='indicator--',
+                                        seed=query),
                               created_by_ref=author_id,
                               name=query,
                               pattern=json.dumps(data['queries'][query]),
@@ -1619,7 +1626,7 @@ class Client(Elasticsearch):
         #                                        seed='fuck-bundles'),
         #           "objects": objs}
         print(json.dumps(bundle))
-        with open('out.json', 'w') as outfile:
+        with open('teoseller.json', 'w') as outfile:
             json.dump(bundle, outfile)
         return True
 
