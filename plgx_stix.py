@@ -113,10 +113,9 @@ def main():
                         source_ref=ind_ref[2],
                         target_ref='identity--' + str(node_key.lower()),
                         relationship_type='deployed-to')
+            # Save your resultant relationships back to your CTI repository
             print(g4i.index(user_id=g4i.identity['id'],
                   body=json.loads(rel.serialize())))
-    # identity--ad50f24a-3ac1-491e-aff4-a76840e123db
-    # identity--ef3e1b35-631a-579e-9ec0-c824a574d2ba
 
     # With that all complete, we are now just waiting for alerts.
     # This endpoint can do that, but of course needs to be scheduled properly.
