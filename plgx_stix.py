@@ -5,6 +5,7 @@ from git4intel.utils import hits_from_res
 # For the new plgx endpoints, install the cobsec fork
 from polylogyx_apis.api import PolylogyxApi
 
+import stix2
 import json
 import random
 import uuid
@@ -96,31 +97,37 @@ def main():
     # And now that the data is all in the right format -
     #  send to the plgx endpoint.
     tags = ['all']
-    alerters = ['email', 'debug']
+    alerters = ['email', 'debug', 'rsyslog']
     res = plgx.deploy_threat_packs(
         packs=packs,
         threat_name=pteranodon,
         tags=tags,
         alerters=alerters)
 
-    print(res)
+    # Create `deployed-to` relationships for each Indicator/Node combo
+    for ind_ref in ind_refs:
+        for node_key in res['nodes']:
+            print(ind_ref[2])
+            print('identity--' + str(node_key.lower()))
+            rel = stix2.v21.Relationship(
+                        source_ref=ind_ref[2],
+                        target_ref='identity--' + str(node_key.lower()),
+                        relationship_type='deployed-to')
+            print(g4i.index(user_id=g4i.identity['id'],
+                  body=json.loads(rel.serialize())))
+    # identity--ad50f24a-3ac1-491e-aff4-a76840e123db
+    # identity--ef3e1b35-631a-579e-9ec0-c824a574d2ba
 
-    # try:
-    #     rule_data = plgx.get_rules()['results']['data']
-    # except KeyError:
-    #     print('Failed to get rule data!')
-    #     return False
+    # With that all complete, we are now just waiting for alerts.
+    # This endpoint can do that, but of course needs to be scheduled properly.
+    try:
+        rule_data = plgx.get_rules()['results']['data']
+    except KeyError:
+        print('Failed to get rule data!')
+        return False
 
-    # for rule in rule_data:
-    #     print(plgx.get_stix_sightings(rule_id=rule['id']))
-
-    # tag_data = plgx.get_tags()
-    # print(tag_data)
-
-    # for tag in tag_data['results']['data']:
-    #     print(tag)
-    #     for node in tag['nodes']:
-    #         print(node.lower())
+    for rule in rule_data:
+        print(plgx.get_stix_sightings(rule_id=rule['id']))
 
 
 if __name__ == '__main__':

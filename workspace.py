@@ -441,8 +441,8 @@ def main():
     # with open('osquery_schema.json', 'w') as outfile:
     #     json.dump(tables, outfile)
 
-    # print(g4i.store_core_data())
-    # print(g4i.data_primer())
+    print(g4i.store_core_data())
+    print(g4i.data_primer())
     print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
 
 
