@@ -1,5 +1,6 @@
 import git4intel
 from git4intel.utils import hits_from_res
+from elasticsearch import helpers
 import stix2
 import json
 from slugify import slugify
@@ -441,11 +442,26 @@ def main():
     # with open('osquery_schema.json', 'w') as outfile:
     #     json.dump(tables, outfile)
 
-    print(g4i.store_core_data())
-    print(g4i.data_primer())
-    print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
+    # print(g4i.store_core_data())
+    # print(g4i.data_primer())
+    # print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
+    # print(g4i.get_sigma('/Users/cobsec/git/sigma/rules'))
 
 
+    stats = {}
+    count = 0
+    q = {"query": {"match_all": {}}}
+    for hit in helpers.scan(client=g4i, index='intel', query=q, user_id=g4i.identity['id']):
+        with open('./cti-data/' + hit['_source']['id'] + '.json', 'w') as outfile:
+            json.dump(hit['_source'], outfile)
+        try:
+            stats[hit['_source']['type']] += 1
+        except KeyError:
+            stats[hit['_source']['type']] = 1
+        count += 1
+
+    print(count)
+    pprint(stats)
 
 
     # # Make some organisation objects for the users/org:

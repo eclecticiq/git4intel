@@ -335,7 +335,21 @@ def get_os_licence(created_by_ref):
             "TLP AMBER or RED."),
         external_references=[OS_EXTREF]
     )
-    bundle = json.loads(stix2.v21.Bundle([OS_LICENSE]).serialize())
+    LGPL3_EXTREF = stix2.v21.ExternalReference(
+        source_name="lgpl-3.0",
+        url="http://www.gnu.org/licenses/lgpl-3.0.html"
+    )
+
+    LGPL3_LICENSE = stix2.v21.MarkingDefinition(
+        id='marking-definition--0a872d70-1d05-45dd-a25f-031af547a102',
+        created='2020-04-01T00:00:00.000Z',
+        created_by_ref=created_by_ref,
+        definition_type='statement',
+        definition=stix2.v21.StatementMarking(
+            statement="Selectable Open Source License."),
+        external_references=[LGPL3_EXTREF]
+    )
+    bundle = json.loads(stix2.v21.Bundle([OS_LICENSE, LGPL3_LICENSE]).serialize())
     return bundle['objects']
 
 

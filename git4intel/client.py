@@ -18,6 +18,7 @@ import time
 import requests
 from datetime import datetime
 import os
+import yaml
 
 try:
     import importlib.resources as pkg_resources
@@ -1489,7 +1490,7 @@ class Client(Elasticsearch):
         return tables
 
     def extract_known_atps(self, s):
-        atk_patt_re = r'TA\d{4}|[T|S|G|M]\d{4}'
+        atk_patt_re = r'TA\d{4}|ta\d{4}|[T|S|G|M|t|s|g|m]\d{4}'
         atk_ids = re.findall(atk_patt_re, s)
         obj_ids = []
         for atk_id in atk_ids:
@@ -1499,15 +1500,13 @@ class Client(Elasticsearch):
                   "path": "external_references",
                   "query": {
                     "bool": {
-                      "must": [
-                        {"match": {"external_references.external_id": atk_id}}
-                      ]
+                      "must": {"match": {"external_references.external_id": atk_id.upper()}}
                     }
                   }
                 }
               }
             }
-            res = self.real_search(index='attack-pattern', body=q,
+            res = self.real_search(index='intel', body=q,
                                    filter_path=['hits.hits._source.id'])
             if not res:
                 continue
@@ -1525,7 +1524,7 @@ class Client(Elasticsearch):
         # objs = []
         author_id = get_deterministic_uuid(prefix='identity--',
                                            seed='teoseller')
-        if not self.exists(index='identity', id=author_id[1]):
+        if not self.exists(index='identity', id=author_id):
             author = stix2.v21.Identity(
                             id=author_id,
                             name='Filippo Mottini',
@@ -1550,7 +1549,7 @@ class Client(Elasticsearch):
             top_ind = stix2.v21.Indicator(
                                   id=get_deterministic_uuid(
                                         prefix='indicator--',
-                                        seed=name),
+                                        seed=name + 'osquery-pack'),
                                   created_by_ref=author_id,
                                   name=name,
                                   pattern=top_data,
@@ -1629,6 +1628,82 @@ class Client(Elasticsearch):
         # print(json.dumps(bundle))
         # with open('teoseller.json', 'w') as outfile:
         #     json.dump(bundle, outfile)
+        return True
+
+    def get_sigma(self, filepath):
+        author_id = get_deterministic_uuid(prefix='identity--',
+                                           seed='Neo23x0')
+        if not self.exists(index='identity', id=author_id):
+            author = stix2.v21.Identity(
+                            id=author_id,
+                            name='Florian Roth',
+                            identity_class='individual',
+                            contact_information='https://github.com/Neo23x0')
+            print(self.index(user_id=self.identity['id'], body=json.loads(author.serialize())))
+            # objs.append(author)
+        obj_md_refs = [
+            # LGPL3 ref to be in line with github license
+            'marking-definition--0a872d70-1d05-45dd-a25f-031af547a102',
+            # Still haven't got this fixed yet... but in this case, not explicitly stated
+            # stix2.v21.common.TLP_GREEN.id
+        ]
+        filepaths = dir_recurse(filepath, '.yml')
+        for filepath in filepaths:
+            with open(filepath, 'r') as f:
+                file_content = f.read()
+            for yml in file_content.split('---'):
+                if not yml:
+                    continue
+                data = yaml.safe_load(yml)
+                try:
+                    tags = data['tags']
+                except KeyError:
+                    continue
+                created = datetime.strptime(data['date'], '%Y/%m/%d').isoformat()
+                try:
+                    modified = datetime.strptime(data['modified'], '%Y/%m/%d').isoformat()
+                    ind = stix2.v21.Indicator(
+                        name=data['title'],
+                        description=data['description'],
+                        created=created,
+                        modified=modified,
+                        valid_from=created,
+                        indicator_types=['malicious-activity'],
+                        pattern_type='sigma',
+                        pattern=yml,
+                        object_marking_refs=obj_md_refs,
+                        created_by_ref=author_id)
+                except KeyError:
+                    ind = stix2.v21.Indicator(
+                        name=data['title'],
+                        description=data['description'],
+                        created=created,
+                        valid_from=created,
+                        indicator_types=['malicious-activity'],
+                        pattern_type='sigma',
+                        pattern=yml,
+                        object_marking_refs=obj_md_refs,
+                        created_by_ref=author_id)
+                rels = []
+                for tag in tags:
+                    atp_ids = self.extract_known_atps(tag)
+                    if atp_ids:
+                        for atp_id in atp_ids:
+                            if atp_id.startswith('course-of-action--'):
+                                continue
+                            rels.append(stix2.v21.Relationship(
+                                    source_ref=ind.id,
+                                    target_ref=atp_id,
+                                    relationship_type='indicates',
+                                    object_marking_refs=obj_md_refs,
+                                    created_by_ref=author_id))
+                if not rels:
+                    continue
+                print(self.index(user_id=self.identity['id'],
+                                 body=json.loads(ind.serialize())))
+                for rel in rels:
+                    print(self.index(user_id=self.identity['id'],
+                                     body=json.loads(rel.serialize())))
         return True
 
     def get_yara(self):
