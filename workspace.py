@@ -13,6 +13,7 @@ import sys
 import requests
 import base64
 import re
+import os
 
 from polylogyx_apis.api import PolylogyxApi
 
@@ -452,8 +453,13 @@ def main():
     count = 0
     q = {"query": {"match_all": {}}}
     for hit in helpers.scan(client=g4i, index='intel', query=q, user_id=g4i.identity['id']):
-        with open('./cti-data/' + hit['_source']['id'] + '.json', 'w') as outfile:
-            json.dump(hit['_source'], outfile)
+        try:
+            with open('./cti-data/' + hit['_source']['type'] + '/' + hit['_source']['id'] + '.json', 'w') as outfile:
+                json.dump(hit['_source'], outfile)
+        except FileNotFoundError:
+            os.mkdir('./cti-data/' + hit['_source']['type'])
+            with open('./cti-data/' + hit['_source']['type'] + '/' + hit['_source']['id'] + '.json', 'w') as outfile:
+                json.dump(hit['_source'], outfile)
         try:
             stats[hit['_source']['type']] += 1
         except KeyError:
