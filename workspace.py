@@ -436,19 +436,7 @@ def deploy_packs(threat_id, tags):
     return out
 
 
-def main():
-
-    # tables = g4i.get_tables('/Users/cobsec/git/osquery/specs')
-
-    # with open('osquery_schema.json', 'w') as outfile:
-    #     json.dump(tables, outfile)
-
-    # print(g4i.store_core_data())
-    # print(g4i.data_primer())
-    # print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
-    # print(g4i.get_sigma('/Users/cobsec/git/sigma/rules'))
-
-
+def data_dump():
     stats = {}
     count = 0
     q = {"query": {"match_all": {}}}
@@ -468,7 +456,22 @@ def main():
 
     print(count)
     pprint(stats)
+    return True
 
+
+def main():
+
+    # tables = g4i.get_tables('/Users/cobsec/git/osquery/specs')
+
+    # with open('osquery_schema.json', 'w') as outfile:
+    #     json.dump(tables, outfile)
+
+    # print(g4i.store_core_data())
+    # print(g4i.data_primer())
+    # print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
+    # print(g4i.get_sigma('/Users/cobsec/git/sigma/rules'))
+
+    print(g4i.data_dump())
 
     # # Make some organisation objects for the users/org:
     # objects, ids = make_org(username1="User1",

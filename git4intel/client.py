@@ -4,7 +4,7 @@ Attributes:
     sdo_indices (:obj:`list` of :obj:`str`): Global list of actively supported
         STIX Domain Objects (SDOs) that each have it's own elasticsearch index.
 """
-from elasticsearch import Elasticsearch, exceptions
+from elasticsearch import Elasticsearch, exceptions, helpers
 import stix2
 from taxii2client import Collection
 import sys
@@ -1704,6 +1704,29 @@ class Client(Elasticsearch):
                 for rel in rels:
                     print(self.index(user_id=self.identity['id'],
                                      body=json.loads(rel.serialize())))
+        return True
+
+    def data_dump(self):
+        stats = {}
+        count = 0
+        q = {"query": {"match_all": {}}}
+        objects = []
+        for hit in helpers.scan(client=self, index='intel', query=q,
+                                user_id=self.identity['id']):
+            objects.append(hit['_source'])
+            try:
+                stats[hit['_source']['type']] += 1
+            except KeyError:
+                stats[hit['_source']['type']] = 1
+            count += 1
+        bundle = {"type": "bundle",
+                  "id": get_deterministic_uuid(prefix='bundle--',
+                                               seed='fuck-bundles'),
+                  "objects": objects}
+        with open('cti-data.json', 'w') as outfile:
+            json.dump(bundle, outfile)
+        print(count)
+        pprint(stats)
         return True
 
     def get_yara(self):
