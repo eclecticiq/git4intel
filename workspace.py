@@ -463,13 +463,15 @@ def jacek_search(s):
     r = r'\S{3,32}--[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}'
 
     ids = re.findall(r, s)
-    q_should = []
+    objects = []
     for _id in ids:
         if _id.split('--')[0] == 'relationship':
             continue
-        q_should.append({"match": {"id": _id.split('--')[1]}})
-    q = {"query": {"bool": {"should": q_should}}}
-    return g4i.real_search(index='intel', body=q)
+        q = {"query": {"bool": {"must": {"match": {"id": _id.split('--')[1]}}}}}
+        res = g4i.real_search(index='intel', body=q, size=1000)
+        for hit in hits_from_res(res):
+            objects.append(hit)
+    return objects
 
 
 def main():
@@ -529,10 +531,10 @@ relationship--66808b05-c20b-44bd-9205-9d815c4b294c: indicator--9caee33c-7dda-490
     res2 = jacek_search(s2)
 
     ids1 = []
-    for hit in hits_from_res(res1):
+    for hit in res1:
         ids1.append(hit['id'])
     ids2 = []
-    for hit in hits_from_res(res2):
+    for hit in res2:
         ids2.append(hit['id'])
 
     already_done = []
@@ -563,18 +565,17 @@ indicator--898ba28c-5079-46b1-8e57-6163fca251ea
 indicator--bbd11da6-48d5-4d5b-a6fa-6ffb0f6dc2f2
 indicator--d2b36ee0-1780-4490-b188-b0ca5c45965a'''
 
-    res = jacek_search(s3)
+    res = jacek_search(s1)
     count = 0
     objects = []
-    for hit in hits_from_res(res):
-        objects.append(hit)
+    for hit in res:
         print(hit)
         count += 1
     print(count)
     bundle = {"type": "bundle",
               "id": get_deterministic_uuid(prefix='bundle--',
                                            seed='fuck-bundles3'),
-              "objects": objects}
+              "objects": res}
     with open('cti-extra2.json', 'w') as outfile:
         json.dump(bundle, outfile)
 
