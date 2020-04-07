@@ -459,6 +459,19 @@ def data_dump():
     return True
 
 
+def jacek_search(s):
+    r = r'\S{3,32}--[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}'
+
+    ids = re.findall(r, s)
+    q_should = []
+    for _id in ids:
+        if _id.split('--')[0] == 'relationship':
+            continue
+        q_should.append({"match": {"id": _id.split('--')[1]}})
+    q = {"query": {"bool": {"should": q_should}}}
+    return g4i.real_search(index='intel', body=q)
+
+
 def main():
 
     # tables = g4i.get_tables('/Users/cobsec/git/osquery/specs')
@@ -473,61 +486,96 @@ def main():
 
     # print(g4i.data_dump())
 
-    q = {
-        "query": {
-            "bool": {
-                "should": [
-                    {"match": {"id": "malware--310f437b-29e7-4844-848c-7220868d074a"}},
-                    {"match": {"id": "malware--b42378e0-f147-496f-992a-26a49705395b"}},
-                    {"match": {"id": "intrusion-set--9559ecaf-2e75-48a7-aee8-9974020bc772"}},
-                    {"match": {"id": "intrusion-set--17862c7d-9e60-48a0-b48e-da4dc4c3f6b0"}},
-                    {"match": {"id": "intrusion-set--68ba94ab-78b8-43e7-83e2-aed3466882c6"}},
-                    {"match": {"id": "intrusion-set--4ca1929c-7d64-4aab-b849-badbfc0c760d"}},
-                    {"match": {"id": "intrusion-set--8a831aaa-f3e0-47a3-bed8-a9ced744dd12"}},
-                    {"match": {"id": "grouping--db41c024-7869-4200-9c4c-4a07b2d09de7"}},
-                    {"match": {"id": "grouping--73a0f925-468b-4cbd-aeef-9c66ceae4067"}},
-                    {"match": {"id": "indicator--1aa6893f-fe4b-419d-aef8-cca9a957cc7f"}},
-                    {"match": {"id": "indicator--a3dd496b-4359-4657-a90b-640cb93b3c64"}},
-                    {"match": {"id": "indicator--837d0fac-507d-41d4-a008-a8164a6483ba"}},
-                    {"match": {"id": "indicator--1aa6893f-fe4b-419d-aef8-cca9a957cc7f"}},
-                    {"match": {"id": "indicator--32aaeec7-912b-4c85-a646-f603a78f5251"}},
-                    {"match": {"id": "indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8"}},
-                    {"match": {"id": "indicator--2618e60e-51c0-4e21-ac9d-6226736028eb"}},
-                    {"match": {"id": "indicator--7c1a44a5-2b9f-41cf-aeb0-ab0d2fc839c7"}},
-                    {"match": {"id": "indicator--ec48a59e-1db5-48f4-ab1c-e80d154283fb"}},
-                    {"match": {"id": "indicator--9caee33c-7dda-4906-abfd-268b18a2a961"}},
-                    {"match": {"id": "indicator--13819ea3-6e34-4aaf-a4e9-d2c9cd7f611e"}},
-                    {"match": {"id": "indicator--d2b36ee0-1780-4490-b188-b0ca5c45965a"}},
-                    {"match": {"id": "indicator--bbd11da6-48d5-4d5b-a6fa-6ffb0f6dc2f2"}},
-                    {"match": {"id": "indicator--2f21d2b9-b1f5-413e-aab6-a194f97a3ff0"}},
-                    {"match": {"id": "indicator--13819ea3-6e34-4aaf-a4e9-d2c9cd7f611e"}},
-                    {"match": {"id": "indicator--13819ea3-6e34-4aaf-a4e9-d2c9cd7f611e"}},
-                    {"match": {"id": "indicator--2b8ef778-c1fe-4dc0-af8a-de2c246ac101"}},
-                    {"match": {"id": "indicator--ba16060a-e5f8-4967-b9c1-cb1430870a3b"}},
-                    {"match": {"id": "indicator--7c1a44a5-2b9f-41cf-aeb0-ab0d2fc839c7"}},
-                    {"match": {"id": "indicator--5562caf3-d474-4644-aabd-66f95d77a3d9"}},
-                    {"match": {"id": "indicator--a581e814-484e-497b-ae0d-7ea040fee56a"}},
-                    {"match": {"id": "indicator--898ba28c-5079-46b1-8e57-6163fca251ea"}},
-                    {"match": {"id": "indicator--75ed9af2-65ad-40ab-a470-8e7a3f026ce0"}},
-                    {"match": {"id": "indicator--6dc428f3-bdf9-43da-adb1-640bc7ab4430"}}
-                ]
-            }
-        }
-    }
+    s1 = '''relationship--87231371-e005-44ab-9b66-1954615f2a7e: malware--310f437b-29e7-4844-848c-7220868d074a revoked-by malware--b42378e0-f147-496f-992a-26a49705395b
+relationship--3680408d-e56e-4d68-a74d-2678093ed53f: intrusion-set--9559ecaf-2e75-48a7-aee8-9974020bc772 revoked-by intrusion-set--17862c7d-9e60-48a0-b48e-da4dc4c3f6b0
+relationship--632ca9a0-a9f3-4b27-96e1-9fcb8bab11cb: intrusion-set--68ba94ab-78b8-43e7-83e2-aed3466882c6 revoked-by intrusion-set--4ca1929c-7d64-4aab-b849-badbfc0c760d
+relationship--53364899-1ea5-47fa-afde-c210aed64120: intrusion-set--8a831aaa-f3e0-47a3-bed8-a9ced744dd12 uses malware--c41a8b7c-3e42-4eee-b87d-ad8a100ee878
+relationship--73ca1e9c-27c8-4feb-8792-6c2cbb3f64f7: grouping--db41c024-7869-4200-9c4c-4a07b2d09de7 derived-from grouping--73a0f925-468b-4cbd-aeef-9c66ceae4067
+relationship--743ab343-e592-410c-bbd8-4bbfe9425a62: indicator--1aa6893f-fe4b-419d-aef8-cca9a957cc7f derived-from indicator--a3dd496b-4359-4657-a90b-640cb93b3c64
+relationship--1305f718-a339-4c0d-ab8e-9a7760fcbd48: indicator--837d0fac-507d-41d4-a008-a8164a6483ba derived-from indicator--1aa6893f-fe4b-419d-aef8-cca9a957cc7f
+relationship--e179b775-7920-4514-b291-d8c3850b4100: indicator--1aa6893f-fe4b-419d-aef8-cca9a957cc7f derived-from indicator--32aaeec7-912b-4c85-a646-f603a78f5251
+relationship--3a49d7a4-88e6-495f-8428-95ee6b7a52b9: indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8 derived-from indicator--2618e60e-51c0-4e21-ac9d-6226736028eb
+relationship--e8664e08-18bc-4427-8783-8195c3e9f41c: indicator--7c1a44a5-2b9f-41cf-aeb0-ab0d2fc839c7 derived-from indicator--ec48a59e-1db5-48f4-ab1c-e80d154283fb
+relationship--b6021aac-a12d-401d-b4ab-2fd2ec0cef18: indicator--9caee33c-7dda-4906-abfd-268b18a2a961 derived-from indicator--ec48a59e-1db5-48f4-ab1c-e80d154283fb
+relationship--05299410-15bb-4985-b0dd-fd55a321439d: indicator--13819ea3-6e34-4aaf-a4e9-d2c9cd7f611e derived-from indicator--ec48a59e-1db5-48f4-ab1c-e80d154283fb
+relationship--29ba3877-ad62-4ccb-8b28-2fc76060464d: indicator--d2b36ee0-1780-4490-b188-b0ca5c45965a derived-from indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8
+relationship--90840469-8b66-47bc-b283-68318623fe71: indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8 derived-from indicator--bbd11da6-48d5-4d5b-a6fa-6ffb0f6dc2f2
+relationship--8c6fdaf6-ca8c-4b20-8e70-19d55f162a3a: indicator--2f21d2b9-b1f5-413e-aab6-a194f97a3ff0 derived-from indicator--13819ea3-6e34-4aaf-a4e9-d2c9cd7f611e
+relationship--134e398e-a782-4a10-a15d-73f7d7b95d8e: indicator--13819ea3-6e34-4aaf-a4e9-d2c9cd7f611e derived-from indicator--2b8ef778-c1fe-4dc0-af8a-de2c246ac101
+relationship--1c4efe1f-6e8a-4eac-92f2-dd72bc686fd9: indicator--ba16060a-e5f8-4967-b9c1-cb1430870a3b derived-from indicator--7c1a44a5-2b9f-41cf-aeb0-ab0d2fc839c7
+relationship--5f9ce4b8-b044-486a-aa23-22c57a3835cd: indicator--7c1a44a5-2b9f-41cf-aeb0-ab0d2fc839c7 derived-from indicator--2b8ef778-c1fe-4dc0-af8a-de2c246ac101
+relationship--f4ad18de-46da-4c0d-8f07-4e65beab70fd: indicator--5562caf3-d474-4644-aabd-66f95d77a3d9 derived-from indicator--a581e814-484e-497b-ae0d-7ea040fee56a
+relationship--1d18940e-200e-4999-84bc-aab80cbd2ad7: indicator--898ba28c-5079-46b1-8e57-6163fca251ea derived-from indicator--5562caf3-d474-4644-aabd-66f95d77a3d9
+relationship--0e48ce21-529e-49e6-989d-7f13cdcef794: indicator--5562caf3-d474-4644-aabd-66f95d77a3d9 derived-from indicator--75ed9af2-65ad-40ab-a470-8e7a3f026ce0
+relationship--5136f806-400c-4497-9548-04479868dbbc: indicator--6dc428f3-bdf9-43da-adb1-640bc7ab4430 derived-from indicator--9caee33c-7dda-4906-abfd-268b18a2a961
+relationship--66808b05-c20b-44bd-9205-9d815c4b294c: indicator--9caee33c-7dda-4906-abfd-268b18a2a961 derived-from indicator--2b8ef778-c1fe-4dc0-af8a-de2c246ac101'''
 
-    res = g4i.real_search(index='intel', body=q)
+    s2 = '''relationship--87231371-e005-44ab-9b66-1954615f2a7e: malware--310f437b-29e7-4844-848c-7220868d074a revoked-by malware--b42378e0-f147-496f-992a-26a49705395b
+relationship--3680408d-e56e-4d68-a74d-2678093ed53f: intrusion-set--9559ecaf-2e75-48a7-aee8-9974020bc772 revoked-by intrusion-set--17862c7d-9e60-48a0-b48e-da4dc4c3f6b0
+relationship--632ca9a0-a9f3-4b27-96e1-9fcb8bab11cb: intrusion-set--68ba94ab-78b8-43e7-83e2-aed3466882c6 revoked-by intrusion-set--4ca1929c-7d64-4aab-b849-badbfc0c760d
+relationship--53364899-1ea5-47fa-afde-c210aed64120: intrusion-set--8a831aaa-f3e0-47a3-bed8-a9ced744dd12 uses malware--c41a8b7c-3e42-4eee-b87d-ad8a100ee878
+relationship--73ca1e9c-27c8-4feb-8792-6c2cbb3f64f7: grouping--db41c024-7869-4200-9c4c-4a07b2d09de7 derived-from grouping--73a0f925-468b-4cbd-aeef-9c66ceae4067
+relationship--3a49d7a4-88e6-495f-8428-95ee6b7a52b9: indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8 derived-from indicator--2618e60e-51c0-4e21-ac9d-6226736028eb
+relationship--b6021aac-a12d-401d-b4ab-2fd2ec0cef18: indicator--9caee33c-7dda-4906-abfd-268b18a2a961 derived-from indicator--ec48a59e-1db5-48f4-ab1c-e80d154283fb
+relationship--29ba3877-ad62-4ccb-8b28-2fc76060464d: indicator--d2b36ee0-1780-4490-b188-b0ca5c45965a derived-from indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8
+relationship--90840469-8b66-47bc-b283-68318623fe71: indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8 derived-from indicator--bbd11da6-48d5-4d5b-a6fa-6ffb0f6dc2f2
+relationship--f4ad18de-46da-4c0d-8f07-4e65beab70fd: indicator--5562caf3-d474-4644-aabd-66f95d77a3d9 derived-from indicator--a581e814-484e-497b-ae0d-7ea040fee56a
+relationship--1d18940e-200e-4999-84bc-aab80cbd2ad7: indicator--898ba28c-5079-46b1-8e57-6163fca251ea derived-from indicator--5562caf3-d474-4644-aabd-66f95d77a3d9
+relationship--0e48ce21-529e-49e6-989d-7f13cdcef794: indicator--5562caf3-d474-4644-aabd-66f95d77a3d9 derived-from indicator--75ed9af2-65ad-40ab-a470-8e7a3f026ce0
+relationship--5136f806-400c-4497-9548-04479868dbbc: indicator--6dc428f3-bdf9-43da-adb1-640bc7ab4430 derived-from indicator--9caee33c-7dda-4906-abfd-268b18a2a961
+relationship--66808b05-c20b-44bd-9205-9d815c4b294c: indicator--9caee33c-7dda-4906-abfd-268b18a2a961 derived-from indicator--2b8ef778-c1fe-4dc0-af8a-de2c246ac101'''
 
+    res1 = jacek_search(s1)
+    res2 = jacek_search(s2)
+
+    ids1 = []
+    for hit in hits_from_res(res1):
+        ids1.append(hit['id'])
+    ids2 = []
+    for hit in hits_from_res(res2):
+        ids2.append(hit['id'])
+
+    already_done = []
+    still_missing = []
+    for _id in ids2:
+        if _id in ids1:
+            already_done.append(_id)
+        else:
+            still_missing.append(_id)
+
+    print('These were already done in the first run:')
+    for _id in already_done:
+        print(_id)
+    print('...and these are the ones that are still missing, so needs more work:')
+    for _id in still_missing:
+        print(_id)
+
+    s3 = '''These were already done in the first run:
+indicator--5562caf3-d474-4644-aabd-66f95d77a3d9
+indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8
+indicator--9caee33c-7dda-4906-abfd-268b18a2a961
+indicator--ec48a59e-1db5-48f4-ab1c-e80d154283fb
+indicator--2b8ef778-c1fe-4dc0-af8a-de2c246ac101
+...and these are the ones that are still missing, so needs more work:
+indicator--a581e814-484e-497b-ae0d-7ea040fee56a
+indicator--75ed9af2-65ad-40ab-a470-8e7a3f026ce0
+indicator--898ba28c-5079-46b1-8e57-6163fca251ea
+indicator--bbd11da6-48d5-4d5b-a6fa-6ffb0f6dc2f2
+indicator--d2b36ee0-1780-4490-b188-b0ca5c45965a'''
+
+    res = jacek_search(s3)
     count = 0
     objects = []
     for hit in hits_from_res(res):
         objects.append(hit)
+        print(hit)
         count += 1
     print(count)
     bundle = {"type": "bundle",
               "id": get_deterministic_uuid(prefix='bundle--',
-                                           seed='fuck-bundles2'),
+                                           seed='fuck-bundles3'),
               "objects": objects}
-    with open('cti-extra.json', 'w') as outfile:
+    with open('cti-extra2.json', 'w') as outfile:
         json.dump(bundle, outfile)
 
     # # Make some organisation objects for the users/org:
