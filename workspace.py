@@ -471,7 +471,64 @@ def main():
     # print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
     # print(g4i.get_sigma('/Users/cobsec/git/sigma/rules'))
 
-    print(g4i.data_dump())
+    # print(g4i.data_dump())
+
+    q = {
+        "query": {
+            "bool": {
+                "should": [
+                    {"match": {"id": "malware--310f437b-29e7-4844-848c-7220868d074a"}},
+                    {"match": {"id": "malware--b42378e0-f147-496f-992a-26a49705395b"}},
+                    {"match": {"id": "intrusion-set--9559ecaf-2e75-48a7-aee8-9974020bc772"}},
+                    {"match": {"id": "intrusion-set--17862c7d-9e60-48a0-b48e-da4dc4c3f6b0"}},
+                    {"match": {"id": "intrusion-set--68ba94ab-78b8-43e7-83e2-aed3466882c6"}},
+                    {"match": {"id": "intrusion-set--4ca1929c-7d64-4aab-b849-badbfc0c760d"}},
+                    {"match": {"id": "intrusion-set--8a831aaa-f3e0-47a3-bed8-a9ced744dd12"}},
+                    {"match": {"id": "grouping--db41c024-7869-4200-9c4c-4a07b2d09de7"}},
+                    {"match": {"id": "grouping--73a0f925-468b-4cbd-aeef-9c66ceae4067"}},
+                    {"match": {"id": "indicator--1aa6893f-fe4b-419d-aef8-cca9a957cc7f"}},
+                    {"match": {"id": "indicator--a3dd496b-4359-4657-a90b-640cb93b3c64"}},
+                    {"match": {"id": "indicator--837d0fac-507d-41d4-a008-a8164a6483ba"}},
+                    {"match": {"id": "indicator--1aa6893f-fe4b-419d-aef8-cca9a957cc7f"}},
+                    {"match": {"id": "indicator--32aaeec7-912b-4c85-a646-f603a78f5251"}},
+                    {"match": {"id": "indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8"}},
+                    {"match": {"id": "indicator--2618e60e-51c0-4e21-ac9d-6226736028eb"}},
+                    {"match": {"id": "indicator--7c1a44a5-2b9f-41cf-aeb0-ab0d2fc839c7"}},
+                    {"match": {"id": "indicator--ec48a59e-1db5-48f4-ab1c-e80d154283fb"}},
+                    {"match": {"id": "indicator--9caee33c-7dda-4906-abfd-268b18a2a961"}},
+                    {"match": {"id": "indicator--13819ea3-6e34-4aaf-a4e9-d2c9cd7f611e"}},
+                    {"match": {"id": "indicator--d2b36ee0-1780-4490-b188-b0ca5c45965a"}},
+                    {"match": {"id": "indicator--bbd11da6-48d5-4d5b-a6fa-6ffb0f6dc2f2"}},
+                    {"match": {"id": "indicator--2f21d2b9-b1f5-413e-aab6-a194f97a3ff0"}},
+                    {"match": {"id": "indicator--13819ea3-6e34-4aaf-a4e9-d2c9cd7f611e"}},
+                    {"match": {"id": "indicator--13819ea3-6e34-4aaf-a4e9-d2c9cd7f611e"}},
+                    {"match": {"id": "indicator--2b8ef778-c1fe-4dc0-af8a-de2c246ac101"}},
+                    {"match": {"id": "indicator--ba16060a-e5f8-4967-b9c1-cb1430870a3b"}},
+                    {"match": {"id": "indicator--7c1a44a5-2b9f-41cf-aeb0-ab0d2fc839c7"}},
+                    {"match": {"id": "indicator--5562caf3-d474-4644-aabd-66f95d77a3d9"}},
+                    {"match": {"id": "indicator--a581e814-484e-497b-ae0d-7ea040fee56a"}},
+                    {"match": {"id": "indicator--898ba28c-5079-46b1-8e57-6163fca251ea"}},
+                    {"match": {"id": "indicator--75ed9af2-65ad-40ab-a470-8e7a3f026ce0"}},
+                    {"match": {"id": "indicator--6dc428f3-bdf9-43da-adb1-640bc7ab4430"}}
+                ]
+            }
+        }
+    }
+
+    res = g4i.real_search(index='intel', body=q)
+
+    count = 0
+    objects = []
+    for hit in hits_from_res(res):
+        objects.append(hit)
+        count += 1
+    print(count)
+    bundle = {"type": "bundle",
+              "id": get_deterministic_uuid(prefix='bundle--',
+                                           seed='fuck-bundles2'),
+              "objects": objects}
+    with open('cti-extra.json', 'w') as outfile:
+        json.dump(bundle, outfile)
 
     # # Make some organisation objects for the users/org:
     # objects, ids = make_org(username1="User1",
