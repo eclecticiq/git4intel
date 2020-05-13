@@ -475,134 +475,12 @@ def jacek_search(s):
 
 
 def main():
-
-    # tables = g4i.get_tables('/Users/cobsec/git/osquery/specs')
-
-    # with open('osquery_schema.json', 'w') as outfile:
-    #     json.dump(tables, outfile)
+    pass
 
     # print(g4i.store_core_data())
     # print(g4i.data_primer())
     # print(g4i.get_osquery('/Users/cobsec/git/osquery-attck'))
     # print(g4i.get_sigma('/Users/cobsec/git/sigma/rules'))
-
-    # print(g4i.data_dump())
-
-    s1 = '''relationship--87231371-e005-44ab-9b66-1954615f2a7e: malware--310f437b-29e7-4844-848c-7220868d074a revoked-by malware--b42378e0-f147-496f-992a-26a49705395b
-relationship--3680408d-e56e-4d68-a74d-2678093ed53f: intrusion-set--9559ecaf-2e75-48a7-aee8-9974020bc772 revoked-by intrusion-set--17862c7d-9e60-48a0-b48e-da4dc4c3f6b0
-relationship--632ca9a0-a9f3-4b27-96e1-9fcb8bab11cb: intrusion-set--68ba94ab-78b8-43e7-83e2-aed3466882c6 revoked-by intrusion-set--4ca1929c-7d64-4aab-b849-badbfc0c760d
-relationship--53364899-1ea5-47fa-afde-c210aed64120: intrusion-set--8a831aaa-f3e0-47a3-bed8-a9ced744dd12 uses malware--c41a8b7c-3e42-4eee-b87d-ad8a100ee878
-relationship--73ca1e9c-27c8-4feb-8792-6c2cbb3f64f7: grouping--db41c024-7869-4200-9c4c-4a07b2d09de7 derived-from grouping--73a0f925-468b-4cbd-aeef-9c66ceae4067
-relationship--743ab343-e592-410c-bbd8-4bbfe9425a62: indicator--1aa6893f-fe4b-419d-aef8-cca9a957cc7f derived-from indicator--a3dd496b-4359-4657-a90b-640cb93b3c64
-relationship--1305f718-a339-4c0d-ab8e-9a7760fcbd48: indicator--837d0fac-507d-41d4-a008-a8164a6483ba derived-from indicator--1aa6893f-fe4b-419d-aef8-cca9a957cc7f
-relationship--e179b775-7920-4514-b291-d8c3850b4100: indicator--1aa6893f-fe4b-419d-aef8-cca9a957cc7f derived-from indicator--32aaeec7-912b-4c85-a646-f603a78f5251
-relationship--3a49d7a4-88e6-495f-8428-95ee6b7a52b9: indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8 derived-from indicator--2618e60e-51c0-4e21-ac9d-6226736028eb
-relationship--e8664e08-18bc-4427-8783-8195c3e9f41c: indicator--7c1a44a5-2b9f-41cf-aeb0-ab0d2fc839c7 derived-from indicator--ec48a59e-1db5-48f4-ab1c-e80d154283fb
-relationship--b6021aac-a12d-401d-b4ab-2fd2ec0cef18: indicator--9caee33c-7dda-4906-abfd-268b18a2a961 derived-from indicator--ec48a59e-1db5-48f4-ab1c-e80d154283fb
-relationship--05299410-15bb-4985-b0dd-fd55a321439d: indicator--13819ea3-6e34-4aaf-a4e9-d2c9cd7f611e derived-from indicator--ec48a59e-1db5-48f4-ab1c-e80d154283fb
-relationship--29ba3877-ad62-4ccb-8b28-2fc76060464d: indicator--d2b36ee0-1780-4490-b188-b0ca5c45965a derived-from indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8
-relationship--90840469-8b66-47bc-b283-68318623fe71: indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8 derived-from indicator--bbd11da6-48d5-4d5b-a6fa-6ffb0f6dc2f2
-relationship--8c6fdaf6-ca8c-4b20-8e70-19d55f162a3a: indicator--2f21d2b9-b1f5-413e-aab6-a194f97a3ff0 derived-from indicator--13819ea3-6e34-4aaf-a4e9-d2c9cd7f611e
-relationship--134e398e-a782-4a10-a15d-73f7d7b95d8e: indicator--13819ea3-6e34-4aaf-a4e9-d2c9cd7f611e derived-from indicator--2b8ef778-c1fe-4dc0-af8a-de2c246ac101
-relationship--1c4efe1f-6e8a-4eac-92f2-dd72bc686fd9: indicator--ba16060a-e5f8-4967-b9c1-cb1430870a3b derived-from indicator--7c1a44a5-2b9f-41cf-aeb0-ab0d2fc839c7
-relationship--5f9ce4b8-b044-486a-aa23-22c57a3835cd: indicator--7c1a44a5-2b9f-41cf-aeb0-ab0d2fc839c7 derived-from indicator--2b8ef778-c1fe-4dc0-af8a-de2c246ac101
-relationship--f4ad18de-46da-4c0d-8f07-4e65beab70fd: indicator--5562caf3-d474-4644-aabd-66f95d77a3d9 derived-from indicator--a581e814-484e-497b-ae0d-7ea040fee56a
-relationship--1d18940e-200e-4999-84bc-aab80cbd2ad7: indicator--898ba28c-5079-46b1-8e57-6163fca251ea derived-from indicator--5562caf3-d474-4644-aabd-66f95d77a3d9
-relationship--0e48ce21-529e-49e6-989d-7f13cdcef794: indicator--5562caf3-d474-4644-aabd-66f95d77a3d9 derived-from indicator--75ed9af2-65ad-40ab-a470-8e7a3f026ce0
-relationship--5136f806-400c-4497-9548-04479868dbbc: indicator--6dc428f3-bdf9-43da-adb1-640bc7ab4430 derived-from indicator--9caee33c-7dda-4906-abfd-268b18a2a961
-relationship--66808b05-c20b-44bd-9205-9d815c4b294c: indicator--9caee33c-7dda-4906-abfd-268b18a2a961 derived-from indicator--2b8ef778-c1fe-4dc0-af8a-de2c246ac101'''
-
-    s2 = '''relationship--87231371-e005-44ab-9b66-1954615f2a7e: malware--310f437b-29e7-4844-848c-7220868d074a revoked-by malware--b42378e0-f147-496f-992a-26a49705395b
-relationship--3680408d-e56e-4d68-a74d-2678093ed53f: intrusion-set--9559ecaf-2e75-48a7-aee8-9974020bc772 revoked-by intrusion-set--17862c7d-9e60-48a0-b48e-da4dc4c3f6b0
-relationship--632ca9a0-a9f3-4b27-96e1-9fcb8bab11cb: intrusion-set--68ba94ab-78b8-43e7-83e2-aed3466882c6 revoked-by intrusion-set--4ca1929c-7d64-4aab-b849-badbfc0c760d
-relationship--53364899-1ea5-47fa-afde-c210aed64120: intrusion-set--8a831aaa-f3e0-47a3-bed8-a9ced744dd12 uses malware--c41a8b7c-3e42-4eee-b87d-ad8a100ee878
-relationship--73ca1e9c-27c8-4feb-8792-6c2cbb3f64f7: grouping--db41c024-7869-4200-9c4c-4a07b2d09de7 derived-from grouping--73a0f925-468b-4cbd-aeef-9c66ceae4067
-relationship--3a49d7a4-88e6-495f-8428-95ee6b7a52b9: indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8 derived-from indicator--2618e60e-51c0-4e21-ac9d-6226736028eb
-relationship--b6021aac-a12d-401d-b4ab-2fd2ec0cef18: indicator--9caee33c-7dda-4906-abfd-268b18a2a961 derived-from indicator--ec48a59e-1db5-48f4-ab1c-e80d154283fb
-relationship--29ba3877-ad62-4ccb-8b28-2fc76060464d: indicator--d2b36ee0-1780-4490-b188-b0ca5c45965a derived-from indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8
-relationship--90840469-8b66-47bc-b283-68318623fe71: indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8 derived-from indicator--bbd11da6-48d5-4d5b-a6fa-6ffb0f6dc2f2
-relationship--f4ad18de-46da-4c0d-8f07-4e65beab70fd: indicator--5562caf3-d474-4644-aabd-66f95d77a3d9 derived-from indicator--a581e814-484e-497b-ae0d-7ea040fee56a
-relationship--1d18940e-200e-4999-84bc-aab80cbd2ad7: indicator--898ba28c-5079-46b1-8e57-6163fca251ea derived-from indicator--5562caf3-d474-4644-aabd-66f95d77a3d9
-relationship--0e48ce21-529e-49e6-989d-7f13cdcef794: indicator--5562caf3-d474-4644-aabd-66f95d77a3d9 derived-from indicator--75ed9af2-65ad-40ab-a470-8e7a3f026ce0
-relationship--5136f806-400c-4497-9548-04479868dbbc: indicator--6dc428f3-bdf9-43da-adb1-640bc7ab4430 derived-from indicator--9caee33c-7dda-4906-abfd-268b18a2a961
-relationship--66808b05-c20b-44bd-9205-9d815c4b294c: indicator--9caee33c-7dda-4906-abfd-268b18a2a961 derived-from indicator--2b8ef778-c1fe-4dc0-af8a-de2c246ac101'''
-
-    res1 = jacek_search(s1)
-    res2 = jacek_search(s2)
-
-    ids1 = []
-    for hit in res1:
-        ids1.append(hit['id'])
-    ids2 = []
-    for hit in res2:
-        ids2.append(hit['id'])
-
-    already_done = []
-    still_missing = []
-    for _id in ids2:
-        if _id in ids1:
-            already_done.append(_id)
-        else:
-            still_missing.append(_id)
-
-    print('These were already done in the first run:')
-    for _id in already_done:
-        print(_id)
-    print('...and these are the ones that are still missing, so needs more work:')
-    for _id in still_missing:
-        print(_id)
-
-    s3 = '''These were already done in the first run:
-indicator--5562caf3-d474-4644-aabd-66f95d77a3d9
-indicator--8c96cc34-c8b0-45ea-afbc-10d33101c0e8
-indicator--9caee33c-7dda-4906-abfd-268b18a2a961
-indicator--ec48a59e-1db5-48f4-ab1c-e80d154283fb
-indicator--2b8ef778-c1fe-4dc0-af8a-de2c246ac101
-...and these are the ones that are still missing, so needs more work:
-indicator--a581e814-484e-497b-ae0d-7ea040fee56a
-indicator--75ed9af2-65ad-40ab-a470-8e7a3f026ce0
-indicator--898ba28c-5079-46b1-8e57-6163fca251ea
-indicator--bbd11da6-48d5-4d5b-a6fa-6ffb0f6dc2f2
-indicator--d2b36ee0-1780-4490-b188-b0ca5c45965a'''
-
-    res = jacek_search(s1)
-    count = 0
-    objects = []
-    for hit in res:
-        print(hit)
-        count += 1
-    print(count)
-    bundle = {"type": "bundle",
-              "id": get_deterministic_uuid(prefix='bundle--',
-                                           seed='fuck-bundles3'),
-              "objects": res}
-    with open('cti-extra2.json', 'w') as outfile:
-        json.dump(bundle, outfile)
-
-    # # Make some organisation objects for the users/org:
-    # objects, ids = make_org(username1="User1",
-    #                         username2="User2",
-    #                         orgname="Acme Corps")
-    # # Objects are in objects, org_id is the only id we need...
-    # org_id = ids[0]
-
-    # available_tags = capture_nodes(org_id=org_id)
-
-    # # Pick a tag to deploy new rules to...
-    # deploy_tag = available_tags[0]
-
-    # # Pick a threat to deploy rules for...
-    # pteranodon = 'malware--5f9f7648-04ba-4a9f-bb4c-2a13e74572bd'
-
-    # print(deploy_packs(threat_id=pteranodon, tags=[deploy_tag]))
-
-                
-                # out[ref['external_id']] = [obj['id'], obj['name']]
-    # pprint(out)
-
-
-
-    # print(deploy_packs(pteranodon, ['all']))
 
     # # Make org 1:
     # org1, users1 = make_org(username1="User1",
@@ -614,131 +492,6 @@ indicator--d2b36ee0-1780-4490-b188-b0ca5c45965a'''
 
     # print(g4i.index_objects(user_id=g4i.identity['id'], objects=org1,
     #                         refresh='wait_for'))
-
-    # res = make_sighting(ind_id='indicator--a6855f67-9494-4fd6-8384-80c5d1b52b8c')
-    # print(res)
-
-    # # with open('sighting.json', 'w') as outfile:
-    # #     json.dump(res, outfile)
-
-    # print(g4i.index_objects(user_id=users1[1], objects=res['objects'],
-    #                         refresh='wait_for'))
-
-
-    # q = {"query": {"match_all": {}}}
-
-    # intel_res = g4i.search(user_id='identity--07d648ff-0aeb-4ccd-8aa5-8ac18d27f312',
-    #                        index='intel', body=q)
-    # # tactic_res = g4i.search(user_id='identity--87864f4b-839d-428f-96f9-455b9f00d445',
-    # #                         index='x-mitre-tactic', body=q)
-    # # matrix_res = g4i.search(user_id='identity--87864f4b-839d-428f-96f9-455b9f00d445',
-    # #                         index='x-mitre-matrix', body=q)
-
-    # out = []
-    # for obj in hits_from_res(intel_res):
-    #     out.append(obj)
-
-    # bundle = {"type": "bundle",
-    #           "id": get_deterministic_uuid(prefix='bundle--',
-    #                                        seed='fuck-bundles'),
-    #           "objects": out}
-    # with open('out.json', 'w') as outfile:
-    #     json.dump(bundle, outfile)
-
-
-
-
-
-
-    # ind = stix2.v21.Indicator(created_by_ref='identity--ce5be1f3-92b4-4a92-a42a-706bf061e2c7',
-    #                           )
-
-    # rel = stix2.v21.Relationship(created_by_ref='identity--ce5be1f3-92b4-4a92-a42a-706bf061e2c7',
-    #                              target_ref='observed-data--ecbf04c1-97eb-44cc-b690-d7e1303b4558',
-    #                              source_ref=ind.id)
-
-    # user_id = 'identity--ce5be1f3-92b4-4a92-a42a-706bf061e2c7'
-
-    # # obs = stix2.v21.URL(value='www.badthing.com',
-    # #                     id='url--f2b7580e-487f-4b23-a0f8-7bdef90be36f')
-
-    # # print(g4i.get(index='url', id='f2b7580e-487f-4b23-a0f8-7bdef90be36f'))
-
-    # res = g4i.get_events(user_id=user_id)
-    # pprint(res)
-
-    # print(obs)
-    # print(g4i.index(user_id=user_id, body=obs))
-
-    # res = g4i.get(index='stix-perc',
-    #               id='percolator--741d4b93-54be-4b4f-a329-9d128bef25d9')
-
-    # pprint(res)
-
-    # res = g4i.get_free_text(user_id=g4i.identity['id'], phrase='Secret')
-    # pprint(res)
-
-    # assertion = {
-    #     "id": get_deterministic_uuid(prefix='assertion--'),
-    #     "type": "assertion",
-    #     "in_object_refs": ["relationship--41414141-4141-4141-4141-414141414141"],
-    #     "out_object_refs": ["relationship--42424242-4242-4242-4242-424242424242"]
-    # }
-    # print(json.dumps(assertion))
-
-    # mitre_atp_id = "attack-pattern--4b74a1d4-b0e9-4ef1-93f1-14ecc6e2f5b5"
-
-    # print(g4i.get_phase_count(user_id=g4i.identity['id'],
-    #                           mitre_atp_id=mitre_atp_id))
-
-    # iset = "malware--5f9f7648-04ba-4a9f-bb4c-2a13e74572bd"
-
-    # res = g4i.get_molecule(user_id=g4i.identity['id'],
-    #                        stix_ids=[iset],
-    #                        schema_name="capabilities",
-    #                        objs=True)
-
-    # pprint(res)
-    # bundle = {"type": "bundle",
-    #           "id": get_deterministic_uuid(prefix='bundle--',
-    #                                        seed='fuck-bundles'),
-    #           "objects": res}
-    # with open('gamaredon.json', 'w') as outfile:
-    #     json.dump(bundle, outfile)
-
-    # get_yara(user_id=g4i.identity['id'])
-
-    # mitre_atp = "tool--aafea02e-ece5-4bb2-91a6-3bf8c7f38a39"
-
-    # res = g4i.get_molecule(user_id=g4i.identity['id'],
-    #                        stix_ids=[mitre_atp],
-    #                        schema_name='mitre',
-    #                        objs=True)
-
-    # # pprint(res)
-    # bundle = {"type": "bundle",
-    #           "id": get_deterministic_uuid(prefix='bundle--',
-    #                                        seed='fuck-bundles'),
-    #           "objects": res}
-    # with open('mitre.json', 'w') as outfile:
-    #     json.dump(bundle, outfile)
-
-    # os_group = "grouping--5de44717-4f2a-42b9-9bdf-a1ea101f7d6e"
-    # res = g4i.get_object(user_id=g4i.identity['id'],
-    #                      obj_id=os_group)
-    # pprint(res)
-
-    # stix_id = "attack-pattern--2f8d3c0c-084f-4202-b988-5d756faf6185"
-
-    # res = g4i.get_molecule(user_id=g4i.identity['id'],
-    #                        stix_ids=[stix_id],
-    #                        schema_name='phase',
-    #                        pivot=True)
-    # pprint(res)
-
-    # atp_id = "attack-pattern--6aac77c4-eaf2-4366-8c13-ce50ab951f38"
-    # iset_id = "intrusion-set--06a11b7e-2a36-47fe-8d3e-82c265df3258"
-    # org_id = "identity--5b29a274-d021-4a38-b819-6263a3e9286d"
 
     # # Do some targeting analysis...
     # cam, cam_id = make_targeting(user_id=g4i.identity['id'],
@@ -873,7 +626,7 @@ indicator--d2b36ee0-1780-4490-b188-b0ca5c45965a'''
 
     # bundle = {"type": "bundle",
     #           "id": get_deterministic_uuid(prefix='bundle--',
-    #                                        seed='fuck-bundles'),
+    #                                        seed='fudge-bundles'),
     #           "objects": objects}
     # with open('mitre-big.json', 'w') as outfile:
     #     json.dump(bundle, outfile)
@@ -935,7 +688,7 @@ indicator--d2b36ee0-1780-4490-b188-b0ca5c45965a'''
     # objects = org1 + green_inc1 + green_inc2 + org2 + red_inc1 + cam + actor
     # # bundle = {"type": "bundle",
     # #           "id": get_deterministic_uuid(prefix='bundle--',
-    # #                                        seed='fuck-bundles'),
+    # #                                        seed='fudge-bundles'),
     # #           "objects": objects}
     # # with open('data.json', 'w') as outfile:
     # #     json.dump(bundle, outfile)
