@@ -24,6 +24,3 @@ g4i.store_core_data()
 g4i.data_primer()
 g4i.get_osquery('/Users/cobsec/git/osquery-attck')
 g4i.get_sigma('/Users/cobsec/git/sigma/rules')```
-
-Functions include:
-* `store()` which takes a stix2 bundle and uses elasticsearch `index()` to push documents in to elasticsearch, applying necessary git4intel fields and 
